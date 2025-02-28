@@ -1,0 +1,43 @@
+name: basic-checks
+
+## Trigger the workflow on push or pull request on the `main` branch
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+## Cancel running checks in progress for the same branch
+concurrency:
+  group: ci-${{ github.ref }}-1
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # https://github.com/marketplace/actions/checkout
+        with:
+          # repository: ${{ github.repository }}
+          # ref: ${{ github.ref }}
+          ## fetch the whole history in PRs for checking conventional commits
+          fetch-depth: ${{ github.event_name != 'pull_request' && 1 || 0 }} # this will finally be parsed to 0 when it's a pull request, and 1 when its a branch
+      
+      ### Setup
+      - name: Setup python
+        uses: actions/setup-python@v4.6.0
+        with:
+          python-version: '>=3.11'
+
+      - name: Setup gitlint
+        run: |
+          pip install gitlint
+          git branch
+
+      ### Checks
+      - name: Run gitlint
+        run: |
+          echo "==> 📖 Check conventional commits: https://www.conventionalcommits.org/en/v1.0.0"
+          gitlint --commit HEAD
