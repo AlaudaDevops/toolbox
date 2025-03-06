@@ -17,14 +17,12 @@ package fscopy_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy"
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy/fake"
 	"github.com/google/go-cmp/cmp"
 )
-
-// var _ os.FileInfo = &os.File{}
 
 // Base test for ListFiles without using filters and not handling errors
 func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
@@ -33,11 +31,11 @@ func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 
 	table := map[string]struct {
 		Path          string
-		ExpectedFiles []os.FileInfo
+		ExpectedFiles []fscopy.FileInfo
 	}{
 		"basic dual folder case with ignore": {
 			"testdata/basic_dual_folder_case_with_ignore",
-			[]os.FileInfo{
+			[]fscopy.FileInfo{
 				// testdata/basic_dual_folder_case_with_ignore
 				// 	├── .syncignore
 				// 	├── file1.txt
@@ -48,19 +46,29 @@ func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 				//		├── file5.next (ignored)
 				// 		└── file6.txt
 				// os.NewFile()
+				&fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/.syncignore", FileName: ".syncignore"},
+				&fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/file1.txt", FileName: "file1.txt"},
+				&fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/file2.txt", FileName: "file2.txt"},
+				//&fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/file3.txt", FileName: "file3.txt"},
+				&fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/subfolder/file4.txt", FileName: "file4.txt"},
+				// &fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/subfolder/file5.next", FileName: "file5.next"},
+				&fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/subfolder/file6.txt", FileName: "file6.txt"},
 			},
 		},
 	}
-
 	for testName, row := range table {
 		t.Run(testName, func(t *testing.T) {
 			results, err := s.ListFiles(ctx, row.Path)
 			if err != nil {
 				t.Error(err)
 			}
-			if diff := cmp.Diff(row.ExpectedFiles, results); diff != "" {
+			if diff := cmp.Diff(row.ExpectedFiles, results, cmp.Comparer(comparePaths)); diff != "" {
 				t.Error(diff)
 			}
 		})
 	}
+}
+
+func comparePaths(x, y fscopy.FileInfo) bool {
+	return x.GetPath() == y.GetPath()
 }

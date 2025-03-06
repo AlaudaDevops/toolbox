@@ -35,3 +35,11 @@ type FileInfo interface {
 	fs.FileInfo
 	GetPath() string
 }
+
+// fileInfoImp private implementation of the FileInfo interface
+type fileInfoImp struct {
+	fs.FileInfo
+	path string
+}
+
+func (f fileInfoImp) GetPath() string { return f.path }

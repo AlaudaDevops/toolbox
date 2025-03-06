@@ -32,24 +32,27 @@ type IgnoreNode struct {
 
 var _ FileFilter = &IgnoreNode{}
 
-func (n *IgnoreNode) IsFileAllowed(ctx context.Context, path string) (bool, error) {
-	matchers := n.listMatchers(path)
-	for key, matcher := range matchers {
-		trimmedPath := strings.TrimPrefix(path, key)
-		if matcher.Match(trimmedPath, false) {
+// IsFileAllowed implements the FileFilter interface returning true if the file is allowed
+// and false if it should be ignored
+func (n *IgnoreNode) IsFileAllowed(ctx context.Context, file FileInfo) (bool, error) {
+	matchers := n.ListMatchers(file.GetPath())
+	for _, matcher := range matchers {
+		if matcher.Match(file.GetPath(), false) {
 			return false, nil
 		}
 	}
 	return true, nil
 }
 
-func (n *IgnoreNode) listMatchers(path string) (result map[string]goignore.IgnoreMatcher) {
+// ListMatchers returns a map of matchers for the given path
+// matching the path and all its ancestors
+func (n *IgnoreNode) ListMatchers(path string) (result map[string]goignore.IgnoreMatcher) {
 	if !strings.HasPrefix(path, n.path) {
 		return
 	}
 	result = map[string]goignore.IgnoreMatcher{n.path: n.matcher}
 	for _, child := range n.children {
-		if childResult := child.listMatchers(path); len(childResult) > 0 {
+		if childResult := child.ListMatchers(path); len(childResult) > 0 {
 			for childKey, matcher := range childResult {
 				result[childKey] = matcher
 			}
@@ -58,12 +61,15 @@ func (n *IgnoreNode) listMatchers(path string) (result map[string]goignore.Ignor
 	return
 }
 
-func (n *IgnoreNode) addChild(path string, matcher goignore.IgnoreMatcher) bool {
+// AddChild tries to add the child to an existing child
+// verifying if it should be added down the tree
+// otherwise will add to its own children
+func (n *IgnoreNode) AddChild(path string, matcher goignore.IgnoreMatcher) bool {
 	if !strings.HasPrefix(path, n.path) {
 		return false
 	}
 	for _, child := range n.children {
-		if child.addChild(path, matcher) {
+		if child.AddChild(path, matcher) {
 			return true
 		}
 	}
