@@ -17,8 +17,11 @@ package fscopy_test
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"testing"
 
+	ifs "github.com/AlaudaDevops/toolbox/syncfiles/pkg/fs"
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy"
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy/fake"
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
@@ -34,11 +37,11 @@ func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 
 	table := map[string]struct {
 		Path          string
-		ExpectedFiles []fscopy.FileInfo
+		ExpectedFiles []ifs.FileInfo
 	}{
 		"basic dual folder case with ignore": {
 			"testdata/basic_dual_folder_case_with_ignore",
-			[]fscopy.FileInfo{
+			[]ifs.FileInfo{
 				// testdata/basic_dual_folder_case_with_ignore
 				// 	├── .syncignore
 				// 	├── file1.txt
@@ -77,6 +80,38 @@ func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 	}
 }
 
-func comparePaths(x, y fscopy.FileInfo) bool {
+func comparePaths(x, y ifs.FileInfo) bool {
 	return x.GetPath() == y.GetPath()
+}
+
+func TestFileSystemSelector_ListFilesNotExistingFolder(t *testing.T) {
+	ctx := context.Background()
+	log := logger.NewLoggerFromContext(ctx, logger.LogLeveler{Level: "debug"})
+	ctx = logger.WithLogger(ctx, log)
+	s := &fscopy.FileSystemSelector{}
+
+	_, err := s.ListFiles(ctx, "testdata/non_existing_dir")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+}
+
+func TestFileSystemSelector_ListFilesFilterWalkAndCheckError(t *testing.T) {
+	ctx := context.Background()
+	log := logger.NewLoggerFromContext(ctx, logger.LogLeveler{Level: "debug"})
+	ctx = logger.WithLogger(ctx, log)
+	s := &fscopy.FileSystemSelector{}
+
+	fakeFileFilter := &fake.FakeFileFilter{Err: errors.New("error filtering file"), FunWalkDir: func(ctx context.Context, path string, d fs.DirEntry, err error) error {
+		return errors.New("error walking path")
+	}}
+
+	allowedFiles, err := s.ListFiles(ctx, "testdata/basic_dual_folder_case_with_ignore", fakeFileFilter)
+
+	if err != nil {
+		t.Error("walking does not return error in filters")
+	}
+	if len(allowedFiles) != 0 {
+		t.Error("should not return any files")
+	}
 }

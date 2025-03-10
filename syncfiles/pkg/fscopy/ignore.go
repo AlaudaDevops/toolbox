@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	ifs "github.com/AlaudaDevops/toolbox/syncfiles/pkg/fs"
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	goignore "github.com/monochromegane/go-gitignore"
 )
@@ -39,7 +40,7 @@ var _ FileFilter = &IgnoreNode{}
 
 // IsFileAllowed implements the FileFilter interface returning true if the file is allowed
 // and false if it should be ignored
-func (n *IgnoreNode) IsFileAllowed(ctx context.Context, file FileInfo) (bool, error) {
+func (n *IgnoreNode) IsFileAllowed(ctx context.Context, file ifs.FileInfo) (bool, error) {
 	matchers := n.ListMatchers(file.GetPath())
 	for _, matcher := range matchers {
 		if matcher.Match(file.GetPath(), false) {

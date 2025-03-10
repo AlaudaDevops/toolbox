@@ -18,27 +18,24 @@ package fscopy
 import (
 	"context"
 	"io/fs"
+
+	ifs "github.com/AlaudaDevops/toolbox/syncfiles/pkg/fs"
 )
 
 // FileSelector selects files from a given path respecting .syncignore files rules
 // in the given path or in its subfolders returning a list of allowed files
 type FileSelector interface {
-	ListFiles(ctx context.Context, path string, filters ...FileFilter) ([]FileInfo, error)
+	ListFiles(ctx context.Context, path string, filters ...FileFilter) ([]ifs.FileInfo, error)
 }
 
 // FileFilter checks if a files is allowed to be copied
 type FileFilter interface {
-	IsFileAllowed(ctx context.Context, info FileInfo) (bool, error)
+	IsFileAllowed(ctx context.Context, info ifs.FileInfo) (bool, error)
 }
 
 // FileTreeOperator operator to walk a file tree and do its own processing
 type FileTreeOperator interface {
 	WalkDirFunc(ctx context.Context, path string, d fs.DirEntry, err error) error
-}
-
-type FileInfo interface {
-	fs.FileInfo
-	GetPath() string
 }
 
 // fileInfoImp private implementation of the FileInfo interface

@@ -20,6 +20,8 @@ import (
 	"io/fs"
 	"path/filepath"
 
+	ifs "github.com/AlaudaDevops/toolbox/syncfiles/pkg/fs"
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	goignore "github.com/monochromegane/go-gitignore"
 )
 
@@ -30,13 +32,16 @@ type FileSystemSelector struct {
 var _ FileSelector = &FileSystemSelector{}
 
 // ListFiles implements the FileSelector interface
-func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters ...FileFilter) ([]FileInfo, error) {
-
-	matchedFiles := make([]FileInfo, 0, 10)
+func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters ...FileFilter) ([]ifs.FileInfo, error) {
+	log := logger.GetLogger(ctx)
+	log.Debug("listing files in path ", path)
+	matchedFiles := make([]ifs.FileInfo, 0, 10)
 	// root never matches (accepts everything)
 	// waits specific .syncignore files to check
-	root := &IgnoreNode{path: path, matcher: goignore.DummyIgnoreMatcher(false), matcherConstructorFunc: goignore.NewGitIgnore}
-	filters = append(filters, root)
+	if len(filters) == 0 {
+		root := &IgnoreNode{path: path, matcher: goignore.DummyIgnoreMatcher(false), matcherConstructorFunc: goignore.NewGitIgnore}
+		filters = append(filters, root)
+	}
 	walkErr := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			// not possible to read file, skipping
@@ -45,7 +50,8 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 		info, err := d.Info()
 		if err != nil {
 			// not possible to read file, skipping
-			return err
+			log.Warn("error reading file ", path, " error: ", err)
+			return nil
 		}
 		fileInfo := fileInfoImp{path: path, FileInfo: info}
 
@@ -53,8 +59,7 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 		for _, filter := range filters {
 			if walker, ok := filter.(FileTreeOperator); ok {
 				if err := walker.WalkDirFunc(ctx, path, d, err); err != nil {
-					// logger
-					return err
+					log.Debug("error walking path ", path, " error: ", err)
 				}
 			}
 			// directories are not filtered by filters
@@ -63,8 +68,8 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 			}
 			fileAllowed, err := filter.IsFileAllowed(ctx, fileInfo)
 			if err != nil {
-				// logger
-				return err
+				log.Warn("error check if file is allowed in path ", path, " error: ", err)
+				continue
 			}
 			if fileAllowed {
 				allowed = true
