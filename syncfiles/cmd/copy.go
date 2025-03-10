@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -32,6 +33,9 @@ func NewCopyCommand(ctx context.Context) *cobra.Command {
 		Short: "Copy files from multiple sources to a target based on a configuration file",
 		Long:  copyLongDescription,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			log := logger.GetLogger(ctx)
+			log.Debug("Copy command called")
+			log.Info("This is an info log")
 			return fmt.Errorf("implement me")
 		},
 	}

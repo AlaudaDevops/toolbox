@@ -31,6 +31,11 @@ type FileFilter interface {
 	IsFileAllowed(ctx context.Context, info FileInfo) (bool, error)
 }
 
+// FileTreeOperator operator to walk a file tree and do its own processing
+type FileTreeOperator interface {
+	WalkDirFunc(ctx context.Context, path string, d fs.DirEntry, err error) error
+}
+
 type FileInfo interface {
 	fs.FileInfo
 	GetPath() string

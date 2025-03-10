@@ -17,17 +17,22 @@ package fscopy
 
 import (
 	"context"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	goignore "github.com/monochromegane/go-gitignore"
 )
 
 // IgnoreNode represents a node in a ignore file filter, and can be used directly
 // to check if a given path is ignored
 type IgnoreNode struct {
-	path     string
-	matcher  goignore.IgnoreMatcher
-	children map[string]*IgnoreNode
+	path                   string
+	matcher                goignore.IgnoreMatcher
+	children               map[string]*IgnoreNode
+	matcherConstructorFunc func(string, string) (goignore.IgnoreMatcher, error)
 }
 
 var _ FileFilter = &IgnoreNode{}
@@ -42,6 +47,37 @@ func (n *IgnoreNode) IsFileAllowed(ctx context.Context, file FileInfo) (bool, er
 		}
 	}
 	return true, nil
+}
+
+var _ FileTreeOperator = &IgnoreNode{}
+
+// WalkDirFunc implements the FileTreeOperator interface
+func (n *IgnoreNode) WalkDirFunc(ctx context.Context, path string, d fs.DirEntry, err error) error {
+	log := logger.GetLogger(ctx)
+	log.Debug("walking", "path", path)
+	if d.IsDir() {
+		// lookup .syncignore file first then
+		// we can start filtering files in one go
+		syncIgnorePath := filepath.Join(path, ".syncignore")
+		syncignore, err := os.Lstat(syncIgnorePath)
+		if err != nil && os.IsNotExist(err) {
+			// .syncignore file does not exist
+			log.Debug(".syncignore file not found in dir", path)
+			return nil
+		}
+		if syncignore != nil {
+			// .syncignore file exists
+			// load its content and add it to the tree
+			matcher, err := n.matcherConstructorFunc(syncIgnorePath, path)
+			if err != nil {
+				// ignore error
+				log.Warn("error loading .syncignore file in", "path", path, "error", err)
+				return nil
+			}
+			n.AddChild(path, matcher)
+		}
+	}
+	return nil
 }
 
 // ListMatchers returns a map of matchers for the given path

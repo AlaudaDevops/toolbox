@@ -17,10 +17,15 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/AlaudaDevops/toolbox/syncfiles/cmd"
 )
 
 func main() {
-	cmd.NewRootCommand(context.Background(), "").Execute()
+	if err := cmd.NewRootCommand(context.Background(), "").Execute(); err != nil {
+		fmt.Println("err?", err)
+		os.Exit(1)
+	}
 }

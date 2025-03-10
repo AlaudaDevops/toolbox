@@ -60,8 +60,6 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 			}
 			return nil
 		}
-		// fs.Dir
-		// dirPath := filepath.Dir(path)
 		info, err := d.Info()
 		if err != nil {
 			// not possible to read file, skipping

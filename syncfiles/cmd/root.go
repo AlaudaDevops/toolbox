@@ -18,6 +18,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -26,13 +27,21 @@ func NewRootCommand(ctx context.Context, name string) *cobra.Command {
 	if name == "" {
 		name = "syncfiles"
 	}
+	// ogLevel used in logger
+	logLevel := &logger.LogLeveler{}
+	// initializing the logger
+	log := logger.NewLoggerFromContext(ctx, logLevel)
+	ctx = logger.WithLogger(ctx, log)
 	cmd := &cobra.Command{
 		Use:   name,
 		Short: "Sync files command based on a configuration file",
 		Long:  rootLongDescription,
+		PostRunE: func(cmd *cobra.Command, args []string) error {
+			return log.Sync()
+		},
 	}
 	// global flags
-	// N/A
+	cmd.PersistentFlags().StringVarP(&logLevel.Level, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, panic, fatal). Defaults to info")
 
 	// Add subcommands
 	cmd.AddCommand(NewCopyCommand(ctx))
