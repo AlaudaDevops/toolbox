@@ -38,6 +38,14 @@ type FileTreeOperator interface {
 	WalkDirFunc(ctx context.Context, path string, d fs.DirEntry, err error) error
 }
 
+// FileCopier copies files from a given path to a destination
+// base is the original base path
+// dst is the destination path
+// files is the list of files to copy
+type FileCopier interface {
+	Copy(ctx context.Context, base, dst string, files ...ifs.FileInfo) error
+}
+
 // fileInfoImp private implementation of the FileInfo interface
 type fileInfoImp struct {
 	fs.FileInfo
@@ -45,3 +53,8 @@ type fileInfoImp struct {
 }
 
 func (f fileInfoImp) GetPath() string { return f.path }
+
+type LinkRequest struct {
+	Source      string
+	Destination string
+}
