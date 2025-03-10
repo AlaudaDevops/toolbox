@@ -18,7 +18,6 @@ package fscopy
 import (
 	"context"
 	"io/fs"
-	"os"
 	"path/filepath"
 
 	goignore "github.com/monochromegane/go-gitignore"
@@ -36,29 +35,12 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 	matchedFiles := make([]FileInfo, 0, 10)
 	// root never matches (accepts everything)
 	// waits specific .syncignore files to check
-	root := &IgnoreNode{path: path, matcher: goignore.DummyIgnoreMatcher(false)}
+	root := &IgnoreNode{path: path, matcher: goignore.DummyIgnoreMatcher(false), matcherConstructorFunc: goignore.NewGitIgnore}
+	filters = append(filters, root)
 	walkErr := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() {
-			// lookup .syncignore file first then
-			// we can start filtering files in one go
-			syncIgnorePath := filepath.Join(path, ".syncignore")
-			syncignore, err := os.Lstat(syncIgnorePath)
-			if err != nil && os.IsNotExist(err) {
-				// .syncignore file does not exist
-				return nil
-			}
-			if syncignore != nil {
-				// .syncignore file exists
-				// load its content and add it to the tree
-				matcher, err := goignore.NewGitIgnore(syncIgnorePath, path)
-				if err != nil {
-					// ignore error
-					// TODO: Add logging
-					return nil
-				}
-				root.AddChild(path, matcher)
-			}
-			return nil
+		if err != nil {
+			// not possible to read file, skipping
+			return err
 		}
 		info, err := d.Info()
 		if err != nil {
@@ -67,11 +49,26 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 		}
 		fileInfo := fileInfoImp{path: path, FileInfo: info}
 
-		// because the files are ordered in WalkDir, and we already loaded the syncignore files
-		// here we can already start comparing the existing files
-		allowed, err := root.IsFileAllowed(ctx, fileInfo)
-		if err != nil {
-			return err
+		allowed := false
+		for _, filter := range filters {
+			if walker, ok := filter.(FileTreeOperator); ok {
+				if err := walker.WalkDirFunc(ctx, path, d, err); err != nil {
+					// logger
+					return err
+				}
+			}
+			// directories are not filtered by filters
+			if allowed || d.IsDir() {
+				continue
+			}
+			fileAllowed, err := filter.IsFileAllowed(ctx, fileInfo)
+			if err != nil {
+				// logger
+				return err
+			}
+			if fileAllowed {
+				allowed = true
+			}
 		}
 		if allowed {
 			matchedFiles = append(matchedFiles, fileInfo)

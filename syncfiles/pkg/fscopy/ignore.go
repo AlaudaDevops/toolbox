@@ -32,7 +32,7 @@ type IgnoreNode struct {
 	path                   string
 	matcher                goignore.IgnoreMatcher
 	children               map[string]*IgnoreNode
-	matcherConstructorFunc func(string, string) (goignore.IgnoreMatcher, error)
+	matcherConstructorFunc func(string, ...string) (goignore.IgnoreMatcher, error)
 }
 
 var _ FileFilter = &IgnoreNode{}
@@ -54,7 +54,7 @@ var _ FileTreeOperator = &IgnoreNode{}
 // WalkDirFunc implements the FileTreeOperator interface
 func (n *IgnoreNode) WalkDirFunc(ctx context.Context, path string, d fs.DirEntry, err error) error {
 	log := logger.GetLogger(ctx)
-	log.Debug("walking", "path", path)
+	log.Debug("walking path ", path)
 	if d.IsDir() {
 		// lookup .syncignore file first then
 		// we can start filtering files in one go

@@ -21,12 +21,15 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy"
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy/fake"
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	"github.com/google/go-cmp/cmp"
 )
 
 // Base test for ListFiles without using filters and not handling errors
 func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 	ctx := context.Background()
+	log := logger.NewLoggerFromContext(ctx, logger.LogLeveler{Level: "debug"})
+	ctx = logger.WithLogger(ctx, log)
 	s := &fscopy.FileSystemSelector{}
 
 	table := map[string]struct {
