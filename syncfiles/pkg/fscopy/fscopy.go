@@ -82,8 +82,9 @@ func (s *FileSystemCopier) CopyFile(ctx context.Context, base, destination strin
 
 const upperDir = ".."
 
-// LinkCopier implements the FileCopier interface
-func (s *FileSystemCopier) Link(ctx context.Context, base, destination string, links ...LinkRequest) error {
+// Link will create symlinks based on the base and destination folders given the list links
+// it will ignore if the destination folder was already created and the link already exists
+func (s *FileSystemCopier) Link(ctx context.Context, base, destination string, links ...ifs.LinkRequest) error {
 	log := logger.GetLogger(ctx)
 	log.Debug("linking files from ", base, " to ", destination)
 
@@ -104,9 +105,9 @@ func (s *FileSystemCopier) Link(ctx context.Context, base, destination string, l
 		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil && os.IsExist(err) {
 			log.Warn("error creating parent folder for ", targetPath, " err: ", err)
 		}
-		log.Debug("linking file ", sourcePath, " to ", targetPath)
+		log.Debug("linking file ", filepath.Join(base, link.Source), " to ", targetPath)
 		err := os.Symlink(sourcePath, targetPath)
-		if err != nil {
+		if err != nil && !os.IsExist(err) {
 			log.Error("error linking file from ", sourcePath, " to ", targetPath, " err: ", err)
 			return err
 		}

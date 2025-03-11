@@ -44,7 +44,7 @@ type FileTreeOperator interface {
 // files is the list of files to copy
 type FileCopier interface {
 	Copy(ctx context.Context, base, dst string, files ...ifs.FileInfo) error
-	Link(ctx context.Context, base, dst string, links ...LinkRequest) error
+	Link(ctx context.Context, base, dst string, links ...ifs.LinkRequest) error
 }
 
 // fileInfoImp private implementation of the FileInfo interface
@@ -54,8 +54,3 @@ type fileInfoImp struct {
 }
 
 func (f fileInfoImp) GetPath() string { return f.path }
-
-type LinkRequest struct {
-	Source      string
-	Destination string
-}

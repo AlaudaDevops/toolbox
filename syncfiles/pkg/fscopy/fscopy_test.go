@@ -77,7 +77,7 @@ func TestFileSystemCopier_Link(t *testing.T) {
 	ctx, _ := testLoggerContext()
 	fsCopier := &fscopy.FileSystemCopier{}
 
-	links := []fscopy.LinkRequest{
+	links := []ifs.LinkRequest{
 		{Source: "file1.txt", Destination: "pub/file1.txt"},
 		{Source: "subfolder/file4.txt", Destination: "pub/subfolder/file4.txt"},
 		{Source: "subfolder/thirdlevel", Destination: "pub/subfolder/thirdlevel"},

@@ -1,0 +1,14 @@
+sources:
+- name: testdata-source
+
+  dir: # 目录信息 跟repository二选一
+    path: cmd/testdata/source-folder
+
+target:
+  copyTo: cmd/testdata/copied-files
+  linkTo: cmd/testdata/link-files
+  links:
+  - from: subfolder/thirdlevel
+    target: subfolder/thirdlevel/<name>
+  - from: subfolder/file4.txt
+    target: subfolder/<name>/file4.txt
