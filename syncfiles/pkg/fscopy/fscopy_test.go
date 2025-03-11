@@ -73,6 +73,7 @@ func TestFileSystemCopier_Copy(t *testing.T) {
 }
 
 func TestFileSystemCopier_Link(t *testing.T) {
+	os.RemoveAll("testdata/linked_test")
 	ctx, _ := testLoggerContext()
 	fsCopier := &fscopy.FileSystemCopier{}
 
@@ -82,17 +83,22 @@ func TestFileSystemCopier_Link(t *testing.T) {
 		{Source: "subfolder/thirdlevel", Destination: "pub/subfolder/thirdlevel"},
 	}
 
-	if err := os.MkdirAll("testdata/dest_basic_dual_folder_case_with_ignore/pub", 0755); err != nil {
+	if err := os.MkdirAll("testdata/linked_test/pub", 0755); err != nil {
 		t.Error("error creating directory ", err)
 	}
-	// defer os.RemoveAll("testdata/dest_basic_dual_folder_case_with_ignore")
+	defer func() {
+		// leave for debugging purposes
+		if !t.Failed() {
+			os.RemoveAll("testdata/linked_test")
+		}
+	}()
 
-	if err := fsCopier.Link(ctx, "testdata/basic_dual_folder_case_with_ignore", "testdata/dest_basic_dual_folder_case_with_ignore", links...); err != nil {
+	if err := fsCopier.Link(ctx, "testdata/basic_dual_folder_case_with_ignore", "testdata/linked_test", links...); err != nil {
 		t.Error("error linking files ", err)
 	}
 	for _, link := range links {
-		if _, err := os.Lstat("testdata/dest_basic_dual_folder_case_with_ignore/" + link.Destination); err != nil {
-			t.Error("error verifying linked file ", "testdata/dest_basic_dual_folder_case_with_ignore/"+link.Destination, " err: ", err)
+		if _, err := os.Lstat("testdata/linked_test/" + link.Destination); err != nil {
+			t.Error("error verifying linked file ", "testdata/linked_test/"+link.Destination, " err: ", err)
 		}
 	}
 }

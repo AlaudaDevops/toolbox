@@ -80,17 +80,34 @@ func (s *FileSystemCopier) CopyFile(ctx context.Context, base, destination strin
 	return os.Chmod(desiredFilePath, file.Mode())
 }
 
+const upperDir = ".."
+
 // LinkCopier implements the FileCopier interface
 func (s *FileSystemCopier) Link(ctx context.Context, base, destination string, links ...LinkRequest) error {
 	log := logger.GetLogger(ctx)
 	log.Debug("linking files from ", base, " to ", destination)
+
 	for _, link := range links {
 		targetPath := filepath.Join(destination, link.Destination)
-		sourcePath := filepath.Join(base, link.Source)
+
+		// split target to calculate how many levels there are
+		// to navigate upper levels
+		targetSplit := strings.Split(targetPath, "/")
+		upperList := make([]string, len(targetSplit)-1)
+		for i := range len(targetSplit) - 1 {
+			upperList[i] = upperDir
+		}
+		// join upperList with destination
+		sourcePath := filepath.Join(append(upperList, base, link.Source)...)
+
+		// creating base dir for target
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil && os.IsExist(err) {
+			log.Warn("error creating parent folder for ", targetPath, " err: ", err)
+		}
 		log.Debug("linking file ", sourcePath, " to ", targetPath)
 		err := os.Symlink(sourcePath, targetPath)
 		if err != nil {
-			// log
+			log.Error("error linking file from ", sourcePath, " to ", targetPath, " err: ", err)
 			return err
 		}
 	}
