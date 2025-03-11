@@ -1,0 +1,18 @@
+sources:
+- name: source-1
+
+  dir: # 目录信息 跟repository二选一
+    path: ../source-folder
+
+target:
+  copyTo: imported-docs
+  linkTo: docs
+  links:
+  - from: public/<name>
+    target: public/<name>
+  - from: shared/crds 
+    target: shared/crds/<name>
+  - from: zh/apis/kubernetes_apis
+    target: zh/apis/kubernetes_apis/<name>
+  - from: zh
+    target: zh/<name>

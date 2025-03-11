@@ -18,9 +18,10 @@ package fscopy
 import (
 	"context"
 	"io/fs"
-	"os"
 	"path/filepath"
 
+	ifs "github.com/AlaudaDevops/toolbox/syncfiles/pkg/fs"
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	goignore "github.com/monochromegane/go-gitignore"
 )
 
@@ -31,49 +32,48 @@ type FileSystemSelector struct {
 var _ FileSelector = &FileSystemSelector{}
 
 // ListFiles implements the FileSelector interface
-func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters ...FileFilter) ([]FileInfo, error) {
-
-	matchedFiles := make([]FileInfo, 0, 10)
+func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters ...FileFilter) ([]ifs.FileInfo, error) {
+	log := logger.GetLogger(ctx)
+	log.Debug("listing files in path ", path)
+	matchedFiles := make([]ifs.FileInfo, 0, 10)
 	// root never matches (accepts everything)
 	// waits specific .syncignore files to check
-	root := &IgnoreNode{path: path, matcher: goignore.DummyIgnoreMatcher(false)}
+	if len(filters) == 0 {
+		root := &IgnoreNode{path: path, matcher: goignore.DummyIgnoreMatcher(false), matcherConstructorFunc: goignore.NewGitIgnore}
+		filters = append(filters, root)
+	}
 	walkErr := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() {
-			// lookup .syncignore file first then
-			// we can start filtering files in one go
-			syncIgnorePath := filepath.Join(path, ".syncignore")
-			syncignore, err := os.Lstat(syncIgnorePath)
-			if err != nil && os.IsNotExist(err) {
-				// .syncignore file does not exist
-				return nil
-			}
-			if syncignore != nil {
-				// .syncignore file exists
-				// load its content and add it to the tree
-				matcher, err := goignore.NewGitIgnore(syncIgnorePath, path)
-				if err != nil {
-					// ignore error
-					// TODO: Add logging
-					return nil
-				}
-				root.AddChild(path, matcher)
-			}
-			return nil
-		}
-		// fs.Dir
-		// dirPath := filepath.Dir(path)
-		info, err := d.Info()
 		if err != nil {
 			// not possible to read file, skipping
 			return err
 		}
+		info, err := d.Info()
+		if err != nil {
+			// not possible to read file, skipping
+			log.Warn("error reading file ", path, " error: ", err)
+			return nil
+		}
 		fileInfo := fileInfoImp{path: path, FileInfo: info}
 
-		// because the files are ordered in WalkDir, and we already loaded the syncignore files
-		// here we can already start comparing the existing files
-		allowed, err := root.IsFileAllowed(ctx, fileInfo)
-		if err != nil {
-			return err
+		allowed := false
+		for _, filter := range filters {
+			if walker, ok := filter.(FileTreeOperator); ok {
+				if err := walker.WalkDirFunc(ctx, path, d, err); err != nil {
+					log.Debug("error walking path ", path, " error: ", err)
+				}
+			}
+			// directories are not filtered by filters
+			if allowed || d.IsDir() {
+				continue
+			}
+			fileAllowed, err := filter.IsFileAllowed(ctx, fileInfo)
+			if err != nil {
+				log.Warn("error check if file is allowed in path ", path, " error: ", err)
+				continue
+			}
+			if fileAllowed {
+				allowed = true
+			}
 		}
 		if allowed {
 			matchedFiles = append(matchedFiles, fileInfo)

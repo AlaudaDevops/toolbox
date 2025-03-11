@@ -17,10 +17,15 @@ package fscopy
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 
+	"io/fs"
+
 	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/fscopy/fake"
+	"github.com/AlaudaDevops/toolbox/syncfiles/pkg/logger"
 	"github.com/google/go-cmp/cmp"
 	goignore "github.com/monochromegane/go-gitignore"
 )
@@ -191,4 +196,91 @@ func TestIgnoreFileFilter_IsFileAllowedWithTestdata(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIgnore_WalkDirFunc(t *testing.T) {
+	ctx := context.Background()
+	log := logger.NewLoggerFromContext(ctx, logger.LogLeveler{Level: "debug"})
+	ctx = logger.WithLogger(ctx, log)
+	root := &IgnoreNode{
+		path:     "testdata/basic_dual_folder_case_with_ignore",
+		children: map[string]*IgnoreNode{},
+		matcherConstructorFunc: func(string, ...string) (goignore.IgnoreMatcher, error) {
+			return goignore.DummyIgnoreMatcher(true), nil
+		},
+	}
+
+	// folder
+	entry := getDirEntry(t, "testdata/basic_dual_folder_case_with_ignore")
+	err := root.WalkDirFunc(ctx, "testdata/basic_dual_folder_case_with_ignore", entry, nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if len(root.children) != 1 {
+		t.Errorf("Expected 1 child node, got %d", len(root.children))
+	}
+	child := root.children["testdata/basic_dual_folder_case_with_ignore"]
+	if child == nil {
+		t.Error("Expected child node, got nil")
+	}
+	if child.path != "testdata/basic_dual_folder_case_with_ignore" || child.matcher == nil || child.matcher != goignore.DummyIgnoreMatcher(true) {
+		t.Errorf("Expected child path %s, got %s or matcher %v, got %v", "testdata/basic_dual_folder_case_with_ignore", child.path, goignore.DummyIgnoreMatcher(true), child.matcher)
+	}
+}
+
+func TestIgnore_WalkDirFunc_NoSyncIgnore(t *testing.T) {
+	ctx := context.Background()
+	log := logger.NewLoggerFromContext(ctx, logger.LogLeveler{Level: "debug"})
+	ctx = logger.WithLogger(ctx, log)
+	root := &IgnoreNode{
+		path:     "testdata/basic_dual_folder_case_with_ignore",
+		children: map[string]*IgnoreNode{},
+		matcherConstructorFunc: func(string, ...string) (goignore.IgnoreMatcher, error) {
+			return goignore.DummyIgnoreMatcher(true), nil
+		},
+	}
+
+	// this folder does not have .syncignore file, should not add any child
+	entry := getDirEntry(t, "testdata/basic_dual_folder_case_with_ignore/subfolder")
+	err := root.WalkDirFunc(ctx, "testdata/basic_dual_folder_case_with_ignore/subfolder", entry, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	// no child should be added
+	if len(root.children) != 0 {
+		t.Errorf("Expected 0 child node, got %d", len(root.children))
+	}
+}
+
+func TestIgnore_WalkDirFunc_ConstructMatcherError(t *testing.T) {
+	ctx := context.Background()
+	log := logger.NewLoggerFromContext(ctx, logger.LogLeveler{Level: "debug"})
+	ctx = logger.WithLogger(ctx, log)
+	root := &IgnoreNode{
+		path:     "testdata/basic_dual_folder_case_with_ignore",
+		children: map[string]*IgnoreNode{},
+		matcherConstructorFunc: func(string, ...string) (goignore.IgnoreMatcher, error) {
+			return nil, fmt.Errorf("constructor error")
+		},
+	}
+
+	// folder
+	entry := getDirEntry(t, "testdata/basic_dual_folder_case_with_ignore")
+	err := root.WalkDirFunc(ctx, "testdata/basic_dual_folder_case_with_ignore", entry, nil)
+	if err != nil {
+		t.Error(err)
+	}
+	// no child should be added
+	if len(root.children) != 0 {
+		t.Errorf("Expected 0 child node, got %d", len(root.children))
+	}
+}
+
+func getDirEntry(t *testing.T, dir string) fs.DirEntry {
+	info, err := os.Lstat(dir)
+	if err != nil {
+		t.Error(err)
+	}
+	return fs.FileInfoToDirEntry(info)
 }

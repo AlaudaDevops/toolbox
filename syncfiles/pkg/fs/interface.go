@@ -12,20 +12,20 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-
-package main
+// Package fs provides file system utilities
+package fs
 
 import (
-	"context"
-	"fmt"
-	"os"
-
-	"github.com/AlaudaDevops/toolbox/syncfiles/cmd"
+	"io/fs"
 )
 
-func main() {
-	if err := cmd.NewRootCommand(context.Background(), "").Execute(); err != nil {
-		fmt.Println("err?", err)
-		os.Exit(1)
-	}
+// FileInfo extends fs.FileInfo with a path string
+type FileInfo interface {
+	fs.FileInfo
+	GetPath() string
+}
+
+type LinkRequest struct {
+	Source      string
+	Destination string
 }

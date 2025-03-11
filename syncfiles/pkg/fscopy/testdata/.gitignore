@@ -1,0 +1,3 @@
+# make sure the test folder is not added to git
+dest_basic_dual_folder_case_with_ignore
+linked_test
