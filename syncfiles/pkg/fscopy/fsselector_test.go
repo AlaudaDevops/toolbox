@@ -72,6 +72,17 @@ func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 				// &fake.FakeFileInfo{Path: "testdata/basic_dual_folder_case_with_ignore/subfolder/thirdlevel/my.txt", FileName: "my.txt"},
 			},
 		},
+		"selector with linked folder": {
+			"testdata/linked_folder",
+			[]ifs.FileInfo{
+				// linked_folder
+				// ├── abc
+				// │   └── target.md
+				// └── xyz -> ../abc
+				&fake.FakeFileInfo{Path: "testdata/linked_folder/abc/target.md", FileName: "target.md"},
+				&fake.FakeFileInfo{Path: "testdata/linked_folder/xyz/target.md", FileName: "target.md"},
+			},
+		},
 	}
 	for testName, row := range table {
 		t.Run(testName, func(t *testing.T) {

@@ -55,6 +55,8 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 		}
 		fileInfo := fileInfoImp{path: path, FileInfo: info}
 
+		log.Debug("file info: ", fileInfo, " dirInfo: ", d)
+
 		allowed := false
 		for _, filter := range filters {
 			if walker, ok := filter.(FileTreeOperator); ok {
