@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -179,6 +180,7 @@ func TestIgnoreFileFilter_IsFileAllowedWithTestdata(t *testing.T) {
 		"testdata/basic_dual_folder_case_with_ignore/file1.txt":            true,
 		"testdata/basic_dual_folder_case_with_ignore/file2.txt":            true,
 		"testdata/basic_dual_folder_case_with_ignore/file3.txt":            false,
+		"testdata/basic_dual_folder_case_with_ignore/subfolder":            false, // folders are ignored
 		"testdata/basic_dual_folder_case_with_ignore/subfolder/file4.txt":  true,
 		"testdata/basic_dual_folder_case_with_ignore/subfolder/file5.next": false,
 		"testdata/basic_dual_folder_case_with_ignore/subfolder/file6.txt":  true,
@@ -187,7 +189,7 @@ func TestIgnoreFileFilter_IsFileAllowedWithTestdata(t *testing.T) {
 	for path, expected := range table {
 		t.Run(path, func(t *testing.T) {
 			pathSplit := strings.SplitN(path, "/", -1)
-			ok, err := f.IsFileAllowed(context.Background(), &fake.FakeFileInfo{Path: path, FileName: pathSplit[len(pathSplit)-1]})
+			ok, err := f.IsFileAllowed(context.Background(), &fake.FakeFileInfo{Path: path, FileName: pathSplit[len(pathSplit)-1], FileIsDir: filepath.Ext(path) == ""})
 			if err != nil {
 				t.Error(err)
 			}

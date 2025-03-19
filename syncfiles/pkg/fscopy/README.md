@@ -3,7 +3,6 @@
 
 Parts:
 
-- clean folder 
 - select files
 - copy files
 - link files

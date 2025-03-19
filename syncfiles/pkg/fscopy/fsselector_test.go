@@ -78,7 +78,7 @@ func TestFileSystemSelector_ListFilesWithoutFilters(t *testing.T) {
 				// linked_folder
 				// ├── abc
 				// │   └── target.md
-				// └── xyz -> ../abc
+				// └── xyz -> abc
 				&fake.FakeFileInfo{Path: "testdata/linked_folder/abc/target.md", FileName: "target.md"},
 				&fake.FakeFileInfo{Path: "testdata/linked_folder/xyz/target.md", FileName: "target.md"},
 			},

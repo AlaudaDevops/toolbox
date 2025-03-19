@@ -41,6 +41,10 @@ var _ FileFilter = &IgnoreNode{}
 // IsFileAllowed implements the FileFilter interface returning true if the file is allowed
 // and false if it should be ignored
 func (n *IgnoreNode) IsFileAllowed(ctx context.Context, file ifs.FileInfo) (bool, error) {
+	// folders are ignored, the focus is on files
+	if file.IsDir() || file.Mode().Type()&fs.ModeSymlink != 0 {
+		return false, nil
+	}
 	matchers := n.ListMatchers(file.GetPath())
 	for _, matcher := range matchers {
 		if matcher.Match(file.GetPath(), false) {
