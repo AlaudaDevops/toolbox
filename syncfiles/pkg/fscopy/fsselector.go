@@ -18,6 +18,7 @@ package fscopy
 import (
 	"context"
 	"io/fs"
+	"os"
 	"path/filepath"
 
 	ifs "github.com/AlaudaDevops/toolbox/syncfiles/pkg/fs"
@@ -53,30 +54,65 @@ func (s *FileSystemSelector) ListFiles(ctx context.Context, path string, filters
 			log.Warn("error reading file ", path, " error: ", err)
 			return nil
 		}
-		fileInfo := fileInfoImp{path: path, FileInfo: info}
 
-		allowed := false
-		for _, filter := range filters {
-			if walker, ok := filter.(FileTreeOperator); ok {
-				if err := walker.WalkDirFunc(ctx, path, d, err); err != nil {
-					log.Debug("error walking path ", path, " error: ", err)
-				}
-			}
-			// directories are not filtered by filters
-			if allowed || d.IsDir() {
-				continue
-			}
-			fileAllowed, err := filter.IsFileAllowed(ctx, fileInfo)
+		filesToEvaluate := make([]fileInfoImp, 0, 10)
+		fileInfo := fileInfoImp{path: path, FileInfo: info}
+		filesToEvaluate = append(filesToEvaluate, fileInfo)
+		log.Debug("file info: ", fileInfo, " dirInfo: ", d)
+
+		// Walkdir does not walk symlinks so
+		// we evaluate them in one level only for now
+		// TODO: create a new WalkDir that walks symlinks
+		// and refactor this method
+		if d.Type()&fs.ModeSymlink != 0 {
+			log.Debug("found a symlink: ", path)
+			target, err := os.Readlink(path)
 			if err != nil {
-				log.Warn("error check if file is allowed in path ", path, " error: ", err)
-				continue
+				log.Warn("error reading symlink ", path, " error: ", err)
+				return nil
 			}
-			if fileAllowed {
-				allowed = true
+			evaluated := filepath.Join(filepath.Dir(path), target)
+			log.Debug("symlink evaluated: ", evaluated, " target: ", target, " path: ", path)
+			entries, err := os.ReadDir(evaluated)
+			if err != nil {
+				log.Warn("error reading directory ", evaluated, " error: ", err)
+				return nil
+			}
+			log.Debug("directory read: ", evaluated, "entries: ", entries)
+			for _, entry := range entries {
+				log.Debug("found entry through symlink: ", entry, " path: ", path)
+
+				info, err := entry.Info()
+				if err != nil {
+					log.Warn("error reading file ", path, " error: ", err)
+					continue
+				}
+				filesToEvaluate = append(filesToEvaluate, fileInfoImp{path: filepath.Join(path, entry.Name()), FileInfo: info})
 			}
 		}
-		if allowed {
-			matchedFiles = append(matchedFiles, fileInfo)
+		for _, fileInfo := range filesToEvaluate {
+			allowed := false
+			for _, filter := range filters {
+				if walker, ok := filter.(FileTreeOperator); ok {
+					if err := walker.WalkDirFunc(ctx, path, d, err); err != nil {
+						log.Debug("error walking path ", path, " error: ", err)
+					}
+				}
+				if allowed {
+					continue
+				}
+				fileAllowed, err := filter.IsFileAllowed(ctx, fileInfo)
+				if err != nil {
+					log.Warn("error check if file is allowed in path ", path, " error: ", err)
+					continue
+				}
+				if fileAllowed {
+					allowed = true
+				}
+			}
+			if allowed {
+				matchedFiles = append(matchedFiles, fileInfo)
+			}
 		}
 		return nil
 	})
