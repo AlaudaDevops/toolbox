@@ -1,0 +1,14 @@
+sources:
+- name: my-source
+
+  dir: # 目录信息 跟repository二选一
+    path: testdata/source-folder
+
+target:
+  copyTo: testdata/copied-directly
+  # linkTo: cmd/testdata/link-files
+  links:
+  - from: subfolder/thirdlevel
+    target: deep/<name>
+  - from: subfolder
+    target: shallow/<name>

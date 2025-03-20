@@ -16,7 +16,9 @@ limitations under the License.
 package fs
 
 import (
+	"fmt"
 	"io/fs"
+	"path/filepath"
 )
 
 // FileInfo extends fs.FileInfo with a path string
@@ -25,7 +27,20 @@ type FileInfo interface {
 	GetPath() string
 }
 
+// LinkRequest represents a request to link a file from a source to a destination
 type LinkRequest struct {
 	Source      string
 	Destination string
+}
+
+// FilterBySource filters files that matches the source pattern
+func FilterBySource(source string, files ...FileInfo) []FileInfo {
+	filtered := make([]FileInfo, 0, len(files))
+	sourcePattern := fmt.Sprintf("%s/**", source)
+	for _, file := range files {
+		if matched, _ := filepath.Match(sourcePattern, file.GetPath()); matched {
+			filtered = append(filtered, file)
+		}
+	}
+	return filtered
 }

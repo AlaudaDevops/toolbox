@@ -41,7 +41,7 @@ func NewRootCommand(ctx context.Context, name string) *cobra.Command {
 		},
 	}
 	// global flags
-	cmd.PersistentFlags().StringVarP(&logLevel.Level, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, panic, fatal). Defaults to info")
+	cmd.PersistentFlags().StringVarP(&logLevel.Level, "log-level", "l", "info", "Set the logging level (debug, info, warn, error, panic, fatal)")
 
 	// Add subcommands
 	cmd.AddCommand(NewCopyCommand(ctx))
