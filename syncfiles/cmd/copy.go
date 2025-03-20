@@ -68,8 +68,6 @@ func RunCopy(ctx context.Context, cmd *cobra.Command, args []string, configFile 
 
 	copier := fscopy.FileSystemCopier{}
 	selector := fscopy.FileSystemSelector{}
-	// filesToCopy := map[string][]ifs.FileInfo{}
-	// filesToLink := map[string][]ifs.LinkRequest{}
 	for _, source := range config.Sources {
 		log.Info("Listing files in source: ", source.Name)
 		files, err := selector.ListFiles(ctx, source.Dir.Path)
@@ -78,10 +76,8 @@ func RunCopy(ctx context.Context, cmd *cobra.Command, args []string, configFile 
 			return err
 		}
 		log.Debug("files in source ", source.Name, " are: ", files)
-		// filesToCopy[source.Name] = files
 		links := config.Target.Parse(source)
 		log.Debug("links in source ", source.Name, " are: ", links)
-		// filesToLink[source.Name] = links
 
 		// TODO: skip real logic in dry-run mode later
 		targetFolderForSource := filepath.Join(config.Target.CopyTo, source.Name)

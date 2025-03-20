@@ -100,12 +100,18 @@ func (s *FileSystemCopier) Link(ctx context.Context, base, destination string, l
 		}
 		// join upperList with destination
 		sourcePath := filepath.Join(append(upperList, base, link.Source)...)
+		sourceExternalPath := filepath.Join(base, link.Source)
+		if _, err := os.Lstat(sourceExternalPath); err != nil {
+			log.Warn("skip linking ", sourcePath, " error getting source file info, err: ", err)
+			continue
+		}
 
 		// creating base dir for target
-		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil && os.IsExist(err) {
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil && !os.IsExist(err) {
 			log.Warn("error creating parent folder for ", targetPath, " err: ", err)
 		}
-		log.Debug("linking file ", filepath.Join(base, link.Source), " to ", targetPath)
+
+		log.Debug("linking file ", sourceExternalPath, " to ", targetPath)
 		err := os.Symlink(sourcePath, targetPath)
 		if err != nil && !os.IsExist(err) {
 			log.Error("error linking file from ", sourcePath, " to ", targetPath, " err: ", err)
