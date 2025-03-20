@@ -77,10 +77,20 @@ func TestFileSystemCopier_Link(t *testing.T) {
 	ctx, _ := testLoggerContext()
 	fsCopier := &fscopy.FileSystemCopier{}
 
-	links := []ifs.LinkRequest{
-		{Source: "file1.txt", Destination: "pub/file1.txt"},
-		{Source: "subfolder/file4.txt", Destination: "pub/subfolder/file4.txt"},
-		{Source: "subfolder/thirdlevel", Destination: "pub/subfolder/thirdlevel"},
+	type linkTest struct {
+		ShouldBeSkiped bool
+		Link           ifs.LinkRequest
+	}
+
+	linkData := []linkTest{
+		{ShouldBeSkiped: false, Link: ifs.LinkRequest{Source: "file1.txt", Destination: "pub/file1.txt"}},
+		{ShouldBeSkiped: false, Link: ifs.LinkRequest{Source: "subfolder/file4.txt", Destination: "pub/subfolder/file4.txt"}},
+		{ShouldBeSkiped: false, Link: ifs.LinkRequest{Source: "subfolder/thirdlevel", Destination: "pub/subfolder/thirdlevel"}},
+		{ShouldBeSkiped: true, Link: ifs.LinkRequest{Source: "subfolder/non-existing-source", Destination: "pub/subfolder/non-existing-source"}}, // should be skipped
+	}
+	links := []ifs.LinkRequest{}
+	for _, link := range linkData {
+		links = append(links, link.Link)
 	}
 
 	if err := os.MkdirAll("testdata/linked_test/pub", 0755); err != nil {
@@ -96,9 +106,12 @@ func TestFileSystemCopier_Link(t *testing.T) {
 	if err := fsCopier.Link(ctx, "testdata/basic_dual_folder_case_with_ignore", "testdata/linked_test", links...); err != nil {
 		t.Error("error linking files ", err)
 	}
-	for _, link := range links {
-		if _, err := os.Lstat("testdata/linked_test/" + link.Destination); err != nil {
-			t.Error("error verifying linked file ", "testdata/linked_test/"+link.Destination, " err: ", err)
+	for _, link := range linkData {
+		_, err := os.Lstat("testdata/linked_test/" + link.Link.Destination)
+		if link.ShouldBeSkiped && err == nil {
+			t.Error("linked file should be skipped ", "testdata/linked_test/"+link.Link.Destination)
+		} else if !link.ShouldBeSkiped && err != nil {
+			t.Error("error verifying linked file ", "testdata/linked_test/"+link.Link.Destination, " err: ", err)
 		}
 	}
 }
