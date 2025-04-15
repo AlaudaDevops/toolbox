@@ -1,0 +1,40 @@
+{{- /* Template for rendering vulnerability tables in Jira format */ -}}
+{{- /* Renders OS vulnerabilities if present */ -}}
+{{- if gt (len .OS) 0 }}
+h3. 系统漏洞
+
+||Library||Vulnerability||Severity||Installed Version||Fixed Version||Title||
+{{- $lastPkg := "" }}
+{{- $sortedVulns := sortVulnerabilities .OS }}
+{{- range $i, $vuln := $sortedVulns }}
+  {{- /* If same package as previous row, only show vulnerability details */ -}}
+  {{- if eq $lastPkg $vuln.PkgName }}
+| |{{ $vuln.VulnerabilityID }}|{{ $vuln.Severity }}|{{ $vuln.InstalledVersion }}|{{ $vuln.FixedVersion }}|{{ $vuln.Title }}
+[https://avd.aquasec.com/nvd/{{ lower $vuln.VulnerabilityID }}]|
+  {{- else }}
+|{{ $vuln.PkgName }}|{{ $vuln.VulnerabilityID }}|{{ $vuln.Severity }}|{{ $vuln.InstalledVersion }}|{{ $vuln.FixedVersion }}|{{ $vuln.Title }}
+[https://avd.aquasec.com/nvd/{{ lower $vuln.VulnerabilityID }}]|
+    {{- $lastPkg = $vuln.PkgName }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+{{- /* Renders language-specific vulnerabilities if present */ -}}
+{{- if gt (len .Lang) 0 }}
+h3. 应用漏洞
+
+||Library||Vulnerability||Severity||Installed Version||Fixed Version||Title||
+{{- $lastPkg := "" }}
+{{- $sortedVulns := sortVulnerabilities .Lang }}
+{{- range $i, $vuln := $sortedVulns }}
+  {{- /* If same package as previous row, only show vulnerability details */ -}}
+  {{- if eq $lastPkg $vuln.PkgName }}
+| |{{ $vuln.VulnerabilityID }}|{{ $vuln.Severity }}|{{ $vuln.InstalledVersion }}|{{ $vuln.FixedVersion }}|{{ $vuln.Title }}
+[https://avd.aquasec.com/nvd/{{ lower $vuln.VulnerabilityID }}]|
+  {{- else }}
+|{{ $vuln.PkgName }}|{{ $vuln.VulnerabilityID }}|{{ $vuln.Severity }}|{{ $vuln.InstalledVersion }}|{{ $vuln.FixedVersion }}|{{ $vuln.Title }}
+[https://avd.aquasec.com/nvd/{{ lower $vuln.VulnerabilityID }}]|
+    {{- $lastPkg = $vuln.PkgName }}
+  {{- end }}
+{{- end }}
+{{- end }}

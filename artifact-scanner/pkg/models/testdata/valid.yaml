@@ -1,0 +1,14 @@
+global:
+  registry:
+    address: registry.example.com
+  images:
+    app:
+      repository: app1
+      tag: v1.0.0
+      owner:
+        team: team1
+    bundle1:
+      repository: test-bundle
+      tag: v1.0.0
+      owner:
+        team: team2
