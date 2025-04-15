@@ -1,0 +1,4 @@
+global:
+  registry:
+    address: registry.example.com
+  images: {}
