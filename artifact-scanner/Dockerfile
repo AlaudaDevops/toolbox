@@ -1,4 +1,7 @@
-FROM docker-mirrors.alauda.cn/library/golang:1.24-alpine AS builder
+ARG BUILDER_IMAGE=golang:1.24-alpine
+ARG BASE_IMAGE=alpine:3.20
+
+FROM ${BUILDER_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -6,7 +9,7 @@ COPY . /app
 
 RUN cd /app &&  go build -o artifact-scanner .
 
-FROM registry.alauda.cn:60070/ops/alpine:3.20
+FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
