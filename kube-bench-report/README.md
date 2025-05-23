@@ -90,10 +90,3 @@ The generated HTML report includes:
   - Status (PASS, FAIL, WARN, INFO)
   - Remediation instructions for failed checks
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the Apache 2.0 License - see the LICENSE file for details.
