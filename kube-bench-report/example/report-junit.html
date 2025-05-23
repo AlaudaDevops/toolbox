@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kube-Bench Security Report</title>
+    <style>
+        :root {
+            --pass-color: #4caf50;
+            --fail-color: #f44336;
+            --warn-color: #ff9800;
+            --info-color: #2196f3;
+            --dark-bg: #2d3748;
+            --light-bg: #f8f9fa;
+            --text-color: #333;
+            --light-text: #f8f9fa;
+            --border-color: #ddd;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-bg);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        h1, h2, h3, h4 {
+            margin-top: 0;
+        }
+        
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .summary-card {
+            flex: 1;
+            min-width: 200px;
+            margin: 10px;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+            color: white;
+        }
+        
+        .pass {
+            background-color: var(--pass-color);
+        }
+        
+        .fail {
+            background-color: var(--fail-color);
+        }
+        
+        .warn {
+            background-color: var(--warn-color);
+        }
+        
+        .info {
+            background-color: var(--info-color);
+        }
+        
+        .controls {
+            margin-top: 30px;
+        }
+        
+        .control {
+            margin-bottom: 30px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .control-header {
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .control-content {
+            padding: 0 15px;
+        }
+        
+        .group {
+            margin: 20px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .group-header {
+            background-color: #f1f1f1;
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .group-content {
+            padding: 0 15px;
+        }
+        
+        .check {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 5px solid;
+        }
+        
+        .check.pass {
+            border-left-color: var(--pass-color);
+            background-color: rgba(76, 175, 80, 0.1);
+        }
+        
+        .check.fail {
+            border-left-color: var(--fail-color);
+            background-color: rgba(244, 67, 54, 0.1);
+        }
+        
+        .check.warn {
+            border-left-color: var(--warn-color);
+            background-color: rgba(255, 152, 0, 0.1);
+        }
+        
+        .check.info {
+            border-left-color: var(--info-color);
+            background-color: rgba(33, 150, 243, 0.1);
+        }
+        
+        .check-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .check-id {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .check-status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            font-size: 0.8em;
+        }
+        
+        .check-text {
+            margin-bottom: 10px;
+        }
+        
+        .remediation {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        
+        .timestamp {
+            text-align: right;
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+        
+        .collapsed .toggle-icon {
+            transform: rotate(-90deg);
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            background-color: var(--dark-bg);
+            color: var(--light-text);
+            border-radius: 0 0 5px 5px;
+        }
+        
+        @media (max-width: 768px) {
+            .summary-card {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Kubernetes Security Benchmark Report</h1>
+            <p>Based on CIS Kubernetes Benchmark</p>
+        </header>
+        
+        <div class="summary">
+            <div class="summary-card pass">
+                <h2>1</h2>
+                <p>PASSED</p>
+            </div>
+            <div class="summary-card fail">
+                <h2>17</h2>
+                <p>FAILED</p>
+            </div>
+            <div class="summary-card warn">
+                <h2>41</h2>
+                <p>WARNINGS</p>
+            </div>
+            <div class="summary-card info">
+                <h2>0</h2>
+                <p>INFO</p>
+            </div>
+        </div>
+        
+        <div class="controls">
+            
+            <div class="control">
+                <div class="control-header" onclick="toggleSection(this.parentElement)">
+                    <h2>. Worker Node Security Configuration</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="control-content">
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>4.1 Worker Node Configuration Files</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.1</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the kubelet service file permissions are set to 600 or more restrictive (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the below command (based on the file location on your system) on the each worker node.
+For example, chmod 600 /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check pass">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.2</span>
+                                    </div>
+                                    <span class="check-status pass">pass</span>
+                                </div>
+                                <div class="check-text">Ensure that the kubelet service file ownership is set to root:root (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the below command (based on the file location on your system) on the each worker node.
+For example,
+chown root:root /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.3</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">If proxy kubeconfig file exists ensure permissions are set to 600 or more restrictive (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the below command (based on the file location on your system) on the each worker node.
+For example,
+chmod 600 /etc/kubernetes/proxy.conf
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.4</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">If proxy kubeconfig file exists ensure ownership is set to root:root (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the below command (based on the file location on your system) on the each worker node.
+For example, chown root:root /etc/kubernetes/proxy.conf
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.5</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --kubeconfig kubelet.conf file permissions are set to 600 or more restrictive (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the below command (based on the file location on your system) on the each worker node.
+For example,
+chmod 600 /etc/kubernetes/kubelet.conf
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.6</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --kubeconfig kubelet.conf file ownership is set to root:root (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the below command (based on the file location on your system) on the each worker node.
+For example,
+chown root:root /etc/kubernetes/kubelet.conf
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.7</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the certificate authorities file permissions are set to 600 or more restrictive (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the following command to modify the file permissions of the
+--client-ca-file chmod 600 &lt;filename&gt;
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.8</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the client certificate authorities file ownership is set to root:root (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the following command to modify the ownership of the --client-ca-file.
+chown root:root &lt;filename&gt;
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.9</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">If the kubelet config.yaml configuration file is being used validate permissions set to 600 or more restrictive (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the following command (using the config file location identified in the Audit step)
+chmod 600 /var/lib/kubelet/config.yaml
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.1.10</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">If the kubelet config.yaml configuration file is being used validate file ownership is set to root:root (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Run the following command (using the config file location identified in the Audit step)
+chown root:root /var/lib/kubelet/config.yaml
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>4.2 Kubelet</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.1</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --anonymous-auth argument is set to false (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `authentication: anonymous: enabled` to
+`false`.
+If using executable arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+`--anonymous-auth=false`
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.2</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --authorization-mode argument is not set to AlwaysAllow (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `authorization.mode` to Webhook. If
+using executable arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameter in KUBELET_AUTHZ_ARGS variable.
+--authorization-mode=Webhook
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.3</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --client-ca-file argument is set as appropriate (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `authentication.x509.clientCAFile` to
+the location of the client CA file.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameter in KUBELET_AUTHZ_ARGS variable.
+--client-ca-file=&lt;path/to/client-ca-file&gt;
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.4</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Verify that the --read-only-port argument is set to 0 (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `readOnlyPort` to 0.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+--read-only-port=0
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.5</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the --streaming-connection-idle-timeout argument is not set to 0 (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `streamingConnectionIdleTimeout` to a
+value other than 0.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+--streaming-connection-idle-timeout=5m
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.6</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --make-iptables-util-chains argument is set to true (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `makeIPTablesUtilChains` to `true`.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+remove the --make-iptables-util-chains argument from the
+KUBELET_SYSTEM_PODS_ARGS variable.
+Based on your system, restart the kubelet service. For example:
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.7</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the --hostname-override argument is not set (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+on each worker node and remove the --hostname-override argument from the
+KUBELET_SYSTEM_PODS_ARGS variable.
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.8</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the eventRecordQPS argument is set to a level which ensures appropriate event capture (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `eventRecordQPS` to an appropriate level.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameter in KUBELET_SYSTEM_PODS_ARGS variable.
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.9</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the --tls-cert-file and --tls-private-key-file arguments are set as appropriate (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `tlsCertFile` to the location
+of the certificate file to use to identify this Kubelet, and `tlsPrivateKeyFile`
+to the location of the corresponding private key file.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the below parameters in KUBELET_CERTIFICATE_ARGS variable.
+--tls-cert-file=&lt;path/to/tls-certificate-file&gt;
+--tls-private-key-file=&lt;path/to/tls-key-file&gt;
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.10</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the --rotate-certificates argument is not set to false (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to add the line `rotateCertificates` to `true` or
+remove it altogether to use the default value.
+If using command line arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+remove --rotate-certificates=false argument from the KUBELET_CERTIFICATE_ARGS
+variable.
+Based on your system, restart the kubelet service. For example,
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.11</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Verify that the RotateKubeletServerCertificate argument is set to true (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Edit the kubelet service file /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+on each worker node and set the below parameter in KUBELET_CERTIFICATE_ARGS variable.
+--feature-gates=RotateKubeletServerCertificate=true
+Based on your system, restart the kubelet service. For example:
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.12</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the Kubelet only makes use of Strong Cryptographic Ciphers (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If using a Kubelet config file, edit the file to set `tlsCipherSuites` to
+TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256
+or to a subset of these values.
+If using executable arguments, edit the kubelet service file
+/etc/systemd/system/kubelet.service.d/10-kubeadm.conf on each worker node and
+set the --tls-cipher-suites parameter as follows, or to a subset of these values.
+--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_256_GCM_SHA384,TLS_RSA_WITH_AES_128_GCM_SHA256
+Based on your system, restart the kubelet service. For example:
+systemctl daemon-reload
+systemctl restart kubelet.service
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.2.13</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that a limit is set on pod PIDs (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Decide on an appropriate level for this parameter and set it,
+either via the --pod-max-pids command line parameter or the PodPidsLimit configuration file setting.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>4.3 kube-proxy</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">4.3.1</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the kube-proxy metrics service is bound to localhost (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Modify or remove any values which bind the metrics service to a non-localhost address.
+The default value is 127.0.0.1:10249.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+            
+            <div class="control">
+                <div class="control-header" onclick="toggleSection(this.parentElement)">
+                    <h2>. Kubernetes Policies</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="control-content">
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>5.4 Secrets Management</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.4.1</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Prefer using Secrets as files over Secrets as environment variables (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If possible, rewrite application code to read Secrets from mounted secret files, rather than
+from environment variables.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.4.2</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Consider external secret storage (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Refer to the Secrets management options offered by your cloud provider or a third-party
+secrets management solution.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>5.5 Extensible Admission Control</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.5.1</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Configure Image Provenance using ImagePolicyWebhook admission controller (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Follow the Kubernetes documentation and setup image provenance.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>5.7 General Policies</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.7.1</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Create administrative boundaries between resources using namespaces (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Follow the documentation and create namespaces for objects in your deployment as you need
+them.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.7.2</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the seccomp profile is set to docker/default in your Pod definitions (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Use `securityContext` to enable the docker/default seccomp profile in your pod definitions.
+An example is as below:
+  securityContext:
+    seccompProfile:
+      type: RuntimeDefault
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.7.3</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Apply SecurityContext to your Pods and Containers (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Follow the Kubernetes documentation and apply SecurityContexts to your Pods. For a
+suggested list of SecurityContexts, you may refer to the CIS Security Benchmark for Docker
+Containers.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.7.4</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">The default namespace should not be used (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Ensure that namespaces are created to allow for appropriate segregation of Kubernetes
+resources and that all new resources are created in a specific namespace.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>5.1 RBAC and Service Accounts</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.1</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that the cluster-admin role is only used where required (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Identify all clusterrolebindings to the cluster-admin role. Check if they are used and
+if they need this role or if they could use a role with fewer privileges.
+Where possible, first bind users to a lower privileged role and then remove the
+clusterrolebinding to the cluster-admin role : kubectl delete clusterrolebinding [name]
+Condition: is_compliant is false if rolename is not cluster-admin and rolebinding is cluster-admin.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.2</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Minimize access to secrets (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove get, list and watch access to Secret objects in the cluster.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.3</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Minimize wildcard use in Roles and ClusterRoles (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible replace any use of wildcards [&#34;*&#34;] in roles and clusterroles with specific
+objects or actions.
+Condition: role_is_compliant is false if [&#34;*&#34;] is found in rules.
+Condition: clusterrole_is_compliant is false if [&#34;*&#34;] is found in rules.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.4</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Minimize access to create pods (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove create access to pod objects in the cluster.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.5</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that default service accounts are not actively used (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Create explicit service accounts wherever a Kubernetes workload requires specific access
+to the Kubernetes API server.
+Modify the configuration of each default service account to include this value
+`automountServiceAccountToken: false`.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check fail">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.6</span>
+                                    </div>
+                                    <span class="check-status fail">fail</span>
+                                </div>
+                                <div class="check-text">Ensure that Service Account Tokens are only mounted where necessary (Automated)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Modify the definition of ServiceAccounts and Pods which do not need to mount service
+account tokens to disable it, with `automountServiceAccountToken: false`.
+If both the ServiceAccount and the Pod&#39;s .spec specify a value for automountServiceAccountToken, the Pod spec takes precedence.
+Condition: Pod is_compliant to true when
+  - ServiceAccount is automountServiceAccountToken: false and Pod is automountServiceAccountToken: false or notset
+  - ServiceAccount is automountServiceAccountToken: true notset and Pod is automountServiceAccountToken: false
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.7</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Avoid use of system:masters group (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Remove the system:masters group from all users in the cluster.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.8</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Limit use of the Bind, Impersonate and Escalate permissions in the Kubernetes cluster (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove the impersonate, bind and escalate rights from subjects.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.9</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize access to create persistent volumes (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove create access to PersistentVolume objects in the cluster.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.10</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize access to the proxy sub-resource of nodes (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove access to the proxy sub-resource of node objects.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.11</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize access to the approval sub-resource of certificatesigningrequests objects (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove access to the approval sub-resource of certificatesigningrequests objects.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.12</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize access to webhook configuration objects (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove access to the validatingwebhookconfigurations or mutatingwebhookconfigurations objects
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.1.13</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize access to the service account token creation (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Where possible, remove access to the token sub-resource of serviceaccount objects.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>5.2 Pod Security Standards</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.1</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the cluster has at least one active policy control mechanism in place (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Ensure that either Pod Security Admission or an external policy control system is in place
+for every namespace which contains user workloads.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.2</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of privileged containers (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of privileged containers.
+Audit: the audit list all pods&#39; containers to retrieve their .securityContext.privileged value.
+Condition: is_compliant is false if container&#39;s `.securityContext.privileged` is set to `true`.
+Default: by default, there are no restrictions on the creation of privileged containers.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.3</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers wishing to share the host process ID namespace (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of `hostPID` containers.
+Audit: the audit retrieves each Pod&#39; spec.hostPID.
+Condition: is_compliant is false if Pod&#39;s spec.hostPID is set to `true`.
+Default: by default, there are no restrictions on the creation of hostPID containers.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.4</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers wishing to share the host IPC namespace (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of `hostIPC` containers.
+Audit: the audit retrieves each Pod&#39; spec.IPC.
+Condition: is_compliant is false if Pod&#39;s spec.hostIPC is set to `true`.
+Default: by default, there are no restrictions on the creation of hostIPC containers.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.5</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers wishing to share the host network namespace (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of `hostNetwork` containers.
+Audit: the audit retrieves each Pod&#39; spec.hostNetwork.
+Condition: is_compliant is false if Pod&#39;s spec.hostNetwork is set to `true`.
+Default: by default, there are no restrictions on the creation of hostNetwork containers.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.6</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers with allowPrivilegeEscalation (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of containers with `.securityContext.allowPrivilegeEscalation` set to `true`.
+Audit: the audit retrieves each Pod&#39;s container(s) `.securityContext.allowPrivilegeEscalation`.
+Condition: is_compliant is false if container&#39;s `.securityContext.allowPrivilegeEscalation` is set to `true`.
+Default: If notset, privilege escalation is allowed (default to true). However if PSP/PSA is used with a `restricted` profile,
+privilege escalation is explicitly disallowed unless configured otherwise.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.7</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of root containers (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Create a policy for each namespace in the cluster, ensuring that either `MustRunAsNonRoot`
+or `MustRunAs` with the range of UIDs not including 0, is set.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.8</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers with the NET_RAW capability (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of containers with the `NET_RAW` capability.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.9</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers with added capabilities (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Ensure that `allowedCapabilities` is not present in policies for the cluster unless
+it is set to an empty array.
+Audit: the audit retrieves each Pod&#39;s container(s) added capabilities.
+Condition: is_compliant is false if added capabilities are added for a given container.
+Default: Containers run with a default set of capabilities as assigned by the Container Runtime.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.10</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers with capabilities assigned (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Review the use of capabilites in applications running on your cluster. Where a namespace
+contains applications which do not require any Linux capabities to operate consider adding
+a PSP which forbids the admission of containers which do not drop all capabilities.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.11</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of Windows HostProcess containers (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of containers that have `.securityContext.windowsOptions.hostProcess` set to `true`.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.12</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of HostPath volumes (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of containers with `hostPath` volumes.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.2.13</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Minimize the admission of containers which use HostPorts (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Add policies to each namespace in the cluster which has user workloads to restrict the
+admission of containers which use `hostPort` sections.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <div class="group">
+                        <div class="group-header" onclick="toggleSection(this.parentElement)">
+                            <h3>5.3 Network Policies and CNI</h3>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="group-content">
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.3.1</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that the CNI in use supports NetworkPolicies (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    If the CNI plugin in use does not support network policies, consideration should be given to
+making use of a different plugin, or finding an alternate mechanism for restricting traffic
+in the Kubernetes cluster.
+
+                                </div>
+                                
+                            </div>
+                            
+                            <div class="check warn">
+                                <div class="check-header">
+                                    <div>
+                                        <span class="check-id">5.3.2</span>
+                                    </div>
+                                    <span class="check-status warn">warn</span>
+                                </div>
+                                <div class="check-text">Ensure that all Namespaces have NetworkPolicies defined (Manual)</div>
+                                
+                                <div class="remediation">
+                                    <strong>Remediation:</strong>
+                                    Follow the documentation and create NetworkPolicy objects as you need them.
+
+                                </div>
+                                
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+            
+        </div>
+        
+        <div class="timestamp">
+            Report generated: 2025-05-22 22:46:45
+        </div>
+        
+        <footer>
+            <p>Generated by kube-bench-report</p>
+        </footer>
+    </div>
+    
+    <script>
+        function toggleSection(element) {
+            const content = element.querySelector('.control-content, .group-content');
+            const icon = element.querySelector('.toggle-icon');
+            
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                element.classList.remove('collapsed');
+            } else {
+                content.style.display = 'none';
+                element.classList.add('collapsed');
+            }
+        }
+        
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('.control, .group');
+            sections.forEach(section => {
+                const content = section.querySelector('.control-content, .group-content');
+                content.style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>
