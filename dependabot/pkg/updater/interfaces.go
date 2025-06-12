@@ -54,7 +54,7 @@ limitations under the License.
 package updater
 
 import (
-	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
 )
 
 // LanguageType represents different programming languages

@@ -1,4 +1,4 @@
-module github.com/alauda-devops/toolbox/dependabot
+module github.com/AlaudaDevops/toolbox/dependabot
 
 go 1.23.0
 

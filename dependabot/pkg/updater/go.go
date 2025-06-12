@@ -26,7 +26,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
 )
 
 // GoUpdater handles updating Go packages

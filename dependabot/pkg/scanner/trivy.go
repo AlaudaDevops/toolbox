@@ -27,8 +27,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/config"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/version"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/version"
 	"github.com/aquasecurity/trivy/pkg/types"
 	"github.com/sirupsen/logrus"
 )

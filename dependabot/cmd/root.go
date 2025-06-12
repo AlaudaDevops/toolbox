@@ -24,9 +24,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/config"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/git"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/pipeline"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/pipeline"
 )
 
 var (

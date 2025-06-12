@@ -23,7 +23,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
 )
 
 // Updater coordinates the updating of vulnerable packages across different languages

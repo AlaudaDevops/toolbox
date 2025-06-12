@@ -20,7 +20,7 @@ package scanner
 import (
 	"fmt"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 )
 
 // Scanner is the interface that all security scanners must implement

@@ -24,7 +24,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/updater"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
 )
 
 // DefaultGitOperator implements GitOperator interface using system git commands

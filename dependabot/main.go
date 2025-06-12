@@ -17,7 +17,7 @@ limitations under the License.
 // main.go is the entry point for the DependaBot application
 package main
 
-import "github.com/alauda-devops/toolbox/dependabot/cmd"
+import "github.com/AlaudaDevops/toolbox/dependabot/cmd"
 
 func main() {
 	cmd.Execute()

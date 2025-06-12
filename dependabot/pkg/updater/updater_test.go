@@ -20,8 +20,8 @@ package updater
 import (
 	"testing"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/testings"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/testings"
 	"github.com/google/go-cmp/cmp"
 )
 

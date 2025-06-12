@@ -20,11 +20,11 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/config"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/git"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/pr"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
-	"github.com/alauda-devops/toolbox/dependabot/pkg/updater"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/pr"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
 	"github.com/sirupsen/logrus"
 )
 

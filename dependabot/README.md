@@ -39,6 +39,14 @@ cd dependabot
 make install
 ```
 
+### Go Install
+
+```bash
+go install github.com/AlaudaDevops/toolbox/dependabot@main
+
+which dependabot
+```
+
 ## Usage
 
 ### Basic Usage

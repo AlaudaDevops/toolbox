@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alauda-devops/toolbox/dependabot/pkg/updater"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
 )
 
 type PRCreateOption struct {
