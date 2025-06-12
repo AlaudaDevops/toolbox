@@ -1,0 +1,41 @@
+{
+  "go": [
+    {
+      "package_dir": "go.mod",
+      "package_name": "golang.org/x/crypto",
+      "current_version": "v0.10.0",
+      "fixed_version": "v0.38.0",
+      "vulnerability_ids": [
+        "CVE-2024-45337",
+        "CVE-2025-22869",
+        "CVE-2023-48795"
+      ],
+      "severity": "CRITICAL",
+      "language": "go"
+    },
+    {
+      "package_dir": "go.mod",
+      "package_name": "golang.org/x/net",
+      "current_version": "v0.10.0",
+      "fixed_version": "v0.17.0",
+      "vulnerability_ids": [
+        "CVE-2023-39325"
+      ],
+      "severity": "HIGH",
+      "language": "go"
+    }
+  ],
+  "node": [
+    {
+      "package_dir": "testing/go.mod",
+      "package_name": "golang.org/x/crypto",
+      "current_version": "v0.10.0",
+      "fixed_version": "v0.36.0",
+      "vulnerability_ids": [
+        "CVE-2024-45337"
+      ],
+      "severity": "CRITICAL",
+      "language": "node"
+    }
+  ]
+}

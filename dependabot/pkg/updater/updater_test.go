@@ -1,0 +1,39 @@
+/*
+Copyright 2025 The AlaudaDevops Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package updater provides functionality to update vulnerable packages for multiple languages
+package updater
+
+import (
+	"testing"
+
+	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
+	"github.com/alauda-devops/toolbox/dependabot/pkg/testings"
+	"github.com/google/go-cmp/cmp"
+)
+
+func TestGroupVulnerabilitiesByLanguage(t *testing.T) {
+	var vulns []scanner.Vulnerability
+	testings.MustLoadJson("./testdata/group_vulns_by_lang.json", &vulns)
+	groupedVulns := groupVulnerabilitiesByLanguage(vulns)
+
+	var expectedGroupedVulns map[LanguageType][]scanner.Vulnerability
+	testings.MustLoadJson("./testdata/group_vulns_by_lang_golden.json", &expectedGroupedVulns)
+
+	if diff := cmp.Diff(expectedGroupedVulns, groupedVulns); diff != "" {
+		t.Errorf("groupVulnerabilitiesByLanguage() mismatch (-want +got):%s", diff)
+	}
+}

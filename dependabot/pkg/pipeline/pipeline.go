@@ -1,0 +1,187 @@
+/*
+Copyright 2025 The AlaudaDevops Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package pipeline provides a comprehensive pipeline for dependency updates and PR creation
+package pipeline
+
+import (
+	"fmt"
+
+	"github.com/alauda-devops/toolbox/dependabot/pkg/config"
+	"github.com/alauda-devops/toolbox/dependabot/pkg/git"
+	"github.com/alauda-devops/toolbox/dependabot/pkg/pr"
+	"github.com/alauda-devops/toolbox/dependabot/pkg/scanner"
+	"github.com/alauda-devops/toolbox/dependabot/pkg/updater"
+	"github.com/sirupsen/logrus"
+)
+
+// Pipeline orchestrates the dependency update and PR creation process
+type Pipeline struct {
+	// config holds pipeline configuration
+	config *Config
+}
+
+// Config holds configuration for the pipeline
+type Config struct {
+	config.DependaBotConfig `json:",inline" yaml:",inline"`
+
+	// ProjectPath is the path to the project
+	ProjectPath string `json:"projectPath" yaml:"projectPath"`
+}
+
+// NewPipeline creates a new dependency update pipeline
+func NewPipeline(config *Config) *Pipeline {
+	return &Pipeline{
+		config: config,
+	}
+}
+
+// Run executes the dependency update and PR creation pipeline
+func (p *Pipeline) Run() error {
+	logrus.Infof("Starting dependency update pipeline for project: %s", p.config.ProjectPath)
+
+	// Step 1: Initialize and run scanner
+	logrus.Info("Running Security Scanning...")
+
+	scannerInstance, err := scanner.NewScanner(p.config.ProjectPath, p.config.Scanner)
+	if err != nil {
+		return fmt.Errorf("failed to create scanner: %w", err)
+	}
+
+	// Ensure cleanup on exit
+	defer func() {
+		if cleanupErr := scannerInstance.Cleanup(); cleanupErr != nil {
+			logrus.Warnf("Warning: failed to cleanup scanner resources: %v", cleanupErr)
+		}
+	}()
+
+	// Run the scan
+	vulnerabilities, err := scannerInstance.Scan()
+	if err != nil {
+		return fmt.Errorf("failed to run security scan: %w", err)
+	}
+
+	// Step 2: Process scan results
+	logrus.Info("Processing scan results...")
+	if len(vulnerabilities) == 0 {
+		logrus.Info("No vulnerabilities found in scan results")
+		return nil
+	}
+
+	logrus.Infof("Found %d vulnerabilities to update", len(vulnerabilities))
+
+	// Step 3: Update packages
+	logrus.Info("Updating vulnerable packages...")
+	updater := updater.New(p.config.ProjectPath)
+	updateSummary, err := updater.UpdatePackages(vulnerabilities)
+	if err != nil {
+		// Even if some updates failed, we might still have successful ones
+		logrus.Warnf("Warning: Some updates failed: %v", err)
+	}
+
+	if len(updateSummary.SuccessfulUpdates) == 0 {
+		logrus.Info("No packages were successfully updated")
+		return fmt.Errorf("no packages were successfully updated")
+	}
+
+	logrus.Debugf("Successfully updated %d packages", len(updateSummary.SuccessfulUpdates))
+	logrus.Debugf("PR Description:\n%s", pr.GeneratePRBody(updateSummary))
+	// Step 4: Check if we should create a branch and PR
+	if !p.config.PRConfig.NeedCreatePR() {
+		logrus.Info("Auto PR creation is disabled, skipping Git and PR operations")
+		return nil
+	}
+
+	// Step 5: Check for Git changes
+	logrus.Info("Creating branch and committing changes...")
+	branchName, err := p.commitChanges(updateSummary)
+	if err != nil {
+		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	// Step 6: Create PR
+	logrus.Info("Creating Pull Request...")
+	// TODO: support other PR providers
+	prCreator := pr.NewGitHubPRCreator(p.config.ProjectPath)
+	if err := prCreator.CreatePR(branchName, p.config.Branch, pr.PRCreateOption{
+		Labels:        p.config.PRConfig.Labels,
+		Assignees:     p.config.PRConfig.Assignees,
+		UpdateSummary: *updateSummary,
+	}); err != nil {
+		return fmt.Errorf("failed to create PR: %w", err)
+	}
+
+	logrus.Info("✅ Pipeline completed successfully!")
+	logrus.Debugf("   - Updated %d packages", len(updateSummary.SuccessfulUpdates))
+	logrus.Debugf("   - Branch: %s", branchName)
+	logrus.Debugf("   - Target: %s", p.config.Branch)
+
+	return nil
+}
+
+func (p *Pipeline) commitChanges(updateSummary *updater.UpdateSummary) (newBranchName string, err error) {
+	gitOperator := git.NewGitOperator(p.config.ProjectPath)
+	hasChanges, err := gitOperator.HasChanges()
+	if err != nil {
+		return "", fmt.Errorf("failed to check Git changes: %w", err)
+	}
+
+	if !hasChanges {
+		logrus.Info("No Git changes detected, skipping branch creation and PR")
+		return "", nil
+	}
+
+	commitID, err := gitOperator.GetCommitID()
+	if err != nil {
+		return "", fmt.Errorf("failed to get commit ID: %w", err)
+	}
+
+	branchName := p.generateBranchName(p.config.BranchPrefix, commitID)
+	if err := gitOperator.CreateBranch(branchName); err != nil {
+		return "", fmt.Errorf("failed to create branch: %w", err)
+	}
+
+	commitMessage := p.generateCommitMessage(updateSummary)
+	if err := gitOperator.CommitChanges(commitMessage); err != nil {
+		return "", fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	if err := gitOperator.PushBranch(); err != nil {
+		return "", fmt.Errorf("failed to push branch: %w", err)
+	}
+
+	return branchName, nil
+}
+
+// generateBranchName generates a unique branch name
+func (p *Pipeline) generateBranchName(branchPrefix, baseCommitID string) string {
+	return fmt.Sprintf("%s-%s", branchPrefix, baseCommitID[0:7])
+}
+
+// generateCommitMessage generates a commit message for the updates
+func (p *Pipeline) generateCommitMessage(result *updater.UpdateSummary) string {
+	if len(result.SuccessfulUpdates) == 1 {
+		update := result.SuccessfulUpdates[0]
+		return fmt.Sprintf("fix: update %s from %s to %s\n\nFixes security vulnerabilities: %v",
+			update.PackageName,
+			update.CurrentVersion,
+			update.FixedVersion,
+			update.VulnerabilityIDs)
+	}
+
+	return fmt.Sprintf("fix: update %d vulnerable dependencies\n\nSecurity updates for multiple packages",
+		len(result.SuccessfulUpdates))
+}
