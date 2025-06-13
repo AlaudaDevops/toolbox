@@ -18,41 +18,61 @@ limitations under the License.
 package pr
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
+	"github.com/google/go-github/v58/github"
 	"github.com/sirupsen/logrus"
 )
 
-// GitHubPRCreator implements PRCreator interface for GitHub using gh CLI
+// GitHubPRCreator implements PRCreator interface for GitHub using the GitHub SDK
 type GitHubPRCreator struct {
 	// workingDir is the working directory for git operations
 	workingDir string
-	// defaultLabels are labels to add to all PRs
+	// client is the GitHub API client
+	client *github.Client
 }
 
 // NewGitHubPRCreator creates a new GitHub PR creator
-func NewGitHubPRCreator(workingDir string) *GitHubPRCreator {
+func NewGitHubPRCreator(baseURL, token string, workingDir string) *GitHubPRCreator {
+	// Create GitHub client
+	client := github.NewClient(nil).WithAuthToken(token)
+	if baseURL != "" {
+		var err error
+		client, err = client.WithEnterpriseURLs(baseURL, baseURL+"/api/v3")
+		if err != nil {
+			logrus.Fatalf("Failed to set enterprise URLs: %v", err)
+		}
+	}
+
 	return &GitHubPRCreator{
 		workingDir: workingDir,
+		client:     client,
 	}
 }
 
 // CreatePR creates a pull request based on the update result
 // If PR already exists, it will update the existing PR instead of creating a new one
-func (g *GitHubPRCreator) CreatePR(sourceBranch, targetBranch string, option PRCreateOption) error {
+func (g *GitHubPRCreator) CreatePR(repo *config.Repo, sourceBranch string, option PRCreateOption) error {
 	if len(option.UpdateSummary.SuccessfulUpdates) == 0 {
 		return fmt.Errorf("no successful updates to create PR for")
 	}
+
+	gitRepo, err := git.ParseRepoURL(repo.URL)
+	if err != nil {
+		return fmt.Errorf("failed to parse repository URL: %w", err)
+	}
+
+	ctx := context.Background()
 
 	// Generate PR title and body
 	title := generatePRTitle(&option.UpdateSummary)
 	body := GeneratePRBody(&option.UpdateSummary)
 
 	// Check if PR already exists
-	existingPR, err := g.checkExistingPR(sourceBranch, targetBranch)
+	existingPR, err := g.checkExistingPR(gitRepo, sourceBranch, repo.Branch)
 	if err != nil {
 		logrus.Warnf("Warning: failed to check existing PR: %v", err)
 		// Continue with creation attempt
@@ -61,109 +81,102 @@ func (g *GitHubPRCreator) CreatePR(sourceBranch, targetBranch string, option PRC
 	if existingPR != nil {
 		// Update existing PR
 		logrus.Debugf("Found existing PR #%d, updating...", existingPR.Number)
-		return g.updateExistingPR(existingPR.Number, title, body, option)
+		return g.updateExistingPR(gitRepo, existingPR.Number, title, body, option)
 	}
 
-	// Create new pull request using gh CLI
-	args := []string{
-		"pr", "create",
-		"--title", title,
-		"--body", body,
-		"--base", targetBranch,
-		"--head", sourceBranch,
+	// Create new pull request
+	newPR := &github.NewPullRequest{
+		Title:               github.String(title),
+		Body:                github.String(body),
+		Head:                github.String(sourceBranch),
+		Base:                github.String(repo.Branch),
+		MaintainerCanModify: github.Bool(true),
+	}
+
+	pr, _, err := g.client.PullRequests.Create(ctx, gitRepo.Group, gitRepo.Repo, newPR)
+	if err != nil {
+		return fmt.Errorf("failed to create PR: %w", err)
 	}
 
 	// Add labels if any
 	if len(option.Labels) > 0 {
-		args = append(args, "--label", strings.Join(option.Labels, ","))
+		_, _, err = g.client.Issues.AddLabelsToIssue(ctx, gitRepo.Group, gitRepo.Repo, pr.GetNumber(), option.Labels)
+		if err != nil {
+			logrus.Warnf("Failed to add labels to PR #%d: %v", pr.GetNumber(), err)
+		}
 	}
 
 	// Add assignees if any
 	if len(option.Assignees) > 0 {
-		args = append(args, "--assignee", strings.Join(option.Assignees, ","))
+		_, _, err = g.client.Issues.AddAssignees(ctx, gitRepo.Group, gitRepo.Repo, pr.GetNumber(), option.Assignees)
+		if err != nil {
+			logrus.Warnf("Failed to add assignees to PR #%d: %v", pr.GetNumber(), err)
+		}
 	}
 
-	cmd := exec.Command("gh", args...)
-	cmd.Dir = g.workingDir
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create PR: %w, output: %s", err, string(output))
-	}
-
-	logrus.Debugf("Successfully created pull request:%s", string(output))
+	logrus.Debugf("Successfully created pull request #%d", pr.GetNumber())
 	return nil
 }
 
-// PRInfo represents basic information about a pull request
-type PRInfo struct {
-	// Number is the pull request number
-	Number int `json:"number"`
-	// Title is the pull request title
-	Title string `json:"title"`
-	// State is the pull request state (open, closed, merged)
-	State string `json:"state"`
-}
-
 // checkExistingPR checks if a PR already exists for the given source and target branches
-func (g *GitHubPRCreator) checkExistingPR(sourceBranch, targetBranch string) (*PRInfo, error) {
+func (g *GitHubPRCreator) checkExistingPR(gitRepo *git.Repository, sourceBranch, targetBranch string) (*PRInfo, error) {
+	ctx := context.Background()
+
 	// List open PRs with the same head branch
-	args := []string{
-		"pr", "list",
-		"--head", sourceBranch,
-		"--base", targetBranch,
-		"--json", "number,title,state",
-		"--limit", "1",
+	opts := &github.PullRequestListOptions{
+		Head:  sourceBranch,
+		Base:  targetBranch,
+		State: "open",
 	}
 
-	cmd := exec.Command("gh", args...)
-	cmd.Dir = g.workingDir
-
-	output, err := cmd.Output()
+	prs, _, err := g.client.PullRequests.List(ctx, gitRepo.Group, gitRepo.Repo, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list existing PRs: %w", err)
-	}
-
-	var prs []PRInfo
-	if err := json.Unmarshal(output, &prs); err != nil {
-		return nil, fmt.Errorf("failed to parse PR list response: %w", err)
 	}
 
 	if len(prs) == 0 {
 		return nil, nil // No existing PR found
 	}
 
-	return &prs[0], nil
+	return &PRInfo{
+		Number: prs[0].GetNumber(),
+		Title:  prs[0].GetTitle(),
+		State:  prs[0].GetState(),
+	}, nil
 }
 
 // updateExistingPR updates an existing pull request
-func (g *GitHubPRCreator) updateExistingPR(prNumber int, title, body string, option PRCreateOption) error {
-	// Update PR with all properties in a single command
-	args := []string{
-		"pr", "edit", fmt.Sprintf("%d", prNumber),
-		"--title", title,
-		"--body", body,
+func (g *GitHubPRCreator) updateExistingPR(gitRepo *git.Repository, prNumber int, title, body string, option PRCreateOption) error {
+	ctx := context.Background()
+
+	// Update PR
+	pr := &github.PullRequest{
+		Title: github.String(title),
+		Body:  github.String(body),
 	}
 
-	// Add labels if provided
-	if len(option.Labels) > 0 {
-		args = append(args, "--add-label", strings.Join(option.Labels, ","))
-	}
-
-	// Add assignees if provided
-	if len(option.Assignees) > 0 {
-		args = append(args, "--add-assignee", strings.Join(option.Assignees, ","))
-	}
-
-	cmd := exec.Command("gh", args...)
-	cmd.Dir = g.workingDir
-
-	output, err := cmd.CombinedOutput()
+	_, _, err := g.client.PullRequests.Edit(ctx, gitRepo.Group, gitRepo.Repo, prNumber, pr)
 	if err != nil {
-		return fmt.Errorf("failed to update PR #%d: %w, output: %s", prNumber, err, string(output))
+		return fmt.Errorf("failed to update PR #%d: %w", prNumber, err)
 	}
 
-	logrus.Debugf("Successfully updated pull request #%d:%s", prNumber, string(output))
+	// Add labels if any
+	if len(option.Labels) > 0 {
+		_, _, err = g.client.Issues.AddLabelsToIssue(ctx, gitRepo.Group, gitRepo.Repo, prNumber, option.Labels)
+		if err != nil {
+			logrus.Warnf("Failed to add labels to PR #%d: %v", prNumber, err)
+		}
+	}
+
+	// Add assignees if any
+	if len(option.Assignees) > 0 {
+		_, _, err = g.client.Issues.AddAssignees(ctx, gitRepo.Group, gitRepo.Repo, prNumber, option.Assignees)
+		if err != nil {
+			logrus.Warnf("Failed to add assignees to PR #%d: %v", prNumber, err)
+		}
+	}
+
+	logrus.Debugf("Successfully updated pull request #%d", prNumber)
 	return nil
 }
 

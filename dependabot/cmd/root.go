@@ -160,6 +160,16 @@ func runDependaBot() error {
 			}
 		}()
 	} else {
+		var err error
+		g := git.NewGitOperator(projectDirPath)
+		repositoryURL, err = g.GetRepoURL()
+		if err != nil {
+			return fmt.Errorf("failed to get repo info: %w", err)
+		}
+		targetBranchName, err = g.GetCurrentBranch()
+		if err != nil {
+			return fmt.Errorf("failed to get branch info: %w", err)
+		}
 		workingProjectPath = projectDirPath
 	}
 
@@ -183,7 +193,10 @@ func runDependaBot() error {
 
 	// 1.3: Create CLI configuration from command line flags
 	cliConfig := &config.DependaBotConfig{
-		Branch: targetBranchName,
+		Repo: config.Repo{
+			URL:    repositoryURL,
+			Branch: targetBranchName,
+		},
 		PRConfig: config.PRConfig{
 			AutoCreate: &enablePRCreation,
 		},

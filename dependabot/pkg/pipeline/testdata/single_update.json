@@ -1,0 +1,19 @@
+{
+    "projectPath": "/test/path",
+    "totalPackages": 1,
+    "successfulUpdates": [
+        {
+            "package_name": "golang.org/x/crypto",
+            "current_version": "v0.0.1",
+            "fixed_version": "v0.1.0",
+            "vulnerability_ids": [
+                "CVE-2023-1234"
+            ],
+            "language": "go",
+            "success": true,
+            "error": ""
+        }
+    ],
+    "failedUpdates": [],
+    "summary": "Updated 1 package successfully"
+}

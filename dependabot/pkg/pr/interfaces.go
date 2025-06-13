@@ -20,8 +20,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
 )
+
+// PRInfo represents basic information about a pull request
+type PRInfo struct {
+	// Number is the pull request number
+	Number int `json:"number"`
+	// Title is the pull request title
+	Title string `json:"title"`
+	// State is the pull request state (open, closed, merged)
+	State string `json:"state"`
+}
 
 type PRCreateOption struct {
 	Labels        []string              `json:"labels" yaml:"labels"`
@@ -32,10 +43,22 @@ type PRCreateOption struct {
 // PRCreator defines the interface for creating pull requests
 type PRCreator interface {
 	// CreatePR creates a pull request based on the update result
-	CreatePR(sourceBranch, targetBranch string, option PRCreateOption) error
+	CreatePR(repo *config.Repo, sourceBranch string, option PRCreateOption) error
 
 	// GetPlatformType returns the type of platform (github, gitlab, etc.)
 	GetPlatformType() string
+}
+
+// NewPRCreator creates a new PRCreator based on the git provider configuration
+func NewPRCreator(provider config.GitProvider, workingDir string) (PRCreator, error) {
+	switch provider.Provider {
+	case "github":
+		return NewGitHubPRCreator(provider.BaseURL, provider.Token, workingDir), nil
+	case "gitlab":
+		return NewGitLabPRCreator(provider.BaseURL, provider.Token, workingDir)
+	default:
+		return nil, fmt.Errorf("unsupported platform type: %s", provider.Provider)
+	}
 }
 
 // generatePRTitle generates a title for the pull request
