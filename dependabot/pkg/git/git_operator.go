@@ -40,6 +40,20 @@ func NewGitOperator(workingDir string) *DefaultGitOperator {
 	}
 }
 
+// GetRepo retrieves the repository information from the current working directory
+// It returns the repository URL and parses it into a Repository struct
+func (g *DefaultGitOperator) GetRepoURL() (string, error) {
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	cmd.Dir = g.workingDir
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to get repo: %w, output: %s", err, string(output))
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
 func (g *DefaultGitOperator) DeleteBranch(branchName string) error {
 	cmd := exec.Command("git", "branch", "-D", branchName)
 	cmd.Dir = g.workingDir

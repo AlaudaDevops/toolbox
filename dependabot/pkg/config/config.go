@@ -23,20 +23,35 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
-
 	"gopkg.in/yaml.v3"
 )
 
 // DependaBotConfig represents the complete configuration for DependaBot (legacy format)
 type DependaBotConfig struct {
-	// Branch is the branch to clone and create PR against
-	Branch string `yaml:"branch" json:"branch"`
-	// BranchPrefix is the prefix for created branches
-	BranchPrefix string `yaml:"branch_prefix" json:"branch_prefix"`
+	// Repo contains repository information
+	Repo Repo `yaml:"repo" json:"repo"`
 	// PRConfig contains PR-specific configuration
 	PRConfig PRConfig `yaml:"pr" json:"pr"`
 	// Scanner contains scanner configuration (supports multiple scanner types)
 	Scanner ScannerConfig `yaml:"scanner" json:"scanner"`
+	// Git contains git provider configuration
+	Git GitProvider `yaml:"git" json:"git"`
+}
+
+type Repo struct {
+	// URL is the repository URL (e.g., "https://github.com/example/repo")
+	URL string `yaml:"url" json:"url"`
+	// Branch is the repository branch (e.g., "main")
+	Branch string `yaml:"branch" json:"branch"`
+}
+
+type GitProvider struct {
+	// Provider is the type of git provider (e.g., "github", "gitlab")
+	Provider string `yaml:"provider" json:"provider"`
+	// BaseURL is the base URL of the git provider (e.g., "https://github.com")
+	BaseURL string `yaml:"baseURL" json:"baseURL"`
+	// Token is the authentication token for the git provider
+	Token string `yaml:"token" json:"token"`
 }
 
 // PRConfig contains pull request configuration
@@ -173,12 +188,12 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 			continue
 		}
 
-		// Merge simple fields (later config wins)
-		if config.Branch != "" {
-			merged.Branch = config.Branch
+		// Merge repo fields
+		if config.Repo.URL != "" {
+			merged.Repo.URL = config.Repo.URL
 		}
-		if config.BranchPrefix != "" {
-			merged.BranchPrefix = config.BranchPrefix
+		if config.Repo.Branch != "" {
+			merged.Repo.Branch = config.Repo.Branch
 		}
 		// Merge PR config
 		if config.PRConfig.AutoCreate != nil {
@@ -199,6 +214,16 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		if len(config.Scanner.Params) > 0 {
 			merged.Scanner.Params = config.Scanner.Params
 		}
+		// Merge Git provider configuration
+		if config.Git.Provider != "" {
+			merged.Git.Provider = config.Git.Provider
+		}
+		if config.Git.BaseURL != "" {
+			merged.Git.BaseURL = config.Git.BaseURL
+		}
+		if config.Git.Token != "" {
+			merged.Git.Token = config.Git.Token
+		}
 	}
 
 	return merged
@@ -206,11 +231,12 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 
 // ApplyDefaults applies default values to configuration
 func (c *ConfigReader) ApplyDefaults(config *DependaBotConfig) *DependaBotConfig {
-	if config.Branch == "" {
-		config.Branch = "main"
+	if config.Repo.Branch == "" {
+		config.Repo.Branch = "main"
 	}
-	if config.BranchPrefix == "" {
-		config.BranchPrefix = "dependabot/security-updates"
+
+	if config.Git.Token == "" {
+		config.Git.Token = os.Getenv("DEPENDABOT_GIT_TOKEN")
 	}
 
 	// Apply scanner defaults (prefer new format over legacy)

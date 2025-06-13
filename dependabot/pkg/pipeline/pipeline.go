@@ -53,7 +53,6 @@ func NewPipeline(config *Config) *Pipeline {
 func (p *Pipeline) Run() error {
 	logrus.Infof("Starting dependency update pipeline for project: %s", p.config.ProjectPath)
 
-	// Step 1: Initialize and run scanner
 	logrus.Info("Running Security Scanning...")
 
 	scannerInstance, err := scanner.NewScanner(p.config.ProjectPath, p.config.Scanner)
@@ -61,20 +60,17 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("failed to create scanner: %w", err)
 	}
 
-	// Ensure cleanup on exit
 	defer func() {
 		if cleanupErr := scannerInstance.Cleanup(); cleanupErr != nil {
 			logrus.Warnf("Warning: failed to cleanup scanner resources: %v", cleanupErr)
 		}
 	}()
 
-	// Run the scan
 	vulnerabilities, err := scannerInstance.Scan()
 	if err != nil {
 		return fmt.Errorf("failed to run security scan: %w", err)
 	}
 
-	// Step 2: Process scan results
 	logrus.Info("Processing scan results...")
 	if len(vulnerabilities) == 0 {
 		logrus.Info("No vulnerabilities found in scan results")
@@ -83,7 +79,6 @@ func (p *Pipeline) Run() error {
 
 	logrus.Infof("Found %d vulnerabilities to update", len(vulnerabilities))
 
-	// Step 3: Update packages
 	logrus.Info("Updating vulnerable packages...")
 	updater := updater.New(p.config.ProjectPath)
 	updateSummary, err := updater.UpdatePackages(vulnerabilities)
@@ -99,24 +94,24 @@ func (p *Pipeline) Run() error {
 
 	logrus.Debugf("Successfully updated %d packages", len(updateSummary.SuccessfulUpdates))
 	logrus.Debugf("PR Description:\n%s", pr.GeneratePRBody(updateSummary))
-	// Step 4: Check if we should create a branch and PR
 	if !p.config.PRConfig.NeedCreatePR() {
 		logrus.Info("Auto PR creation is disabled, skipping Git and PR operations")
 		return nil
 	}
 
-	// Step 5: Check for Git changes
 	logrus.Info("Creating branch and committing changes...")
 	branchName, err := p.commitChanges(updateSummary)
 	if err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
 	}
 
-	// Step 6: Create PR
 	logrus.Info("Creating Pull Request...")
-	// TODO: support other PR providers
-	prCreator := pr.NewGitHubPRCreator(p.config.ProjectPath)
-	if err := prCreator.CreatePR(branchName, p.config.Branch, pr.PRCreateOption{
+	prCreator, err := pr.NewPRCreator(p.config.Git, p.config.ProjectPath)
+	if err != nil {
+		return fmt.Errorf("failed to initialize PR creator: %w", err)
+	}
+
+	if err := prCreator.CreatePR(&p.config.Repo, branchName, pr.PRCreateOption{
 		Labels:        p.config.PRConfig.Labels,
 		Assignees:     p.config.PRConfig.Assignees,
 		UpdateSummary: *updateSummary,
@@ -127,7 +122,7 @@ func (p *Pipeline) Run() error {
 	logrus.Info("✅ Pipeline completed successfully!")
 	logrus.Debugf("   - Updated %d packages", len(updateSummary.SuccessfulUpdates))
 	logrus.Debugf("   - Branch: %s", branchName)
-	logrus.Debugf("   - Target: %s", p.config.Branch)
+	logrus.Debugf("   - Target: %s", p.config.Repo.Branch)
 
 	return nil
 }
@@ -149,7 +144,7 @@ func (p *Pipeline) commitChanges(updateSummary *updater.UpdateSummary) (newBranc
 		return "", fmt.Errorf("failed to get commit ID: %w", err)
 	}
 
-	branchName := p.generateBranchName(p.config.BranchPrefix, commitID)
+	branchName := p.generateBranchName(commitID)
 	if err := gitOperator.CreateBranch(branchName); err != nil {
 		return "", fmt.Errorf("failed to create branch: %w", err)
 	}
@@ -167,6 +162,6 @@ func (p *Pipeline) commitChanges(updateSummary *updater.UpdateSummary) (newBranc
 }
 
 // generateBranchName generates a unique branch name
-func (p *Pipeline) generateBranchName(branchPrefix, baseCommitID string) string {
-	return fmt.Sprintf("%s-%s", branchPrefix, baseCommitID[0:7])
+func (p *Pipeline) generateBranchName(baseCommitID string) string {
+	return fmt.Sprintf("dependabot/security-updates-%s", baseCommitID[0:7])
 }

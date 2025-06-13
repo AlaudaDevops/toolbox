@@ -8,8 +8,7 @@ import (
 	"testing"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/gomega"
 )
 
 func Test_generateCommitMessage(t *testing.T) {
@@ -30,19 +29,20 @@ func Test_generateCommitMessage(t *testing.T) {
 		},
 	}
 
+	g := NewWithT(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Read test input
 			inputData, err := os.ReadFile(filepath.Join("testdata", tt.inputFile))
-			require.NoError(t, err)
+			g.Expect(err).NotTo(HaveOccurred(), "Failed to read input file %s", tt.inputFile)
 
 			var updateSummary updater.UpdateSummary
 			err = json.Unmarshal(inputData, &updateSummary)
-			require.NoError(t, err)
+			g.Expect(err).NotTo(HaveOccurred(), "Failed to unmarshal input data from %s", tt.inputFile)
 
 			// Read expected output
 			expected, err := os.ReadFile(filepath.Join("testdata", tt.goldenFile))
-			require.NoError(t, err)
+			g.Expect(err).NotTo(HaveOccurred(), "Failed to read expected output file %s", tt.goldenFile)
 
 			// Generate commit message
 			got := generateCommitMessage(&updateSummary)
@@ -50,7 +50,7 @@ func Test_generateCommitMessage(t *testing.T) {
 			// Remove trailing newlines for comparison
 			expectedStr := strings.TrimRight(string(expected), "\n")
 			gotStr := strings.TrimRight(got, "\n")
-			assert.Equal(t, expectedStr, gotStr)
+			g.Expect(gotStr).To(Equal(expectedStr))
 		})
 	}
 }
