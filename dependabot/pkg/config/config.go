@@ -23,29 +23,44 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
-
 	"gopkg.in/yaml.v3"
 )
 
 // DependaBotConfig represents the complete configuration for DependaBot (legacy format)
 type DependaBotConfig struct {
-	// Branch is the branch to clone and create PR against
-	Branch string `yaml:"branch" json:"branch"`
-	// BranchPrefix is the prefix for created branches
-	BranchPrefix string `yaml:"branch_prefix" json:"branch_prefix"`
-	// PRConfig contains PR-specific configuration
-	PRConfig PRConfig `yaml:"pr" json:"pr"`
+	// Repo contains repository information
+	Repo RepoConfig `yaml:"repo" json:"repo" mapstructure:"repo"`
+	// PR contains PR-specific configuration
+	PR PRConfig `yaml:"pr" json:"pr" mapstructure:"pr"`
 	// Scanner contains scanner configuration (supports multiple scanner types)
-	Scanner ScannerConfig `yaml:"scanner" json:"scanner"`
+	Scanner ScannerConfig `yaml:"scanner" json:"scanner" mapstructure:"scanner"`
+	// Git contains git provider configuration
+	Git GitProviderConfig `yaml:"git" json:"git" mapstructure:"git"`
+}
+
+type RepoConfig struct {
+	// URL is the repository URL (e.g., "https://github.com/example/repo")
+	URL string `yaml:"url" json:"url" mapstructure:"url"`
+	// Branch is the repository branch (e.g., "main")
+	Branch string `yaml:"branch" json:"branch" mapstructure:"branch"`
+}
+
+type GitProviderConfig struct {
+	// Provider is the type of git provider (e.g., "github", "gitlab")
+	Provider string `yaml:"provider" json:"provider" mapstructure:"provider"`
+	// BaseURL is the base URL of the git provider (e.g., "https://github.com")
+	BaseURL string `yaml:"baseURL" json:"baseURL" mapstructure:"baseURL"`
+	// Token is the authentication token for the git provider
+	Token string `yaml:"token" json:"token" mapstructure:"token"`
 }
 
 // PRConfig contains pull request configuration
 type PRConfig struct {
-	AutoCreate *bool `yaml:"autoCreate" json:"autoCreate"`
+	AutoCreate *bool `yaml:"autoCreate" json:"autoCreate" mapstructure:"autoCreate"`
 	// Labels are labels to add to the created PR
-	Labels []string `yaml:"labels" json:"labels"`
+	Labels []string `yaml:"labels" json:"labels" mapstructure:"labels"`
 	// Assignees are users to assign to the created PR
-	Assignees []string `yaml:"assignees" json:"assignees"`
+	Assignees []string `yaml:"assignees" json:"assignees" mapstructure:"assignees"`
 }
 
 func (p *PRConfig) NeedCreatePR() bool {
@@ -55,21 +70,11 @@ func (p *PRConfig) NeedCreatePR() bool {
 // ScannerConfig contains generic scanner configuration
 type ScannerConfig struct {
 	// Type specifies the scanner type (e.g., "trivy", "govulncheck")
-	Type string `yaml:"type" json:"type"`
+	Type string `yaml:"type" json:"type" mapstructure:"type"`
 	// Timeout for scanner execution (e.g., "5m")
-	Timeout string `yaml:"timeout" json:"timeout"`
+	Timeout string `yaml:"timeout" json:"timeout" mapstructure:"timeout"`
 	// Params contains scanner-specific parameters
-	Params []string `yaml:"params" json:"params"`
-}
-
-// TrivyConfig contains Trivy scanning configuration (deprecated, use ScannerConfig)
-type TrivyConfig struct {
-	// Scanners specifies which trivy scanners to use
-	Scanners []string `yaml:"scanners" json:"scanners"`
-	// IgnoreUnfixed ignores vulnerabilities without fixes
-	IgnoreUnfixed bool `yaml:"ignore_unfixed" json:"ignore_unfixed"`
-	// Timeout for trivy scan (e.g., "5m")
-	Timeout string `yaml:"timeout" json:"timeout"`
+	Params []string `yaml:"params" json:"params" mapstructure:"params"`
 }
 
 // PipelineScannerConfig represents scanner config for pipeline
@@ -157,8 +162,8 @@ func (c *ConfigReader) convertFromGitHubFormat(githubConfig *GitHubDependabotCon
 	}
 
 	// Map labels and assignees
-	config.PRConfig.Labels = goUpdate.Labels
-	config.PRConfig.Assignees = goUpdate.Assignees
+	config.PR.Labels = goUpdate.Labels
+	config.PR.Assignees = goUpdate.Assignees
 
 	return config
 }
@@ -173,22 +178,22 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 			continue
 		}
 
-		// Merge simple fields (later config wins)
-		if config.Branch != "" {
-			merged.Branch = config.Branch
+		// Merge repo fields
+		if config.Repo.URL != "" {
+			merged.Repo.URL = config.Repo.URL
 		}
-		if config.BranchPrefix != "" {
-			merged.BranchPrefix = config.BranchPrefix
+		if config.Repo.Branch != "" {
+			merged.Repo.Branch = config.Repo.Branch
 		}
 		// Merge PR config
-		if config.PRConfig.AutoCreate != nil {
-			merged.PRConfig.AutoCreate = config.PRConfig.AutoCreate
+		if config.PR.AutoCreate != nil {
+			merged.PR.AutoCreate = config.PR.AutoCreate
 		}
-		if len(config.PRConfig.Labels) > 0 {
-			merged.PRConfig.Labels = config.PRConfig.Labels
+		if len(config.PR.Labels) > 0 {
+			merged.PR.Labels = config.PR.Labels
 		}
-		if len(config.PRConfig.Assignees) > 0 {
-			merged.PRConfig.Assignees = config.PRConfig.Assignees
+		if len(config.PR.Assignees) > 0 {
+			merged.PR.Assignees = config.PR.Assignees
 		}
 		if config.Scanner.Type != "" {
 			merged.Scanner.Type = config.Scanner.Type
@@ -199,6 +204,16 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		if len(config.Scanner.Params) > 0 {
 			merged.Scanner.Params = config.Scanner.Params
 		}
+		// Merge Git provider configuration
+		if config.Git.Provider != "" {
+			merged.Git.Provider = config.Git.Provider
+		}
+		if config.Git.BaseURL != "" {
+			merged.Git.BaseURL = config.Git.BaseURL
+		}
+		if config.Git.Token != "" {
+			merged.Git.Token = config.Git.Token
+		}
 	}
 
 	return merged
@@ -206,13 +221,6 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 
 // ApplyDefaults applies default values to configuration
 func (c *ConfigReader) ApplyDefaults(config *DependaBotConfig) *DependaBotConfig {
-	if config.Branch == "" {
-		config.Branch = "main"
-	}
-	if config.BranchPrefix == "" {
-		config.BranchPrefix = "dependabot/security-updates"
-	}
-
 	// Apply scanner defaults (prefer new format over legacy)
 	// If neither scanner config nor trivy config is set, apply defaults to both for backward compatibility
 	if config.Scanner.Type == "" {
