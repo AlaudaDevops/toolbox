@@ -21,27 +21,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/pipeline"
-)
-
-var (
-	// cfgFile is the external configuration file path
-	cfgFile string
-	// projectDir is the path to the project directory containing go.mod
-	projectDir string
-	// repo is the repository URL to clone and analyze
-	repo string
-	// branch is the branch to clone and create PR against (default: main)
-	branch string
-	// createPR enables automatic PR creation
-	createPR bool
-	// debug enables debug log output
-	debug bool
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -54,14 +39,6 @@ in your projects based on Trivy security scan results.
 It supports multiple programming languages and can automatically create
 pull requests with the security fixes.
 
-The tool can either use existing Trivy scan results or automatically run
-Trivy scanning if no results file is provided.
-
-Configuration can be provided via:
-1. Repository configuration: .github/dependabot.yml or .github/dependabot.yaml
-2. External configuration file (--config flag)
-3. Command line flags (highest priority)
-
 Example usage:
   # Local project mode (automatic scan)
   dependabot --dir /path/to/project
@@ -69,12 +46,13 @@ Example usage:
   dependabot --dir /path/to/project --create-pr=false
 
   # Remote repository mode (clone + automatic scan)
-  dependabot --repo https://github.com/user/repo.git
-  dependabot --repo git@github.com:user/repo.git --branch main
-  dependabot --repo https://github.com/user/repo.git --create-pr=false
+  dependabot --repo.url https://github.com/user/repo.git
+  dependabot --repo.url git@github.com:user/repo.git --repo.branch main
+  dependabot --repo.url https://github.com/user/repo.git --pr.autoCreate=false
 
   # Using external configuration file
-  dependabot --repo https://github.com/user/repo.git --config my-config.yml`,
+  dependabot --repo.url https://github.com/user/repo.git --config my-config.yml`,
+
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runDependaBot()
 	},
@@ -89,55 +67,37 @@ func Execute() {
 	}
 }
 
-func init() {
-	// Persistent flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file")
-
-	// Optional flags
-	rootCmd.Flags().StringVar(&projectDir, "dir", ".", "path to project directory containing go.mod (default: current directory)")
-	rootCmd.Flags().StringVar(&repo, "repo", "", "repository URL to clone and analyze (alternative to dir)")
-	rootCmd.Flags().StringVar(&branch, "branch", "main", "branch to clone and create PR against")
-	rootCmd.Flags().BoolVar(&createPR, "create-pr", false, "enable automatic PR creation")
-	rootCmd.Flags().BoolVar(&debug, "debug", false, "enable debug log output")
-
-	cobra.OnInitialize(func() {
-		if debug {
-			logrus.SetLevel(logrus.DebugLevel)
-			logrus.Debug("Debug logging enabled")
-		} else {
-			logrus.SetLevel(logrus.InfoLevel)
-		}
-	})
-}
-
 // runDependaBot runs the main DependaBot pipeline
 func runDependaBot() error {
-	// Get values directly from cobra flags
-	projectDirPath := projectDir
-	repositoryURL := repo
-	targetBranchName := branch
-	enablePRCreation := createPR
-
-	// Show config file being used if specified
-	if cfgFile != "" {
-		logrus.Infof("Using config file: %s", cfgFile)
+	if viper.GetBool("debug") {
+		logrus.SetLevel(logrus.DebugLevel)
+		logrus.Debug("Debug logging enabled")
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
 	}
 
+	var cfg config.DependaBotConfig
+	err := viper.Unmarshal(&cfg)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal repository configuration: %w", err)
+	}
+	// Get values directly from cobra flags
+	projectDirPath := viper.GetString("dir")
+
 	// Validate input parameters
-	if repositoryURL != "" && projectDirPath != "." {
+	if cfg.Repo.URL != "" && projectDirPath != "." {
 		return fmt.Errorf("cannot specify both --repo and --dir. Use --repo for remote repositories or --dir for local projects")
 	}
 
-	if repositoryURL == "" && projectDirPath == "" {
+	if cfg.Repo.URL == "" && projectDirPath == "" {
 		projectDirPath = "."
 	}
 
-	// Step 0: Handle repository cloning if needed
 	var workingProjectPath string
 	var gitCloner *git.GitCloner
 
-	if repositoryURL != "" {
-		logrus.Infof("Cloning remote repository: %s", repositoryURL)
+	if cfg.Repo.URL != "" {
+		logrus.Infof("Cloning remote repository: %s", cfg.Repo.URL)
 
 		// Check if git is installed
 		if err := git.CheckGitInstalled(); err != nil {
@@ -145,7 +105,7 @@ func runDependaBot() error {
 		}
 
 		// Clone repository with specified branch
-		gitCloner = git.NewGitCloner(repositoryURL, targetBranchName)
+		gitCloner = git.NewGitCloner(cfg.Repo.URL, cfg.Repo.Branch)
 
 		clonedPath, err := gitCloner.CloneRepository()
 		if err != nil {
@@ -162,49 +122,29 @@ func runDependaBot() error {
 	} else {
 		var err error
 		g := git.NewGitOperator(projectDirPath)
-		repositoryURL, err = g.GetRepoURL()
+		cfg.Repo.URL, err = g.GetRepoURL()
 		if err != nil {
 			return fmt.Errorf("failed to get repo info: %w", err)
 		}
-		targetBranchName, err = g.GetCurrentBranch()
+		cfg.Repo.Branch, err = g.GetCurrentBranch()
 		if err != nil {
 			return fmt.Errorf("failed to get branch info: %w", err)
 		}
 		workingProjectPath = projectDirPath
 	}
 
-	// Step 1: Read and merge all configurations
 	logrus.Info("Reading and merging configurations...")
 
 	configReader := config.NewConfigReader()
 
-	// 1.1: Read repository configuration
 	repoConfig, err := configReader.ReadRepoConfig(workingProjectPath)
 	if err != nil {
 		logrus.Warnf("Warning: failed to read repository config: %v", err)
 		repoConfig = &config.DependaBotConfig{}
 	}
 
-	// 1.2: Read external configuration if provided
-	externalConfig, err := configReader.ReadExternalConfig(cfgFile)
-	if err != nil {
-		return fmt.Errorf("failed to read external config: %w", err)
-	}
-
-	// 1.3: Create CLI configuration from command line flags
-	cliConfig := &config.DependaBotConfig{
-		Repo: config.Repo{
-			URL:    repositoryURL,
-			Branch: targetBranchName,
-		},
-		PRConfig: config.PRConfig{
-			AutoCreate: &enablePRCreation,
-		},
-	}
-
-	// 1.4: Merge configurations (repo config -> external config -> CLI config)
 	// CLI config has highest priority
-	finalConfig := configReader.MergeConfigs(repoConfig, externalConfig, cliConfig)
+	finalConfig := configReader.MergeConfigs(repoConfig, &cfg)
 	finalConfig = configReader.ApplyDefaults(finalConfig)
 
 	// Step 2: Convert to pipeline configuration

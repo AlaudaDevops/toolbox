@@ -29,38 +29,38 @@ import (
 // DependaBotConfig represents the complete configuration for DependaBot (legacy format)
 type DependaBotConfig struct {
 	// Repo contains repository information
-	Repo Repo `yaml:"repo" json:"repo"`
-	// PRConfig contains PR-specific configuration
-	PRConfig PRConfig `yaml:"pr" json:"pr"`
+	Repo RepoConfig `yaml:"repo" json:"repo" mapstructure:"repo"`
+	// PR contains PR-specific configuration
+	PR PRConfig `yaml:"pr" json:"pr" mapstructure:"pr"`
 	// Scanner contains scanner configuration (supports multiple scanner types)
-	Scanner ScannerConfig `yaml:"scanner" json:"scanner"`
+	Scanner ScannerConfig `yaml:"scanner" json:"scanner" mapstructure:"scanner"`
 	// Git contains git provider configuration
-	Git GitProvider `yaml:"git" json:"git"`
+	Git GitProviderConfig `yaml:"git" json:"git" mapstructure:"git"`
 }
 
-type Repo struct {
+type RepoConfig struct {
 	// URL is the repository URL (e.g., "https://github.com/example/repo")
-	URL string `yaml:"url" json:"url"`
+	URL string `yaml:"url" json:"url" mapstructure:"url"`
 	// Branch is the repository branch (e.g., "main")
-	Branch string `yaml:"branch" json:"branch"`
+	Branch string `yaml:"branch" json:"branch" mapstructure:"branch"`
 }
 
-type GitProvider struct {
+type GitProviderConfig struct {
 	// Provider is the type of git provider (e.g., "github", "gitlab")
-	Provider string `yaml:"provider" json:"provider"`
+	Provider string `yaml:"provider" json:"provider" mapstructure:"provider"`
 	// BaseURL is the base URL of the git provider (e.g., "https://github.com")
-	BaseURL string `yaml:"baseURL" json:"baseURL"`
+	BaseURL string `yaml:"baseURL" json:"baseURL" mapstructure:"baseURL"`
 	// Token is the authentication token for the git provider
-	Token string `yaml:"token" json:"token"`
+	Token string `yaml:"token" json:"token" mapstructure:"token"`
 }
 
 // PRConfig contains pull request configuration
 type PRConfig struct {
-	AutoCreate *bool `yaml:"autoCreate" json:"autoCreate"`
+	AutoCreate *bool `yaml:"autoCreate" json:"autoCreate" mapstructure:"autoCreate"`
 	// Labels are labels to add to the created PR
-	Labels []string `yaml:"labels" json:"labels"`
+	Labels []string `yaml:"labels" json:"labels" mapstructure:"labels"`
 	// Assignees are users to assign to the created PR
-	Assignees []string `yaml:"assignees" json:"assignees"`
+	Assignees []string `yaml:"assignees" json:"assignees" mapstructure:"assignees"`
 }
 
 func (p *PRConfig) NeedCreatePR() bool {
@@ -70,21 +70,11 @@ func (p *PRConfig) NeedCreatePR() bool {
 // ScannerConfig contains generic scanner configuration
 type ScannerConfig struct {
 	// Type specifies the scanner type (e.g., "trivy", "govulncheck")
-	Type string `yaml:"type" json:"type"`
+	Type string `yaml:"type" json:"type" mapstructure:"type"`
 	// Timeout for scanner execution (e.g., "5m")
-	Timeout string `yaml:"timeout" json:"timeout"`
+	Timeout string `yaml:"timeout" json:"timeout" mapstructure:"timeout"`
 	// Params contains scanner-specific parameters
-	Params []string `yaml:"params" json:"params"`
-}
-
-// TrivyConfig contains Trivy scanning configuration (deprecated, use ScannerConfig)
-type TrivyConfig struct {
-	// Scanners specifies which trivy scanners to use
-	Scanners []string `yaml:"scanners" json:"scanners"`
-	// IgnoreUnfixed ignores vulnerabilities without fixes
-	IgnoreUnfixed bool `yaml:"ignore_unfixed" json:"ignore_unfixed"`
-	// Timeout for trivy scan (e.g., "5m")
-	Timeout string `yaml:"timeout" json:"timeout"`
+	Params []string `yaml:"params" json:"params" mapstructure:"params"`
 }
 
 // PipelineScannerConfig represents scanner config for pipeline
@@ -172,8 +162,8 @@ func (c *ConfigReader) convertFromGitHubFormat(githubConfig *GitHubDependabotCon
 	}
 
 	// Map labels and assignees
-	config.PRConfig.Labels = goUpdate.Labels
-	config.PRConfig.Assignees = goUpdate.Assignees
+	config.PR.Labels = goUpdate.Labels
+	config.PR.Assignees = goUpdate.Assignees
 
 	return config
 }
@@ -196,14 +186,14 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 			merged.Repo.Branch = config.Repo.Branch
 		}
 		// Merge PR config
-		if config.PRConfig.AutoCreate != nil {
-			merged.PRConfig.AutoCreate = config.PRConfig.AutoCreate
+		if config.PR.AutoCreate != nil {
+			merged.PR.AutoCreate = config.PR.AutoCreate
 		}
-		if len(config.PRConfig.Labels) > 0 {
-			merged.PRConfig.Labels = config.PRConfig.Labels
+		if len(config.PR.Labels) > 0 {
+			merged.PR.Labels = config.PR.Labels
 		}
-		if len(config.PRConfig.Assignees) > 0 {
-			merged.PRConfig.Assignees = config.PRConfig.Assignees
+		if len(config.PR.Assignees) > 0 {
+			merged.PR.Assignees = config.PR.Assignees
 		}
 		if config.Scanner.Type != "" {
 			merged.Scanner.Type = config.Scanner.Type
@@ -231,14 +221,6 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 
 // ApplyDefaults applies default values to configuration
 func (c *ConfigReader) ApplyDefaults(config *DependaBotConfig) *DependaBotConfig {
-	if config.Repo.Branch == "" {
-		config.Repo.Branch = "main"
-	}
-
-	if config.Git.Token == "" {
-		config.Git.Token = os.Getenv("DEPENDABOT_GIT_TOKEN")
-	}
-
 	// Apply scanner defaults (prefer new format over legacy)
 	// If neither scanner config nor trivy config is set, apply defaults to both for backward compatibility
 	if config.Scanner.Type == "" {

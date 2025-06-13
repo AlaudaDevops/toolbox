@@ -44,7 +44,7 @@ func NewGitLabPRCreator(baseURL, token string, workingDir string) (*GitLabPRCrea
 	}, nil
 }
 
-func (g *GitLabPRCreator) getRepoID(repo *config.Repo) (int, error) {
+func (g *GitLabPRCreator) getRepoID(repo *config.RepoConfig) (int, error) {
 	gitRepo, err := git.ParseRepoURL(repo.URL)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse repository URL: %w", err)
@@ -57,7 +57,7 @@ func (g *GitLabPRCreator) getRepoID(repo *config.Repo) (int, error) {
 }
 
 // CreatePR creates a merge request based on the update result
-func (g *GitLabPRCreator) CreatePR(repo *config.Repo, sourceBranch string, option PRCreateOption) error {
+func (g *GitLabPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) error {
 	repoID, err := g.getRepoID(repo)
 	if err != nil {
 		return err
