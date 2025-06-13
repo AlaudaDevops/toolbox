@@ -154,7 +154,7 @@ func (p *Pipeline) commitChanges(updateSummary *updater.UpdateSummary) (newBranc
 		return "", fmt.Errorf("failed to create branch: %w", err)
 	}
 
-	commitMessage := p.generateCommitMessage(updateSummary)
+	commitMessage := generateCommitMessage(updateSummary)
 	if err := gitOperator.CommitChanges(commitMessage); err != nil {
 		return "", fmt.Errorf("failed to commit changes: %w", err)
 	}
@@ -169,19 +169,4 @@ func (p *Pipeline) commitChanges(updateSummary *updater.UpdateSummary) (newBranc
 // generateBranchName generates a unique branch name
 func (p *Pipeline) generateBranchName(branchPrefix, baseCommitID string) string {
 	return fmt.Sprintf("%s-%s", branchPrefix, baseCommitID[0:7])
-}
-
-// generateCommitMessage generates a commit message for the updates
-func (p *Pipeline) generateCommitMessage(result *updater.UpdateSummary) string {
-	if len(result.SuccessfulUpdates) == 1 {
-		update := result.SuccessfulUpdates[0]
-		return fmt.Sprintf("fix: update %s from %s to %s\n\nFixes security vulnerabilities: %v",
-			update.PackageName,
-			update.CurrentVersion,
-			update.FixedVersion,
-			update.VulnerabilityIDs)
-	}
-
-	return fmt.Sprintf("fix: update %d vulnerable dependencies\n\nSecurity updates for multiple packages",
-		len(result.SuccessfulUpdates))
 }
