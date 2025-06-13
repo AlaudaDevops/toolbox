@@ -94,7 +94,7 @@ func (p *Pipeline) Run() error {
 
 	logrus.Debugf("Successfully updated %d packages", len(updateSummary.SuccessfulUpdates))
 	logrus.Debugf("PR Description:\n%s", pr.GeneratePRBody(updateSummary))
-	if !p.config.PRConfig.NeedCreatePR() {
+	if !p.config.PR.NeedCreatePR() {
 		logrus.Info("Auto PR creation is disabled, skipping Git and PR operations")
 		return nil
 	}
@@ -112,8 +112,8 @@ func (p *Pipeline) Run() error {
 	}
 
 	if err := prCreator.CreatePR(&p.config.Repo, branchName, pr.PRCreateOption{
-		Labels:        p.config.PRConfig.Labels,
-		Assignees:     p.config.PRConfig.Assignees,
+		Labels:        p.config.PR.Labels,
+		Assignees:     p.config.PR.Assignees,
 		UpdateSummary: *updateSummary,
 	}); err != nil {
 		return fmt.Errorf("failed to create PR: %w", err)

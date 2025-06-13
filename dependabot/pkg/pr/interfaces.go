@@ -43,14 +43,14 @@ type PRCreateOption struct {
 // PRCreator defines the interface for creating pull requests
 type PRCreator interface {
 	// CreatePR creates a pull request based on the update result
-	CreatePR(repo *config.Repo, sourceBranch string, option PRCreateOption) error
+	CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) error
 
 	// GetPlatformType returns the type of platform (github, gitlab, etc.)
 	GetPlatformType() string
 }
 
 // NewPRCreator creates a new PRCreator based on the git provider configuration
-func NewPRCreator(provider config.GitProvider, workingDir string) (PRCreator, error) {
+func NewPRCreator(provider config.GitProviderConfig, workingDir string) (PRCreator, error) {
 	switch provider.Provider {
 	case "github":
 		return NewGitHubPRCreator(provider.BaseURL, provider.Token, workingDir), nil
