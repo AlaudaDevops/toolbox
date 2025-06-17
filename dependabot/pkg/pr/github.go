@@ -23,6 +23,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/google/go-github/v58/github"
 	"github.com/sirupsen/logrus"
 )
@@ -55,14 +56,18 @@ func NewGitHubPRCreator(baseURL, token string, workingDir string) *GitHubPRCreat
 
 // CreatePR creates a pull request based on the update result
 // If PR already exists, it will update the existing PR instead of creating a new one
-func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) error {
+func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) (types.PRInfo, error) {
+	prInfo := types.PRInfo{
+		SourceBranch: sourceBranch,
+		TargetBranch: repo.Branch,
+	}
 	if len(option.UpdateSummary.FixedVulns()) == 0 {
-		return fmt.Errorf("no successful updates to create PR for")
+		return prInfo, fmt.Errorf("no successful updates to create PR for")
 	}
 
 	gitRepo, err := git.ParseRepoURL(repo.URL)
 	if err != nil {
-		return fmt.Errorf("failed to parse repository URL: %w", err)
+		return prInfo, fmt.Errorf("failed to parse repository URL: %w", err)
 	}
 
 	ctx := context.Background()
@@ -70,6 +75,7 @@ func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 	// Generate PR title and body
 	title := generatePRTitle(option.UpdateSummary)
 	body := GeneratePRBody(option.UpdateSummary)
+	prInfo.Title = title
 
 	// Check if PR already exists
 	existingPR, err := g.checkExistingPR(gitRepo, sourceBranch, repo.Branch)
@@ -81,7 +87,7 @@ func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 	if existingPR != nil {
 		// Update existing PR
 		logrus.Debugf("Found existing PR #%d, updating...", existingPR.Number)
-		return g.updateExistingPR(gitRepo, existingPR.Number, title, body, option)
+		return *existingPR, g.updateExistingPR(gitRepo, existingPR.Number, title, body, option)
 	}
 
 	// Create new pull request
@@ -95,8 +101,11 @@ func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 
 	pr, _, err := g.client.PullRequests.Create(ctx, gitRepo.Group, gitRepo.Repo, newPR)
 	if err != nil {
-		return fmt.Errorf("failed to create PR: %w", err)
+		return prInfo, fmt.Errorf("failed to create PR: %w", err)
 	}
+
+	prInfo.Number = pr.GetNumber()
+	prInfo.URL = pr.GetHTMLURL()
 
 	// Add labels if any
 	if len(option.Labels) > 0 {
@@ -115,11 +124,11 @@ func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 	}
 
 	logrus.Debugf("Successfully created pull request #%d", pr.GetNumber())
-	return nil
+	return prInfo, nil
 }
 
 // checkExistingPR checks if a PR already exists for the given source and target branches
-func (g *GitHubPRCreator) checkExistingPR(gitRepo *git.Repository, sourceBranch, targetBranch string) (*PRInfo, error) {
+func (g *GitHubPRCreator) checkExistingPR(gitRepo *git.Repository, sourceBranch, targetBranch string) (*types.PRInfo, error) {
 	ctx := context.Background()
 
 	// List open PRs with the same head branch
@@ -138,10 +147,12 @@ func (g *GitHubPRCreator) checkExistingPR(gitRepo *git.Repository, sourceBranch,
 		return nil, nil // No existing PR found
 	}
 
-	return &PRInfo{
-		Number: prs[0].GetNumber(),
-		Title:  prs[0].GetTitle(),
-		State:  prs[0].GetState(),
+	return &types.PRInfo{
+		SourceBranch: sourceBranch,
+		TargetBranch: targetBranch,
+		Title:        prs[0].GetTitle(),
+		Number:       prs[0].GetNumber(),
+		URL:          prs[0].GetHTMLURL(),
 	}, nil
 }
 

@@ -165,3 +165,16 @@ git:
   token: xxx
   baseUrl: https://gitlab.example.com
 ```
+
+### Notice Configuration
+
+Notice configuration is used to send notifications about the vulnerability updates.
+
+Currently, only WeCom webhook is supported.
+
+```yaml
+notice:
+  type: "wecom"  # or "wechat"
+  params:
+    webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
+```

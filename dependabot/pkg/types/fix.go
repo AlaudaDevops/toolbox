@@ -69,19 +69,3 @@ func (v VulnFixResults) FixSummary() string {
 
 	return fmt.Sprintf("Updated %d packages successfully, %d failed", v.FixedVulnCount(), v.FixFailedVulnCount())
 }
-
-// PRRequest represents a pull request creation request
-type PRRequest struct {
-	// Title is the pull request title
-	Title string
-	// Body is the pull request body/description
-	Body string
-	// SourceBranch is the branch containing changes
-	SourceBranch string
-	// TargetBranch is the branch to merge into (usually main/master)
-	TargetBranch string
-	// Labels are labels to add to the pull request
-	Labels []string
-	// Assignees are users to assign to the pull request
-	Assignees []string
-}

@@ -52,15 +52,17 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 	failedErrors := make([]error, 0, len(vulnerabilities))
 	// Process each directory separately
 	for _, vuln := range vulnerabilities {
+		fixResult := types.VulnFixResult{
+			Vulnerability: vuln,
+			Success:       true,
+		}
 		err := g.updatePackage(vuln)
 		if err != nil {
+			fixResult.Success = false
+			fixResult.Error = err.Error()
 			failedErrors = append(failedErrors, err)
 		}
-		result = append(result, types.VulnFixResult{
-			Vulnerability: vuln,
-			Success:       err == nil,
-			Error:         err.Error(),
-		})
+		result = append(result, fixResult)
 	}
 
 	// Print overall summary

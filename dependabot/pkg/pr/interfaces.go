@@ -24,16 +24,6 @@ import (
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 )
 
-// PRInfo represents basic information about a pull request
-type PRInfo struct {
-	// Number is the pull request number
-	Number int `json:"number"`
-	// Title is the pull request title
-	Title string `json:"title"`
-	// State is the pull request state (open, closed, merged)
-	State string `json:"state"`
-}
-
 type PRCreateOption struct {
 	Labels        []string             `json:"labels" yaml:"labels"`
 	Assignees     []string             `json:"assignees" yaml:"assignees"`
@@ -43,7 +33,7 @@ type PRCreateOption struct {
 // PRCreator defines the interface for creating pull requests
 type PRCreator interface {
 	// CreatePR creates a pull request based on the update result
-	CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) error
+	CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) (types.PRInfo, error)
 
 	// GetPlatformType returns the type of platform (github, gitlab, etc.)
 	GetPlatformType() string

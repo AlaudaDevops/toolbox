@@ -22,6 +22,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/notice"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/pr"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
@@ -113,11 +114,12 @@ func (p *Pipeline) Run() error {
 		return fmt.Errorf("failed to initialize PR creator: %w", err)
 	}
 
-	if err := prCreator.CreatePR(&p.config.Repo, branchName, pr.PRCreateOption{
+	prInfo, err := prCreator.CreatePR(&p.config.Repo, branchName, pr.PRCreateOption{
 		Labels:        p.config.PR.Labels,
 		Assignees:     p.config.PR.Assignees,
 		UpdateSummary: updateSummary,
-	}); err != nil {
+	})
+	if err != nil {
 		return fmt.Errorf("failed to create PR: %w", err)
 	}
 
@@ -126,7 +128,34 @@ func (p *Pipeline) Run() error {
 	logrus.Debugf("   - Branch: %s", branchName)
 	logrus.Debugf("   - Target: %s", p.config.Repo.Branch)
 
+	// Send notification if configured
+	if notice.IsNotificationEnabled(p.config.Notice) {
+		logrus.Info("Sending notification...")
+		if err := p.sendNotification(p.config.Repo.URL, updateSummary, prInfo); err != nil {
+			// Don't fail the entire pipeline if notification fails
+			logrus.Warnf("Warning: Failed to send notification: %v", err)
+		} else {
+			logrus.Info("✅ Notification sent successfully")
+		}
+	}
+
+	logrus.Info("✅ Pipeline completed successfully!")
 	return nil
+}
+
+// sendNotification sends a notification about the vulnerability updates
+func (p *Pipeline) sendNotification(repoURL string, updateSummary types.VulnFixResults, prInfo types.PRInfo) error {
+	notifier, err := notice.NewNotifier(p.config.Notice)
+	if err != nil {
+		return fmt.Errorf("failed to create notifier: %w", err)
+	}
+
+	if notifier == nil {
+		// No notifier configured
+		return nil
+	}
+
+	return notifier.Notify(repoURL, updateSummary, prInfo)
 }
 
 func (p *Pipeline) commitChanges(updateSummary types.VulnFixResults) (newBranchName string, err error) {

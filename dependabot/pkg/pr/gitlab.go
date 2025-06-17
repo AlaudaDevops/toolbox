@@ -21,6 +21,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/sirupsen/logrus"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -57,19 +58,24 @@ func (g *GitLabPRCreator) getRepoID(repo *config.RepoConfig) (int, error) {
 }
 
 // CreatePR creates a merge request based on the update result
-func (g *GitLabPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) error {
+func (g *GitLabPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) (types.PRInfo, error) {
+	prInfo := types.PRInfo{
+		SourceBranch: sourceBranch,
+		TargetBranch: repo.Branch,
+	}
 	repoID, err := g.getRepoID(repo)
 	if err != nil {
-		return err
+		return prInfo, err
 	}
 
 	if len(option.UpdateSummary.FixedVulns()) == 0 {
-		return fmt.Errorf("no successful updates to create merge request for")
+		return prInfo, fmt.Errorf("no successful updates to create merge request for")
 	}
 
 	// Generate MR title and description
 	title := generatePRTitle(option.UpdateSummary)
 	description := GeneratePRBody(option.UpdateSummary)
+	prInfo.Title = title
 
 	// Check if MR already exists
 	existingMR, err := g.checkExistingMR(repoID, sourceBranch, repo.Branch)
@@ -81,7 +87,7 @@ func (g *GitLabPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 	if existingMR != nil {
 		// Update existing MR
 		logrus.Debugf("Found existing merge request !%d, updating...", existingMR.Number)
-		return g.updateExistingMR(repoID, existingMR.Number, title, description, option)
+		return *existingMR, g.updateExistingMR(repoID, existingMR.Number, title, description, option)
 	}
 
 	// Create new merge request
@@ -97,11 +103,14 @@ func (g *GitLabPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 
 	mr, _, err := g.client.MergeRequests.CreateMergeRequest(repoID, opts)
 	if err != nil {
-		return fmt.Errorf("failed to create merge request: %w", err)
+		return prInfo, fmt.Errorf("failed to create merge request: %w", err)
 	}
 
+	prInfo.Number = mr.IID
+	prInfo.URL = mr.WebURL
+
 	logrus.Debugf("Successfully created merge request !%d: %s", mr.IID, mr.WebURL)
-	return nil
+	return prInfo, nil
 }
 
 // GetPlatformType returns the type of platform
@@ -110,7 +119,7 @@ func (g *GitLabPRCreator) GetPlatformType() string {
 }
 
 // checkExistingMR checks if a merge request already exists for the given source and target branches
-func (g *GitLabPRCreator) checkExistingMR(repoID int, sourceBranch, targetBranch string) (*PRInfo, error) {
+func (g *GitLabPRCreator) checkExistingMR(repoID int, sourceBranch, targetBranch string) (*types.PRInfo, error) {
 	expectState := "opened"
 	opts := &gitlab.ListProjectMergeRequestsOptions{
 		SourceBranch: &sourceBranch,
@@ -129,10 +138,12 @@ func (g *GitLabPRCreator) checkExistingMR(repoID int, sourceBranch, targetBranch
 
 	// Return the first matching MR
 	mr := mrs[0]
-	return &PRInfo{
-		Number: mr.IID,
-		Title:  mr.Title,
-		State:  string(mr.State),
+	return &types.PRInfo{
+		Title:        mr.Title,
+		SourceBranch: sourceBranch,
+		TargetBranch: targetBranch,
+		Number:       mr.IID,
+		URL:          mr.WebURL,
 	}, nil
 }
 
