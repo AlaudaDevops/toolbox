@@ -24,9 +24,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/sirupsen/logrus"
-
-	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
 )
 
 // GoUpdater handles updating Go packages
@@ -44,49 +43,52 @@ func NewGoUpdater(projectPath string) *GoUpdater {
 
 // UpdatePackages updates vulnerable Go packages to their fixed versions
 // Supports mono repo scenarios by grouping vulnerabilities by PackageDir
-func (g *GoUpdater) UpdatePackages(vulnerabilities []scanner.Vulnerability) error {
+func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types.VulnFixResults, error) {
 	if len(vulnerabilities) == 0 {
-		return nil
+		return nil, nil
 	}
 
-	// Track overall statistics
-	var allUpdateErrors []string
-	totalSuccessCount := 0
-
+	result := types.VulnFixResults{}
+	failedErrors := make([]error, 0, len(vulnerabilities))
 	// Process each directory separately
 	for _, vuln := range vulnerabilities {
+		fixResult := types.VulnFixResult{
+			Vulnerability: vuln,
+			Success:       true,
+		}
 		err := g.updatePackage(vuln)
 		if err != nil {
-			allUpdateErrors = append(allUpdateErrors, err.Error())
-		} else {
-			totalSuccessCount += 1
+			fixResult.Success = false
+			fixResult.Error = err.Error()
+			failedErrors = append(failedErrors, err)
 		}
+		result = append(result, fixResult)
 	}
 
 	// Print overall summary
 	logrus.Debugf("=== Overall Golang Update Summary ===")
-	logrus.Debugf("  Successfully updated: %d packages", totalSuccessCount)
-	logrus.Debugf("  Failed to update: %d packages", len(allUpdateErrors))
+	logrus.Debugf("  Successfully updated: %d packages", result.FixedVulnCount())
+	logrus.Debugf("  Failed to update: %d packages", result.FixFailedVulnCount())
 
-	if len(allUpdateErrors) > 0 {
+	if len(failedErrors) > 0 {
 		logrus.Debugf("Errors encountered:")
-		for _, errorMsg := range allUpdateErrors {
-			logrus.Debugf("  - %s", errorMsg)
+		for _, err := range failedErrors {
+			logrus.Debugf("  - %s", err.Error())
 		}
-		return fmt.Errorf("failed to update %d out of %d packages", len(allUpdateErrors), len(vulnerabilities))
+		return result, fmt.Errorf("failed to update %d out of %d packages", result.FixedVulnCount(), result.TotalVulnCount())
 	}
 
-	return nil
+	return result, nil
 }
 
 // GetLanguageType returns the language type this updater handles
-func (g *GoUpdater) GetLanguageType() LanguageType {
-	return LanguageGo
+func (g *GoUpdater) GetLanguageType() types.LanguageType {
+	return types.LanguageGo
 }
 
 // updatePackage updates a single Go package using go get
 // Note: This method assumes the current working directory is already set to the correct package directory
-func (g *GoUpdater) updatePackage(vuln scanner.Vulnerability) error {
+func (g *GoUpdater) updatePackage(vuln types.Vulnerability) error {
 	// Construct the go get command
 	packageWithVersion := fmt.Sprintf("%s@v%s", vuln.PackageName, strings.TrimPrefix(vuln.FixedVersion, "v"))
 

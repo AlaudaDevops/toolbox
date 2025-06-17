@@ -18,12 +18,12 @@ package config
 
 // GitHubDependabotConfig represents GitHub Dependabot compatible configuration
 type GitHubDependabotConfig struct {
-	Version int                      `yaml:"version" json:"version"`
-	Updates []DependabotUpdateConfig `yaml:"updates" json:"updates"`
+	Version int                            `yaml:"version" json:"version"`
+	Updates []GitHubDependabotUpdateConfig `yaml:"updates" json:"updates"`
 }
 
-// DependabotUpdateConfig represents a single package ecosystem update configuration
-type DependabotUpdateConfig struct {
+// GitHubDependabotUpdateConfig represents a single package ecosystem update configuration
+type GitHubDependabotUpdateConfig struct {
 	PackageEcosystem string   `yaml:"package-ecosystem" json:"package-ecosystem"`
 	Labels           []string `yaml:"labels,omitempty" json:"labels,omitempty"`
 	Assignees        []string `yaml:"assignees,omitempty" json:"assignees,omitempty"`

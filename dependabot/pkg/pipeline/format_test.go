@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	. "github.com/onsi/gomega"
 )
 
@@ -36,7 +36,7 @@ func Test_generateCommitMessage(t *testing.T) {
 			inputData, err := os.ReadFile(filepath.Join("testdata", tt.inputFile))
 			g.Expect(err).NotTo(HaveOccurred(), "Failed to read input file %s", tt.inputFile)
 
-			var updateSummary updater.UpdateSummary
+			var updateSummary types.VulnFixResults
 			err = json.Unmarshal(inputData, &updateSummary)
 			g.Expect(err).NotTo(HaveOccurred(), "Failed to unmarshal input data from %s", tt.inputFile)
 
@@ -45,7 +45,7 @@ func Test_generateCommitMessage(t *testing.T) {
 			g.Expect(err).NotTo(HaveOccurred(), "Failed to read expected output file %s", tt.goldenFile)
 
 			// Generate commit message
-			got := generateCommitMessage(&updateSummary)
+			got := generateCommitMessage(updateSummary)
 
 			// Remove trailing newlines for comparison
 			expectedStr := strings.TrimRight(string(expected), "\n")

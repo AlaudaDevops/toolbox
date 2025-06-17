@@ -28,8 +28,9 @@ import (
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/version"
-	"github.com/aquasecurity/trivy/pkg/types"
+	trivyTypes "github.com/aquasecurity/trivy/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
@@ -57,7 +58,7 @@ func (t *TrivyScanner) GetName() string {
 }
 
 // Scan performs the security scan and returns vulnerabilities
-func (t *TrivyScanner) Scan() ([]Vulnerability, error) {
+func (t *TrivyScanner) Scan() ([]types.Vulnerability, error) {
 	logrus.Infof("Running %s scan", t.GetName())
 
 	// Check if trivy is installed
@@ -182,7 +183,7 @@ func CheckTrivyInstalled() error {
 }
 
 // ParseTrivyResults parses trivy scan results from a JSON file and returns Go package vulnerabilities
-func ParseTrivyResults(filePath string) ([]Vulnerability, error) {
+func ParseTrivyResults(filePath string) ([]types.Vulnerability, error) {
 	if filePath == "" {
 		return nil, fmt.Errorf("trivy result file path cannot be empty")
 	}
@@ -198,7 +199,7 @@ func ParseTrivyResults(filePath string) ([]Vulnerability, error) {
 		return nil, fmt.Errorf("failed to read trivy result file: %w", err)
 	}
 
-	var trivyReport types.Report
+	var trivyReport trivyTypes.Report
 	if err := json.Unmarshal(data, &trivyReport); err != nil {
 		return nil, fmt.Errorf("failed to parse trivy result JSON: %w", err)
 	}
@@ -207,8 +208,8 @@ func ParseTrivyResults(filePath string) ([]Vulnerability, error) {
 }
 
 // extractGoVulnerabilities extracts Go package vulnerabilities from trivy results
-func extractGoVulnerabilities(trivyReport types.Report) []Vulnerability {
-	var vulnerabilities []Vulnerability
+func extractGoVulnerabilities(trivyReport trivyTypes.Report) []types.Vulnerability {
+	var vulnerabilities []types.Vulnerability
 
 	for _, result := range trivyReport.Results {
 		// Only process Go module targets
@@ -216,7 +217,7 @@ func extractGoVulnerabilities(trivyReport types.Report) []Vulnerability {
 			continue
 		}
 
-		packageVulns := make(map[string]Vulnerability, len(result.Vulnerabilities))
+		packageVulns := make(map[string]types.Vulnerability, len(result.Vulnerabilities))
 
 		for _, vuln := range result.Vulnerabilities {
 			// Skip vulnerabilities without fixed versions
@@ -233,7 +234,7 @@ func extractGoVulnerabilities(trivyReport types.Report) []Vulnerability {
 				pkgVuln.Severity = getHighestSeverity(pkgVuln.Severity, string(vuln.Severity))
 				packageVulns[vuln.PkgName] = pkgVuln
 			} else {
-				packageVulns[vuln.PkgName] = Vulnerability{
+				packageVulns[vuln.PkgName] = types.Vulnerability{
 					PackageDir:       result.Target,
 					PackageName:      vuln.PkgName,
 					CurrentVersion:   normalizeVersionForLanguage(vuln.InstalledVersion, string(result.Type)),
@@ -287,7 +288,7 @@ func getHighestSeverity(severities ...string) string {
 }
 
 // isGoTarget checks if the target is a Go module
-func isGoTarget(result types.Result) bool {
+func isGoTarget(result trivyTypes.Result) bool {
 	return result.Type == "gomod" ||
 		result.Class == "lang-pkgs" ||
 		strings.HasSuffix(result.Target, "go.mod") ||

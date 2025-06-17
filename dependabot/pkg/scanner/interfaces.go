@@ -21,12 +21,13 @@ import (
 	"fmt"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 )
 
 // Scanner is the interface that all security scanners must implement
 type Scanner interface {
 	// Scan performs the security scan and returns vulnerabilities
-	Scan() ([]Vulnerability, error)
+	Scan() ([]types.Vulnerability, error)
 	// Cleanup cleans up any temporary resources created during scanning
 	Cleanup() error
 	// GetName returns the name of the scanner
@@ -36,29 +37,11 @@ type Scanner interface {
 // ScanResult represents the result of a security scan
 type ScanResult struct {
 	// Vulnerabilities is the list of vulnerabilities found
-	Vulnerabilities []Vulnerability `json:"vulnerabilities"`
+	Vulnerabilities []types.Vulnerability `json:"vulnerabilities"`
 	// ScannerName is the name of the scanner that produced this result
 	ScannerName string `json:"scanner_name"`
 	// ScanPath is the path that was scanned
 	ScanPath string `json:"scan_path"`
-}
-
-// Vulnerability represents a security vulnerability in a package
-type Vulnerability struct {
-	// PackageDir is the directory of the vulnerable package
-	PackageDir string `json:"package_dir"`
-	// PackageName is the name of the vulnerable package
-	PackageName string `json:"package_name"`
-	// CurrentVersion is the current version of the package
-	CurrentVersion string `json:"current_version"`
-	// FixedVersion is the version that fixes the vulnerability
-	FixedVersion string `json:"fixed_version"`
-	// VulnerabilityIDs are the identifiers of the vulnerabilities
-	VulnerabilityIDs []string `json:"vulnerability_ids"`
-	// Severity is the severity level of the vulnerability
-	Severity string `json:"severity"`
-	// Language indicates the programming language ecosystem this vulnerability belongs to
-	Language string `json:"language,omitempty"`
 }
 
 // NewScanner creates a new scanner instance based on the provided configuration

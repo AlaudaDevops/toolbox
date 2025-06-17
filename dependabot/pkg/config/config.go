@@ -36,6 +36,15 @@ type DependaBotConfig struct {
 	Scanner ScannerConfig `yaml:"scanner" json:"scanner" mapstructure:"scanner"`
 	// Git contains git provider configuration
 	Git GitProviderConfig `yaml:"git" json:"git" mapstructure:"git"`
+	// Notice contains notice configuration
+	Notice NoticeConfig `yaml:"notice" json:"notice" mapstructure:"notice"`
+}
+
+type NoticeConfig struct {
+	// Type is the type of notice (e.g., "slack", "dingtalk")
+	Type string `yaml:"type" json:"type" mapstructure:"type"`
+	// Params contains notice-specific parameters
+	Params map[string]interface{} `yaml:"params" json:"params" mapstructure:"params"`
 }
 
 type RepoConfig struct {
@@ -149,7 +158,7 @@ func (c *ConfigReader) convertFromGitHubFormat(githubConfig *GitHubDependabotCon
 	config := &DependaBotConfig{}
 
 	// Find the first Go module update configuration
-	var goUpdate *DependabotUpdateConfig
+	var goUpdate *GitHubDependabotUpdateConfig
 	for _, update := range githubConfig.Updates {
 		if update.PackageEcosystem == "gomod" {
 			goUpdate = &update
@@ -213,6 +222,13 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		}
 		if config.Git.Token != "" {
 			merged.Git.Token = config.Git.Token
+		}
+		// Merge Notice configuration
+		if config.Notice.Type != "" {
+			merged.Notice.Type = config.Notice.Type
+		}
+		if len(config.Notice.Params) > 0 {
+			merged.Notice.Params = config.Notice.Params
 		}
 	}
 

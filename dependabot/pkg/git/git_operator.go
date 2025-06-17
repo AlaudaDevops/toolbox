@@ -23,8 +23,6 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
 )
 
 // DefaultGitOperator implements GitOperator interface using system git commands
@@ -173,4 +171,4 @@ func (g *DefaultGitOperator) HasChanges() (bool, error) {
 }
 
 // Ensure DefaultGitOperator implements GitOperator interface
-var _ updater.GitOperator = (*DefaultGitOperator)(nil)
+var _ GitOperator = (*DefaultGitOperator)(nil)
