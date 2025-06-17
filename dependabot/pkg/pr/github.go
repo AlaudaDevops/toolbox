@@ -133,7 +133,9 @@ func (g *GitHubPRCreator) checkExistingPR(gitRepo *git.Repository, sourceBranch,
 
 	// List open PRs with the same head branch
 	opts := &github.PullRequestListOptions{
-		Head:  sourceBranch,
+		// head ref should contain the organization name
+		// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
+		Head:  fmt.Sprintf("%s:%s", gitRepo.Group, sourceBranch),
 		Base:  targetBranch,
 		State: "open",
 	}
