@@ -56,7 +56,7 @@ func NewGitHubPRCreator(baseURL, token string, workingDir string) *GitHubPRCreat
 // CreatePR creates a pull request based on the update result
 // If PR already exists, it will update the existing PR instead of creating a new one
 func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string, option PRCreateOption) error {
-	if len(option.UpdateSummary.SuccessfulUpdates) == 0 {
+	if len(option.UpdateSummary.FixedVulns()) == 0 {
 		return fmt.Errorf("no successful updates to create PR for")
 	}
 
@@ -68,8 +68,8 @@ func (g *GitHubPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 	ctx := context.Background()
 
 	// Generate PR title and body
-	title := generatePRTitle(&option.UpdateSummary)
-	body := GeneratePRBody(&option.UpdateSummary)
+	title := generatePRTitle(option.UpdateSummary)
+	body := GeneratePRBody(option.UpdateSummary)
 
 	// Check if PR already exists
 	existingPR, err := g.checkExistingPR(gitRepo, sourceBranch, repo.Branch)

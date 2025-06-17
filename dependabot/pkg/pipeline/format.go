@@ -3,13 +3,14 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 )
 
 // generateCommitMessage generates a commit message for the updates
-func generateCommitMessage(result *updater.UpdateSummary) string {
-	if len(result.SuccessfulUpdates) == 1 {
-		update := result.SuccessfulUpdates[0]
+func generateCommitMessage(result types.VulnFixResults) string {
+	fixedVulns := result.FixedVulns()
+	if len(fixedVulns) == 1 {
+		update := fixedVulns[0]
 		return fmt.Sprintf("fix: update %s from %s to %s\n\nFixes security vulnerabilities: %v",
 			update.PackageName,
 			update.CurrentVersion,
@@ -18,5 +19,5 @@ func generateCommitMessage(result *updater.UpdateSummary) string {
 	}
 
 	return fmt.Sprintf("fix: update %d vulnerable dependencies\n\nSecurity updates for multiple packages",
-		len(result.SuccessfulUpdates))
+		len(fixedVulns))
 }

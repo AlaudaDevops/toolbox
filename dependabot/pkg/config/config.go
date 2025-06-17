@@ -149,7 +149,7 @@ func (c *ConfigReader) convertFromGitHubFormat(githubConfig *GitHubDependabotCon
 	config := &DependaBotConfig{}
 
 	// Find the first Go module update configuration
-	var goUpdate *DependabotUpdateConfig
+	var goUpdate *GitHubDependabotUpdateConfig
 	for _, update := range githubConfig.Updates {
 		if update.PackageEcosystem == "gomod" {
 			goUpdate = &update

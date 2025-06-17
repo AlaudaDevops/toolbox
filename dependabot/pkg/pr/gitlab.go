@@ -63,13 +63,13 @@ func (g *GitLabPRCreator) CreatePR(repo *config.RepoConfig, sourceBranch string,
 		return err
 	}
 
-	if len(option.UpdateSummary.SuccessfulUpdates) == 0 {
+	if len(option.UpdateSummary.FixedVulns()) == 0 {
 		return fmt.Errorf("no successful updates to create merge request for")
 	}
 
 	// Generate MR title and description
-	title := generatePRTitle(&option.UpdateSummary)
-	description := GeneratePRBody(&option.UpdateSummary)
+	title := generatePRTitle(option.UpdateSummary)
+	description := GeneratePRBody(option.UpdateSummary)
 
 	// Check if MR already exists
 	existingMR, err := g.checkExistingMR(repoID, sourceBranch, repo.Branch)

@@ -21,7 +21,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aquasecurity/trivy/pkg/types"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
+	trivyTypes "github.com/aquasecurity/trivy/pkg/types"
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -34,7 +35,7 @@ func loadJson(filePath string, obj any) (err error) {
 }
 
 func TestExtractGoVulnerabilities(t *testing.T) {
-	var trivyReport types.Report
+	var trivyReport trivyTypes.Report
 	err := loadJson("./testdata/go_vuln.json", &trivyReport)
 	if err != nil {
 		t.Fatalf("failed to load trivy report: %v", err)
@@ -42,7 +43,7 @@ func TestExtractGoVulnerabilities(t *testing.T) {
 
 	vulns := extractGoVulnerabilities(trivyReport)
 
-	var expectedVulns []Vulnerability
+	var expectedVulns []types.Vulnerability
 	err = loadJson("./testdata/go_vuln_golden.json", &expectedVulns)
 	if err != nil {
 		t.Fatalf("failed to load golden vulns: %v", err)

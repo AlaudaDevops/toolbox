@@ -24,6 +24,7 @@ import (
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/pr"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
 	"github.com/sirupsen/logrus"
 )
@@ -87,12 +88,13 @@ func (p *Pipeline) Run() error {
 		logrus.Warnf("Warning: Some updates failed: %v", err)
 	}
 
-	if len(updateSummary.SuccessfulUpdates) == 0 {
+	fixedVulns := updateSummary.FixedVulns()
+	if len(fixedVulns) == 0 {
 		logrus.Info("No packages were successfully updated")
 		return fmt.Errorf("no packages were successfully updated")
 	}
 
-	logrus.Debugf("Successfully updated %d packages", len(updateSummary.SuccessfulUpdates))
+	logrus.Debugf("Successfully updated %d packages", len(fixedVulns))
 	logrus.Debugf("PR Description:\n%s", pr.GeneratePRBody(updateSummary))
 	if !p.config.PR.NeedCreatePR() {
 		logrus.Info("Auto PR creation is disabled, skipping Git and PR operations")
@@ -114,20 +116,20 @@ func (p *Pipeline) Run() error {
 	if err := prCreator.CreatePR(&p.config.Repo, branchName, pr.PRCreateOption{
 		Labels:        p.config.PR.Labels,
 		Assignees:     p.config.PR.Assignees,
-		UpdateSummary: *updateSummary,
+		UpdateSummary: updateSummary,
 	}); err != nil {
 		return fmt.Errorf("failed to create PR: %w", err)
 	}
 
 	logrus.Info("✅ Pipeline completed successfully!")
-	logrus.Debugf("   - Updated %d packages", len(updateSummary.SuccessfulUpdates))
+	logrus.Debugf("   - Updated %d packages", len(fixedVulns))
 	logrus.Debugf("   - Branch: %s", branchName)
 	logrus.Debugf("   - Target: %s", p.config.Repo.Branch)
 
 	return nil
 }
 
-func (p *Pipeline) commitChanges(updateSummary *updater.UpdateSummary) (newBranchName string, err error) {
+func (p *Pipeline) commitChanges(updateSummary types.VulnFixResults) (newBranchName string, err error) {
 	gitOperator := git.NewGitOperator(p.config.ProjectPath)
 	hasChanges, err := gitOperator.HasChanges()
 	if err != nil {

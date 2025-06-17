@@ -21,7 +21,7 @@ import (
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
-	"github.com/AlaudaDevops/toolbox/dependabot/pkg/updater"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 )
 
 // PRInfo represents basic information about a pull request
@@ -35,9 +35,9 @@ type PRInfo struct {
 }
 
 type PRCreateOption struct {
-	Labels        []string              `json:"labels" yaml:"labels"`
-	Assignees     []string              `json:"assignees" yaml:"assignees"`
-	UpdateSummary updater.UpdateSummary `json:"update_summary" yaml:"update_summary"`
+	Labels        []string             `json:"labels" yaml:"labels"`
+	Assignees     []string             `json:"assignees" yaml:"assignees"`
+	UpdateSummary types.VulnFixResults `json:"update_summary" yaml:"update_summary"`
 }
 
 // PRCreator defines the interface for creating pull requests
@@ -62,42 +62,44 @@ func NewPRCreator(provider config.GitProviderConfig, workingDir string) (PRCreat
 }
 
 // generatePRTitle generates a title for the pull request
-func generatePRTitle(result *updater.UpdateSummary) string {
-	successCount := len(result.SuccessfulUpdates)
+func generatePRTitle(result types.VulnFixResults) string {
+	fixedVulns := result.FixedVulns()
 
-	if successCount == 1 {
-		update := result.SuccessfulUpdates[0]
+	if len(fixedVulns) == 1 {
+		update := fixedVulns[0]
 		return fmt.Sprintf("chore(deps): bump %s from %s to %s", update.PackageName, update.CurrentVersion, update.FixedVersion)
 	}
 
 	// Group by language for multiple updates
-	languageGroups := make(map[updater.LanguageType]int)
-	for _, update := range result.SuccessfulUpdates {
-		languageGroups[updater.LanguageType(update.Language)]++
+	languageGroups := make(map[types.LanguageType]int)
+	for _, update := range fixedVulns {
+		languageGroups[types.LanguageType(update.Language)]++
 	}
 
 	if len(languageGroups) == 1 {
 		// All updates are for the same language
 		for language := range languageGroups {
-			return fmt.Sprintf("chore(deps): bump %d %s dependencies", successCount, language)
+			return fmt.Sprintf("chore(deps): bump %d %s dependencies", len(fixedVulns), language)
 		}
 	}
 
 	// Multiple languages
-	return fmt.Sprintf("chore(deps): bump %d dependencies across multiple languages", successCount)
+	return fmt.Sprintf("chore(deps): bump %d dependencies across multiple languages", len(fixedVulns))
 }
 
 // GeneratePRBody generates the body/description for the pull request
-func GeneratePRBody(result *updater.UpdateSummary) string {
+func GeneratePRBody(result types.VulnFixResults) string {
 	var body strings.Builder
 
 	body.WriteString("## 🔒 Security Updates\n\n")
 	body.WriteString("This pull request updates dependencies to fix security vulnerabilities identified by Trivy scanning.\n\n")
 
 	// Group updates by language
-	languageGroups := make(map[updater.LanguageType][]updater.PackageUpdate)
-	for _, update := range result.SuccessfulUpdates {
-		languageGroups[updater.LanguageType(update.Language)] = append(languageGroups[updater.LanguageType(update.Language)], update)
+	fixedVulns := result.FixedVulns()
+	fixFailedVulns := result.FixFailedVulns()
+	languageGroups := make(map[types.LanguageType][]types.Vulnerability)
+	for _, update := range fixedVulns {
+		languageGroups[types.LanguageType(update.Language)] = append(languageGroups[types.LanguageType(update.Language)], update)
 	}
 
 	// Generate updates by language
@@ -117,12 +119,10 @@ func GeneratePRBody(result *updater.UpdateSummary) string {
 
 	// Add summary information
 	body.WriteString("## 📊 Update Summary\n\n")
-	body.WriteString(fmt.Sprintf("- **Total packages updated**: %d\n", len(result.SuccessfulUpdates)))
-	body.WriteString(fmt.Sprintf("- **Project path**: %s\n", result.ProjectPath))
-	body.WriteString(fmt.Sprintf("- **Updated at**: %s\n", result.Timestamp))
+	body.WriteString(fmt.Sprintf("- **Total packages updated**: %d\n", len(fixedVulns)))
 
-	if len(result.FailedUpdates) > 0 {
-		body.WriteString(fmt.Sprintf("- **Failed updates**: %d (see logs for details)\n", len(result.FailedUpdates)))
+	if len(fixFailedVulns) > 0 {
+		body.WriteString(fmt.Sprintf("- **Failed updates**: %d (see logs for details)\n", len(fixFailedVulns)))
 	}
 
 	body.WriteString("\n## 🤖 Automated by DependaBot\n\n")

@@ -20,17 +20,17 @@ package updater
 import (
 	"testing"
 
-	"github.com/AlaudaDevops/toolbox/dependabot/pkg/scanner"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/testings"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/google/go-cmp/cmp"
 )
 
 func TestGroupVulnerabilitiesByLanguage(t *testing.T) {
-	var vulns []scanner.Vulnerability
+	var vulns []types.Vulnerability
 	testings.MustLoadJson("./testdata/group_vulns_by_lang.json", &vulns)
 	groupedVulns := groupVulnerabilitiesByLanguage(vulns)
 
-	var expectedGroupedVulns map[LanguageType][]scanner.Vulnerability
+	var expectedGroupedVulns map[types.LanguageType][]types.Vulnerability
 	testings.MustLoadJson("./testdata/group_vulns_by_lang_golden.json", &expectedGroupedVulns)
 
 	if diff := cmp.Diff(expectedGroupedVulns, groupedVulns); diff != "" {
