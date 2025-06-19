@@ -32,7 +32,7 @@ func NewNotifier(noticeConfig config.NoticeConfig) (Notifier, error) {
 		if !ok || webhookURL == "" {
 			return nil, fmt.Errorf("webhook_url is required for WeChat Work notifier")
 		}
-		logrus.Debugf("Creating WeChat Work notifier with webhook URL: %s", webhookURL)
+		logrus.Debug("Creating WeChat Work notifier")
 		return NewWeComNotifier(webhookURL), nil
 	case "":
 		// No notification configured

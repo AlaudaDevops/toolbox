@@ -117,7 +117,7 @@ func (w *WeComNotifier) buildMessage(componentName string, vulnFixResults types.
 	if pr.URL != "" {
 		msg.WriteString("\n**🔗 Pull Request：**\n")
 		msg.WriteString(fmt.Sprintf(" - 标题：%s\n", pr.Title))
-		msg.WriteString(fmt.Sprintf(" - 链接：[查看PR](%s)\n\n", pr.URL))
+		msg.WriteString(fmt.Sprintf(" - 链接：[%s](%s)\n\n", pr.URL, pr.URL))
 	}
 
 	// Fixed vulnerabilities
