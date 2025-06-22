@@ -30,6 +30,9 @@ artifact-scanner scan [options]
 Configuration file (`config.yaml`) example:
 
 ```yaml
+registry:
+  address: registry.example.com # Registry address to pull image
+
 jira:
   baseURL: https://your-jira-instance.atlassian.net # Jira access URL
   username: your-jira-username # Jira username
@@ -37,6 +40,13 @@ jira:
 
 ops:
   baseURL: https://ops-api-instance # API address of the scanning system provided by operations team
+
+users: # Maps user emails to Jira usernames and team name
+- email: user1@example.com
+  jira:
+    user: user1 # jira user name
+    team: team1 # jira user team
+
 ```
 
 ## Workflow

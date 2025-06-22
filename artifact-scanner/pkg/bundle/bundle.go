@@ -22,7 +22,6 @@ import (
 	"io/fs"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/artifact-scanner/pkg/models"
@@ -40,12 +39,12 @@ import (
 func extract(ctx context.Context, bundle models.Image) (string, error) {
 	logger := logging.FromContext(ctx).With("bundle", bundle)
 
-	wd, err := os.Getwd()
+	tmpDir, err := os.MkdirTemp("", "artifact-scanner_")
 	if err != nil {
 		return "", err
 	}
 	imageName := strings.ReplaceAll(bundle.Repository, "/", "-")
-	bundleDir := path.Join(wd, imageName)
+	bundleDir := path.Join(tmpDir, imageName)
 	manifestsDir := path.Join(bundleDir, "manifests")
 	if _, err := os.Stat(manifestsDir); err == nil {
 		logger.Debugw("bundle already extracted", "path", bundleDir)
@@ -56,11 +55,6 @@ func extract(ctx context.Context, bundle models.Image) (string, error) {
 
 	if err := os.Mkdir(bundleDir, fs.ModePerm); err != nil {
 		return "", err
-	}
-
-	// This should always work, but if it doesn't bundleDir is still valid.
-	if dir, err := filepath.Rel(wd, bundleDir); err == nil {
-		bundleDir = dir
 	}
 
 	// Use a containerd registry instead of shelling out to a container tool.

@@ -49,8 +49,8 @@ func (s *Scanner) Scan(ctx context.Context, image models.Image) (models.ScanResu
 	logger := logging.FromContext(ctx)
 
 	var images []models.Image
-	if !image.IsBundle {
-		images = append(images, models.Image{})
+	if image.Type == models.ImageTypeImage {
+		images = append(images, image)
 	} else {
 		relatedImages, err := getRelatedImages(ctx, image)
 		if err != nil {

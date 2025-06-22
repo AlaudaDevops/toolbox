@@ -107,7 +107,7 @@ func TestImageFromURL(t *testing.T) {
 				Registry:   "docker.io",
 				Repository: "library/nginx",
 				Tag:        "1.21",
-				IsBundle:   false,
+				Type:       ImageTypeImage,
 			},
 			expectError: false,
 		},
@@ -118,7 +118,7 @@ func TestImageFromURL(t *testing.T) {
 				Registry:   "myregistry.com",
 				Repository: "app/backend",
 				Tag:        "latest",
-				IsBundle:   false,
+				Type:       ImageTypeImage,
 			},
 			expectError: false,
 		},
@@ -129,7 +129,7 @@ func TestImageFromURL(t *testing.T) {
 				Registry:   "docker.io",
 				Repository: "library/app-bundle",
 				Tag:        "latest",
-				IsBundle:   true,
+				Type:       ImageTypeBundle,
 			},
 			expectError: false,
 		},
@@ -153,7 +153,7 @@ func TestImageFromURL(t *testing.T) {
 				g.Expect(result.Registry).To(Equal(tt.expected.Registry))
 				g.Expect(result.Repository).To(Equal(tt.expected.Repository))
 				g.Expect(result.Tag).To(Equal(tt.expected.Tag))
-				g.Expect(result.IsBundle).To(Equal(tt.expected.IsBundle))
+				g.Expect(result.Type).To(Equal(tt.expected.Type))
 			}
 		})
 	}

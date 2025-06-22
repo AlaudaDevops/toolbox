@@ -1,0 +1,39 @@
+packageType: OperatorBundle
+owners:
+- email: user1@example.com
+channels:
+- channel: alpha
+  defaultChannel: true
+  repository: devops/connectors-operator-bundle
+  stage: alpha
+  displayName:
+    zh: Connectors
+    en: Connectors
+  brief:
+    zh: Connectors 旨在提供为 k8s 集群提供工具接入能力。
+    en: Connectors aims to provide tool access capabilities for Kubernetes clusters.
+  description:
+    zh: |
+      ## 介绍
+
+      Connectors 提供在 Kubernetes 访问工具的能力。
+
+    en: |
+      ## Introduction
+
+      Connectors provides the capability to access tools in Kubernetes.
+  architectures:
+  - amd64
+  - arm64
+  protocolStacks:
+  - IPv4
+  - IPv6
+  - DualStack
+  provider:
+    zh: 平台
+    en: platform
+  providerType: platform
+  catalogSource: platform
+  categories:
+  - Developer Tools
+  functions: []

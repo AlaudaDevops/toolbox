@@ -1,0 +1,110 @@
+channels:
+  - channel: alpha
+    version: v1.1.0-beta.126.gf70d7e4
+    artifacts:
+      - repository: devops/connectors-operator-bundle
+        tag: v1.1.0-beta.126.gf70d7e4
+        digest: sha256:ac185f1d5bfb942eb8821211f4e155d7e8e5ba5814f8840d1a4b83267b13e519
+        type: Bundle
+        size:
+          amd64: 220864
+          arm64: 220864
+        includes:
+          - devops/connectors/controller:v0.13.0-gb14aa7e
+          - devops/connectors/csi:v0.13.0-gb14aa7e
+          - devops/connectors/git:v0.13.0-ge5a5903
+          - devops/connectors/proxy:v0.13.0-gb14aa7e
+          - devops/connectors/api:v0.13.0-gb14aa7e
+          - devops/connectors/oci:v0.13.0-gbdc09f2
+          - devops/connectors-operator:v1.1.0-beta.126.gf70d7e4
+          - 3rdparty/k8scsi/csi-node-driver-registrar:v2.11.1-8a8c8819
+          - 3rdparty/k8scsi/livenessprobe:v2.12.0-53cb3dd7
+          - devops/connectors/controller:v0.13.0-gb14aa7e
+          - devops/connectors/csi:v0.13.0-gb14aa7e
+          - devops/connectors/git:v0.13.0-ge5a5903
+          - devops/connectors/proxy:v0.13.0-gb14aa7e
+          - devops/connectors/api:v0.13.0-gb14aa7e
+          - devops/connectors/oci:v0.13.0-gbdc09f2
+          - 3rdparty/k8scsi/csi-node-driver-registrar:v2.11.1-8a8c8819
+          - 3rdparty/k8scsi/livenessprobe:v2.12.0-53cb3dd7
+      - repository: devops/connectors/controller
+        tag: v0.13.0-gb14aa7e
+        digest: sha256:a0e1072184c3894cc77b9e8a77b675eca1160823f6588ff0c2c6548a111c6841
+        type: Image
+        size:
+          amd64: 39175683
+          arm64: 36669556
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: devops/connectors/csi
+        tag: v0.13.0-gb14aa7e
+        digest: sha256:b45b7dd9a77872417ead260d151fc4a2eab0b2c679894b040508eb68be43b954
+        type: Image
+        size:
+          amd64: 38678463
+          arm64: 36259667
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: devops/connectors/git
+        tag: v0.13.0-ge5a5903
+        digest: sha256:785c145372f5341118579659c0fd76dc9233c5ba29d621983fb8459909034b86
+        type: Image
+        size:
+          amd64: 39202130
+          arm64: 36759430
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: devops/connectors/proxy
+        tag: v0.13.0-gb14aa7e
+        digest: sha256:06b69cb8ed0c3b05b71032548a7e58f53ff1e999b3fac221c4dcba7fdc9803d2
+        type: Image
+        size:
+          amd64: 42998366
+          arm64: 40279834
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: devops/connectors/api
+        tag: v0.13.0-gb14aa7e
+        digest: sha256:1fbada6cd0f1c7cf6813476459adb94d7e35df1715230d695c47962e1477662b
+        type: Image
+        size:
+          amd64: 37912994
+          arm64: 35508909
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: devops/connectors/oci
+        tag: v0.13.0-gbdc09f2
+        digest: sha256:8c03081b914bb148b71f2966e1dec609ce345d1507a1f8c8619dc0f4a3c3ab50
+        type: Image
+        size:
+          amd64: 40680010
+          arm64: 38148125
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: devops/connectors-operator
+        tag: v1.1.0-beta.126.gf70d7e4
+        digest: sha256:1db13adfbd0f7d9c0423bbd856ca2e64a148e357b0e198d8277ac73e19517073
+        type: Image
+        size:
+          amd64: 20257027
+          arm64: 19184801
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: 3rdparty/k8scsi/csi-node-driver-registrar
+        tag: v2.11.1-8a8c8819
+        digest: sha256:fddd4a113043a105aca72b57322ffb9622329113d1f1d7bfd43af87339844598
+        type: Image
+        size:
+          amd64: 30214520
+          arm64: 28924086
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4
+      - repository: 3rdparty/k8scsi/livenessprobe
+        tag: v2.12.0-53cb3dd7
+        digest: sha256:3072bcec4845af847663f09ba95a98189d1d1e753dcc4784feac2b9ecaceff4f
+        type: Image
+        size:
+          amd64: 29937022
+          arm64: 28649861
+        belongTo:
+          - devops/connectors-operator-bundle:v1.1.0-beta.126.gf70d7e4

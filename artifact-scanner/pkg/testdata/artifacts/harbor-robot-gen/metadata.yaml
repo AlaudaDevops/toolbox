@@ -1,0 +1,32 @@
+packageType: ModulePlugin
+owners:
+- email: user1@example.com
+channels:
+- channel: default
+  defaultChannel: true
+  repository: devops/chart-harbor-robot-gen
+  stage: alpha
+  displayName:
+    zh: Harbor Robot Generator
+    en: Harbor Robot Generator
+  brief:
+    zh: Harbor Robot Account Generator 将会自动在 Harbor 上生成机器人账号，并在 k8s 集群中，使用机器人 token 创建定期刷新的 secret, 绑定到指定的 sa 上。
+    en: Harbor Robot Account Generator will generate Harbor Robot Account, and in k8s cluster, use robot's token to create refreshable secret, and bind it to specified sa
+  description:
+    zh: Harbor Robot Account Generator 将会自动在 Harbor 上生成机器人账号，并在 k8s 集群中，使用机器人 token 创建定期刷新的 secret, 绑定到指定的 sa 上。
+    en: Harbor Robot Account Generator will generate Harbor Robot Account, and in k8s cluster, use robot's token to create refreshable secret, and bind it to specified sa
+  architectures:
+  - amd64
+  - arm64
+  protocolStacks:
+  - IPv4
+  - IPv6
+  - DualStack
+  provider:
+    zh: Alauda
+    en: Alauda
+  providerType: platform
+  catalogSource: ""
+  categories:
+  - Developer Tools
+  functions: []

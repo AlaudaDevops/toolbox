@@ -1,0 +1,99 @@
+packageType: OperatorBundle
+owners:
+- email: user2@example.com
+channels:
+- channel: gitlab-17
+  defaultChannel: false
+  packIgnore: true
+  repository: devops/gitlab-ce-operator-bundle
+  stage: GA # 取值 [alpha, beta, GA]
+  displayName:
+    zh: Alauda Build of Gitlab
+    en: Alauda Build of Gitlab
+  brief:
+    zh: Gitlab 是一个分布式代码管理工具，它可以管理项目源代码并控制代码的版本。
+    en: Gitlab is a code management tool that manages source code and controls the versioning of code.
+  description:
+    zh: |
+      # Gitlab-Official
+      ## 注意
+
+      Gitlab-Official: 支持架构为 __ARM__ 、__x86__
+
+      ## 介绍
+
+      Gitlab-Official Operator 是用于部署可集成在 DevOps 中使用的 Gitlab-Official。
+
+      Gitlab-Official 是一个开源的版本控制系统，它使用 Git 作为代码管理工具，并在此基础上搭建起来的 web 服务。
+    en: |
+      # Gitlab-Official
+      ## Note
+      Supports __ARM__ and __x86__ architectures.
+
+      ## Introduction
+
+      The Gitlab-Official Operator is used to deploy a Gitlab-Official that can be integrated for use in DevOps.
+
+      Gitlab-Official is an open source version control system, also a web service, based on using Git to manage code.
+  architectures:
+  - amd64
+  - arm64
+  protocolStacks:
+  - IPv4
+  - IPv6
+  - DualStack
+  provider:
+    zh: Alauda
+    en: Alauda
+  providerType: platform
+  catalogSource: platform
+  categories:
+  - Developer Tools
+  functions: []
+- channel: stable
+  defaultChannel: true
+  repository: devops/gitlab-ce-operator-bundle
+  stage: GA # 取值 [alpha, beta, GA]
+  displayName:
+    zh: Alauda Build of Gitlab
+    en: Alauda Build of Gitlab
+  brief:
+    zh: Gitlab 是一个分布式代码管理工具，它可以管理项目源代码并控制代码的版本。
+    en: Gitlab is a code management tool that manages source code and controls the versioning of code.
+  description:
+    zh: |
+      # Gitlab-Official
+      ## 注意
+
+      Gitlab-Official: 支持架构为 __ARM__ 、__x86__
+
+      ## 介绍
+
+      Gitlab-Official Operator 是用于部署可集成在 DevOps 中使用的 Gitlab-Official。
+
+      Gitlab-Official 是一个开源的版本控制系统，它使用 Git 作为代码管理工具，并在此基础上搭建起来的 web 服务。
+    en: |
+      # Gitlab-Official
+      ## Note
+      Supports __ARM__ and __x86__ architectures.
+
+      ## Introduction
+
+      The Gitlab-Official Operator is used to deploy a Gitlab-Official that can be integrated for use in DevOps.
+
+      Gitlab-Official is an open source version control system, also a web service, based on using Git to manage code.
+  architectures:
+  - amd64
+  - arm64
+  protocolStacks:
+  - IPv4
+  - IPv6
+  - DualStack
+  provider:
+    zh: Alauda
+    en: Alauda
+  providerType: platform
+  catalogSource: platform
+  categories:
+  - Developer Tools
+  functions: []
