@@ -17,6 +17,7 @@ limitations under the License.
 package config
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -27,8 +28,10 @@ import (
 // Jira: Jira configuration settings
 // Ops: OPS API configuration settings
 type Config struct {
-	Jira Jira `json:"jira" yaml:"jira"`
-	Ops  Ops  `json:"ops" yaml:"ops"`
+	Jira     Jira     `json:"jira" yaml:"jira"`
+	Ops      Ops      `json:"ops" yaml:"ops"`
+	Users    []User   `json:"users" yaml:"users"`
+	Registry Registry `json:"registry" yaml:"registry"`
 }
 
 // Jira represents Jira configuration settings
@@ -47,6 +50,24 @@ type Ops struct {
 	BaseURL string `json:"baseURL" yaml:"baseURL"`
 }
 
+// Registry represents the registry that pulls the images
+type Registry struct {
+	Address string `json:"address" yaml:"address"`
+}
+
+type User struct {
+	Email string   `json:"email" yaml:"email"`
+	Jira  JiraUser `json:"jira" yaml:"jira"`
+}
+
+// JiraUser represents a Jira user
+type JiraUser struct {
+	// Jira username
+	User string `json:"user" yaml:"user"`
+	// Jira team key
+	Team string `json:"team" yaml:"team"`
+}
+
 // Load loads the configuration from a YAML file
 // path: The path to the configuration file
 // Returns the loaded configuration and any error that occurred
@@ -62,4 +83,36 @@ func Load(path string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+type contextKey struct{}
+
+var (
+	ContextKeyConfig contextKey = contextKey{}
+)
+
+// InjectContext injects the Config into the context
+// ctx: The context to inject the Config into
+// Returns the context with the Config injected
+func (c *Config) InjectContext(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ContextKeyConfig, c)
+}
+
+// FromContext returns the Config from the context
+// ctx: The context to get the Config from
+// Returns the Config from the context
+func FromContext(ctx context.Context) *Config {
+	return ctx.Value(ContextKeyConfig).(*Config)
+}
+
+// GetJiraUser returns the Jira user for a given email
+// email: The email of the user
+// Returns the Jira user for the given email
+func (c *Config) GetJiraUser(email string) *JiraUser {
+	for _, u := range c.Users {
+		if u.Email == email {
+			return &u.Jira
+		}
+	}
+	return nil
 }

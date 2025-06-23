@@ -19,6 +19,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/AlaudaDevops/toolbox/artifact-scanner/pkg/models"
 
 	"github.com/AlaudaDevops/toolbox/artifact-scanner/pkg/bundle"
@@ -33,6 +35,7 @@ import (
 
 type Options struct {
 	valuesPath string
+	directory  string
 	branch     string
 	configPath string
 	bundle     string
@@ -57,9 +60,10 @@ func ScanCmd(ctx context.Context, name string) *cobra.Command {
 
 func (s *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&s.valuesPath, "values", "values.yaml", `values file path`)
+	flags.StringVar(&s.directory, "dir", "", `directory to be scanned, the directory should contains plugins that follow "alauda/artifacts" structure`)
 	flags.StringVar(&s.branch, "branch", "main", `branch name`)
 	flags.StringVar(&s.configPath, "config", "config.yaml", `config file path`)
-	flags.StringVar(&s.bundle, "bundle", "", `bundle to be scanned`)
+	flags.StringVar(&s.bundle, "bundle", "", `bundle to be scanned, multiple bundles can be separated by comma`)
 }
 
 func (s *Options) run(ctx context.Context) error {
@@ -70,8 +74,21 @@ func (s *Options) run(ctx context.Context) error {
 		return err
 	}
 
-	imageSource := models.NewValuesSource(s.valuesPath, s.bundle)
-	images, err := imageSource.GetImages()
+	ctx = cfg.InjectContext(ctx)
+
+	var imageSource models.ImageSource
+	if s.directory != "" {
+		bundleNames := []string{}
+		if s.bundle != "" {
+			bundleNames = strings.Split(s.bundle, ",")
+		}
+
+		imageSource = models.NewDirSource(s.directory, bundleNames)
+	} else {
+		imageSource = models.NewValuesSource(s.valuesPath, s.bundle)
+	}
+
+	images, err := imageSource.GetImages(ctx)
 	if err != nil {
 		return err
 	}
@@ -86,7 +103,7 @@ func (s *Options) run(ctx context.Context) error {
 
 	for _, image := range images {
 
-		if !image.IsBundle {
+		if image.Type != models.ImageTypeBundle {
 			// todo: only handle bundles currently
 			continue
 		}

@@ -1,0 +1,21 @@
+channels:
+  - channel: default
+    version: v0.13.0-gb3a73ed
+    artifacts:
+      - repository: devops/chart-harbor-robot-gen
+        tag: v0.13.0-gb3a73ed
+        digest: sha256:0a54fa22852defe999276464e42de6a13c05f44320a7be019f1bbbe77d5349d8
+        type: Chart
+        size:
+          chart: 6091
+        includes:
+          - devops/harbor-robot-gen/controller:v0.13.0-gb3a73ed
+      - repository: devops/harbor-robot-gen/controller
+        tag: v0.13.0-gb3a73ed
+        digest: sha256:fade64ea214d3af102a0e45fac02a9d8f6b139b1d376ea6923382623a323f143
+        type: Image
+        size:
+          amd64: 42312789
+          arm64: 39668194
+        belongTo:
+          - devops/chart-harbor-robot-gen:v0.13.0-gb3a73ed

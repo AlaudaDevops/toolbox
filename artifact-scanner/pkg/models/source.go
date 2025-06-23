@@ -17,15 +17,19 @@ limitations under the License.
 package models
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/artifact-scanner/pkg/artifactsdir"
+	"github.com/AlaudaDevops/toolbox/artifact-scanner/pkg/config"
 	"gopkg.in/yaml.v3"
 )
 
 // ImageSource defines the interface for retrieving images
 type ImageSource interface {
-	GetImages() ([]Image, error)
+	GetImages(ctx context.Context) ([]Image, error)
 }
 
 // ValuesSource represents a source of images from a values file
@@ -48,7 +52,7 @@ func NewValuesSource(valuesPath, bundle string) ImageSource {
 
 // GetImages retrieves images from the values file
 // Returns a list of images and any error that occurred
-func (v *ValuesSource) GetImages() ([]Image, error) {
+func (v *ValuesSource) GetImages(ctx context.Context) ([]Image, error) {
 	bytes, err := os.ReadFile(v.valuesPath)
 	if err != nil {
 		return nil, err
@@ -61,12 +65,21 @@ func (v *ValuesSource) GetImages() ([]Image, error) {
 
 	images := make([]Image, 0)
 	for _, item := range values.Global.Images {
+
+		imageType := ImageTypeImage
+		if strings.HasSuffix(item.Repository, "bundle") {
+			imageType = ImageTypeBundle
+		}
+		if strings.Contains(item.Repository, "chart") {
+			imageType = ImageTypeChart
+		}
+
 		image := Image{
 			Repository: item.Repository,
 			Tag:        item.Tag,
 			Owner:      item.Owner,
 			Registry:   values.Global.Registry.Address,
-			IsBundle:   strings.HasSuffix(item.Repository, "bundle"),
+			Type:       imageType,
 		}
 
 		if v.bundle == "" || (v.bundle != "" && v.bundle == item.Repository) {
@@ -95,4 +108,76 @@ type Global struct {
 // Address: The registry address
 type Registry struct {
 	Address string `json:"address" yaml:"address"`
+}
+
+// DirSource represents a source of images from a directory
+// the directory should be a directory contains plugins, the plugins folder structure should be like definitions of alauda/artifacts
+// dirPath: Path to the directory contains plugins
+type DirSource struct {
+	dirPath string
+	plugins []string
+}
+
+func NewDirSource(dirPath string, plugins []string) ImageSource {
+	return &DirSource{
+		dirPath: dirPath,
+		plugins: plugins,
+	}
+}
+
+// GetImages retrieves images from the artifacts directory
+// up to now, only return all bundle and chart images
+func (d *DirSource) GetImages(ctx context.Context) ([]Image, error) {
+	plugins, err := artifactsdir.NewParser(d.dirPath, d.plugins).Parse(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	pluginNames := make([]string, 0)
+	if len(d.plugins) > 0 {
+		pluginNames = d.plugins
+	} else {
+		for _, plugin := range plugins {
+			pluginNames = append(pluginNames, plugin.Name)
+		}
+	}
+
+	images := make([]Image, 0)
+
+	for _, pluginName := range pluginNames {
+		plugin, ok := plugins[pluginName]
+		if !ok {
+			return nil, fmt.Errorf("plugin %s not found", pluginName)
+		}
+
+		chartOrBundles, err := plugin.GetBundleOrChart()
+		if err != nil {
+			return nil, err
+		}
+
+		if len(plugin.Metadata.Owners) == 0 {
+			return nil, fmt.Errorf("plugin %s has no owners", pluginName)
+		}
+
+		cfg := config.FromContext(ctx)
+		jiraUser := cfg.GetJiraUser(plugin.Metadata.Owners[0].Email)
+		if jiraUser == nil {
+			return nil, fmt.Errorf("cannot find jira user by plugin's owner '%s', please add user mappings in the config.yaml. plugin: %s", plugin.Metadata.Owners[0].Email, pluginName)
+		}
+
+		for _, artifact := range chartOrBundles {
+			images = append(images, Image{
+				Repository: artifact.Repository,
+				Tag:        artifact.Tag,
+				Type:       ImageType(artifact.Type),
+				Registry:   cfg.Registry.Address,
+				Owner: Owner{
+					Team:     jiraUser.Team,
+					JiraUser: jiraUser.User,
+				},
+			})
+		}
+	}
+
+	return images, nil
 }

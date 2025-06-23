@@ -31,19 +31,27 @@ type Owner struct {
 	JiraUser string `json:"jira_user" yaml:"jira_user"`
 }
 
+type ImageType string
+
+const (
+	ImageTypeBundle ImageType = "Bundle"
+	ImageTypeChart  ImageType = "Chart"
+	ImageTypeImage  ImageType = "Image"
+)
+
 // Image represents a container image with its metadata
 // Repository: The repository name of the image
 // Tag: The tag of the image
 // Owner: The ownership information of the image
 // Registry: The registry where the image is stored (not serialized)
-// IsBundle: Whether the image is a bundle (not serialized)
+// Type: The type of the image (bundle, chart, image)
 type Image struct {
 	Repository string `json:"repository" yaml:"repository"`
 	Tag        string `json:"tag" yaml:"tag"`
 	Owner      Owner  `json:"owner" yaml:"owner"`
 
-	Registry string `json:"-" yaml:"-"`
-	IsBundle bool   `json:"-" yaml:"-"`
+	Registry string    `json:"-" yaml:"-"`
+	Type     ImageType `json:"-" yaml:"-"`
 }
 
 // URL returns the full URL of the image including registry, repository and tag
@@ -81,11 +89,18 @@ func ImageFromURL(url string) (Image, error) {
 		tag = tagged.Tag()
 	}
 
+	var imageType = ImageTypeImage
+	if strings.HasSuffix(repository, "bundle") {
+		imageType = ImageTypeBundle
+	} else if strings.Contains(repository, "chart") {
+		imageType = ImageTypeChart
+	}
+
 	image := Image{
 		Repository: repository,
 		Tag:        tag,
 		Registry:   registry,
-		IsBundle:   strings.HasSuffix(repository, "bundle"),
+		Type:       imageType,
 	}
 
 	return image, nil

@@ -17,8 +17,10 @@ limitations under the License.
 package models
 
 import (
+	"context"
 	"testing"
 
+	"github.com/AlaudaDevops/toolbox/artifact-scanner/pkg/config"
 	. "github.com/onsi/gomega"
 )
 
@@ -96,8 +98,9 @@ func TestValuesSource_GetImages(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
 			source := NewValuesSource(tc.path, tc.bundle)
-			images, err := source.GetImages()
+			images, err := source.GetImages(ctx)
 
 			if tc.expectErr {
 				g.Expect(err).To(HaveOccurred())
@@ -112,16 +115,100 @@ func TestValuesSource_GetImages(t *testing.T) {
 						g.Expect(images[0].Repository).To(Equal("app1"))
 						g.Expect(images[0].Registry).To(Equal("registry.example.com"))
 						g.Expect(images[1].Repository).To(Equal("test-bundle"))
-						g.Expect(images[1].IsBundle).To(BeTrue())
+						g.Expect(images[1].Type).To(Equal(ImageTypeBundle))
 					}
 
 					// 第二个测试用例的额外检查
 					if tc.name == "valid yaml with bundle filter" {
 						g.Expect(images[0].Repository).To(Equal("test-bundle"))
-						g.Expect(images[0].IsBundle).To(BeTrue())
+						g.Expect(images[0].Type).To(Equal(ImageTypeBundle))
 					}
 				}
 			}
 		})
 	}
+}
+
+func TestDirSource_GetImages(t *testing.T) {
+	g := NewGomegaWithT(t)
+	ctx := context.Background()
+	config := config.Config{
+		Users: []config.User{
+			{
+				Email: "user1@example.com",
+				Jira: config.JiraUser{
+					User: "user1",
+					Team: "DEVOPS",
+				},
+			},
+			{
+				Email: "user2@example.com",
+				Jira: config.JiraUser{
+					User: "user2",
+					Team: "DEVOPS",
+				},
+			},
+		},
+	}
+	ctx = config.InjectContext(ctx)
+
+	t.Run("get bundles or chart of all plugins", func(t *testing.T) {
+		source := NewDirSource("testdata/artifacts", nil)
+		images, err := source.GetImages(ctx)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(images).To(HaveLen(3))
+		g.Expect(images).To(ContainElement(Image{
+			Repository: "devops/connectors-operator-bundle",
+			Tag:        "v1.1.0-beta.126.gf70d7e4",
+			Type:       ImageTypeBundle,
+			Owner: Owner{
+				Team:     "DEVOPS",
+				JiraUser: "user1",
+			},
+		}))
+		g.Expect(images).To(ContainElement(Image{
+			Repository: "devops/gitlab-ce-operator-bundle",
+			Tag:        "v17.12.0-beta.21.g5e337e0",
+			Type:       ImageTypeBundle,
+			Owner: Owner{
+				Team:     "DEVOPS",
+				JiraUser: "user2",
+			},
+		}))
+		g.Expect(images).To(ContainElement(Image{
+			Repository: "devops/chart-harbor-robot-gen",
+			Tag:        "v0.13.0-gb3a73ed",
+			Type:       ImageTypeChart,
+			Owner: Owner{
+				Team:     "DEVOPS",
+				JiraUser: "user1",
+			},
+		}))
+	})
+
+	t.Run("get bundles or chart of specific plugins", func(t *testing.T) {
+		source := NewDirSource("testdata/artifacts", []string{"gitlab-ce-operator", "harbor-robot-gen"})
+		images, err := source.GetImages(ctx)
+		g.Expect(err).NotTo(HaveOccurred())
+		g.Expect(images).To(HaveLen(2))
+
+		g.Expect(images).To(ContainElement(Image{
+			Repository: "devops/gitlab-ce-operator-bundle",
+			Tag:        "v17.12.0-beta.21.g5e337e0",
+			Type:       ImageTypeBundle,
+			Owner: Owner{
+				Team:     "DEVOPS",
+				JiraUser: "user2",
+			},
+		}))
+		g.Expect(images).To(ContainElement(Image{
+			Repository: "devops/chart-harbor-robot-gen",
+			Tag:        "v0.13.0-gb3a73ed",
+			Type:       ImageTypeChart,
+			Owner: Owner{
+				Team:     "DEVOPS",
+				JiraUser: "user1",
+			},
+		}))
+	})
 }

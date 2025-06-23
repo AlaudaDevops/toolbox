@@ -1,0 +1,153 @@
+channels:
+  - channel: gitlab-17
+    version: v17.12.0-beta.21.g5e337e0
+    artifacts:
+      - repository: devops/gitlab-ce-operator-bundle
+        tag: v17.12.0-beta.21.g5e337e0
+        digest: sha256:d268ba98646a5caef8ab602abf5dc57dfeb4eb098040d82d683a1a90784e70e9
+        type: Bundle
+        size:
+          amd64: 10446
+          arm64: 10446
+  - channel: stable
+    version: v17.12.0-beta.21.g5e337e0
+    artifacts:
+      - repository: devops/gitlab-ce-operator-bundle
+        tag: v17.12.0-beta.21.g5e337e0
+        digest: sha256:d268ba98646a5caef8ab602abf5dc57dfeb4eb098040d82d683a1a90784e70e9
+        type: Bundle
+        size:
+          amd64: 10446
+          arm64: 10446
+        includes:
+          - devops/gitlab-org/build/cng/certificates:debian-12-3491606d
+          - devops/gitlab-org/build/cng/gitaly:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-base:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-shell:v14.41.0-3491606d
+          - devops/gitlab-org/build/cng/kubectl:1.32.4-3491606d
+          - devops/gitlab-org/build/cng/cfssl-self-sign:1.6.5-3491606d
+          - devops/gitlab-org/build/cng/gitlab-sidekiq-ce:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-toolbox-ce:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-webservice-ce:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-workhorse-ce:v17.11.1-3491606d
+          - devops/gitlab-ce-operator:v17.12.0-beta.21.g5e337e0
+          - frontend/gitlab-operator-plugin:v0.1.0-beta.108.g7b9c60c
+          - devops/gitlab-org/build/cng/certificates:debian-12-3491606d
+          - devops/gitlab-org/build/cng/gitaly:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-base:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-shell:v14.41.0-3491606d
+          - devops/gitlab-org/build/cng/kubectl:1.32.4-3491606d
+          - devops/gitlab-org/build/cng/cfssl-self-sign:1.6.5-3491606d
+          - devops/gitlab-org/build/cng/gitlab-sidekiq-ce:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-toolbox-ce:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-webservice-ce:v17.11.1-3491606d
+          - devops/gitlab-org/build/cng/gitlab-workhorse-ce:v17.11.1-3491606d
+          - frontend/gitlab-operator-plugin:v0.1.0-beta.108.g7b9c60c
+      - repository: devops/gitlab-org/build/cng/certificates
+        tag: debian-12-3491606d
+        digest: sha256:2f485cf1d60612c4a874fb8df7f4143eaf467e07f36adda41a7f9f8189947b3c
+        type: Image
+        size:
+          amd64: 104428551
+          arm64: 103209082
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitaly
+        tag: v17.11.1-3491606d
+        digest: sha256:2cf7f3c126a0250e55c1bfa5f028fb31c754824cf28fae00e25687cebfa16128
+        type: Image
+        size:
+          amd64: 463085056
+          arm64: 446029330
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitlab-base
+        tag: v17.11.1-3491606d
+        digest: sha256:5b7a9dced7ba7aaf7dd5bf20d15344e12cbbcdd5af4df0c04bc77adb5a8155c4
+        type: Image
+        size:
+          amd64: 104427400
+          arm64: 103207931
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitlab-shell
+        tag: v14.41.0-3491606d
+        digest: sha256:11cb6a8ae562de75252557292bb1a813c45817c593531a88f00ac90ab98bb896
+        type: Image
+        size:
+          amd64: 180211492
+          arm64: 174976980
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/kubectl
+        tag: 1.32.4-3491606d
+        digest: sha256:1e2459efcb9fb7cd6d34a182357b035a74afdf3d23f7e6c7cd110219969a6e0a
+        type: Image
+        size:
+          amd64: 118220273
+          arm64: 116922028
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/cfssl-self-sign
+        tag: 1.6.5-3491606d
+        digest: sha256:ba25cb227ced54aa2cfdc0a99c52c26c8e2381691dbaed625cffd44c578213d9
+        type: Image
+        size:
+          amd64: 11261390
+          arm64: 11134959
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitlab-sidekiq-ce
+        tag: v17.11.1-3491606d
+        digest: sha256:86e5d2103217f7fbb79cc251d3fd534271cf46877081f183ffa39e3b21746d5b
+        type: Image
+        size:
+          amd64: 1203106894
+          arm64: 1190156474
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitlab-toolbox-ce
+        tag: v17.11.1-3491606d
+        digest: sha256:730fc966c60e1baabe784f6544102db877953dd62063dd2c6df2734b2f948f49
+        type: Image
+        size:
+          amd64: 1286832269
+          arm64: 1270149026
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitlab-webservice-ce
+        tag: v17.11.1-3491606d
+        digest: sha256:31c2ecb7543c41e7866de29f81764fde34165d5db2cfb4554e06645e6ad273e5
+        type: Image
+        size:
+          amd64: 1184162147
+          arm64: 1171349998
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-org/build/cng/gitlab-workhorse-ce
+        tag: v17.11.1-3491606d
+        digest: sha256:a22c27133e1a4c2fb039f6328524dc0911d77ea92afbef035f7834c453f1e4ee
+        type: Image
+        size:
+          amd64: 518953539
+          arm64: 513816550
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: devops/gitlab-ce-operator
+        tag: v17.12.0-beta.21.g5e337e0
+        digest: sha256:b0003d680340f6ccf59aaf48d1ceb96ba5496e927871f41ff77a99ab0589325a
+        type: Image
+        size:
+          amd64: 23610356
+          arm64: 22328636
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
+      - repository: frontend/gitlab-operator-plugin
+        tag: v0.1.0-beta.108.g7b9c60c
+        digest: sha256:5905d93ee3b106bafb1c2b2d18e57bcd9ab8420a47211b57bd29c1049a661810
+        type: Image
+        size:
+          amd64: 5633750
+          arm64: 5615647
+        belongTo:
+          - devops/gitlab-ce-operator-bundle:v17.12.0-beta.21.g5e337e0
