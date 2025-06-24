@@ -110,7 +110,7 @@ func (s *Client) get(path string, query *url.Values, result interface{}) error {
 	}
 
 	if err := json.Unmarshal(body, result); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal response, error: %w, body: %s", err, string(body))
 	}
 
 	return nil
