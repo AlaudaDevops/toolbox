@@ -220,7 +220,7 @@ func (c *Client) GetComponentVersion(ctx context.Context, projectKey string, com
 		}
 	}
 
-	return "", fmt.Errorf("no component version, project: %s, component: %s", projectKey, component)
+	return "", fmt.Errorf("no unreleased component version in jira, project: %s, component: %s", projectKey, component)
 }
 
 // findCompletionTransitionID finds the transition ID that moves an issue to a completed state
