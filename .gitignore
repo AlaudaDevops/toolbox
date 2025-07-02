@@ -1,2 +1,5 @@
 # Added by goreleaser init:
 dist/
+
+# Build artifacts
+kube-bench-report/kube-bench-report
