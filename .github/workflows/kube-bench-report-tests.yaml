@@ -1,0 +1,73 @@
+name: kube-bench-report-tests
+
+# Trigger the workflow on push or pull request on the main branch
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kube-bench-report/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kube-bench-report/**'
+
+# Cancel running checks in progress for the same branch
+concurrency:
+  group: kube-bench-report-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('kube-bench-report/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        working-directory: ./kube-bench-report
+        run: go mod download
+
+      - name: Run tests
+        working-directory: ./kube-bench-report
+        run: go test -v ./...
+
+      - name: Run tests with coverage
+        working-directory: ./kube-bench-report
+        run: go test -v -coverprofile=coverage.out ./...
+
+      - name: Generate coverage report
+        working-directory: ./kube-bench-report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          retention-days: 3
+          path: |
+            kube-bench-report/coverage.out
+            kube-bench-report/coverage.html
+
+      - name: Display coverage summary
+        working-directory: ./kube-bench-report
+        run: |
+          echo "## Test Coverage Summary" >> $GITHUB_STEP_SUMMARY
+          go tool cover -func=coverage.out | tail -1 >> $GITHUB_STEP_SUMMARY
