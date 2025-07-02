@@ -3,3 +3,7 @@ dist/
 
 # Build artifacts
 kube-bench-report/kube-bench-report
+
+# Test artifacts
+test.html
+kube-bench-report.html
