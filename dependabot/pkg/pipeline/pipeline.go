@@ -55,6 +55,12 @@ func NewPipeline(config *Config) *Pipeline {
 func (p *Pipeline) Run() error {
 	logrus.Infof("Starting dependency update pipeline for project: %s", p.config.ProjectPath)
 
+	// Execute pre-scan script if configured
+	scriptExecutor := NewScriptExecutor(p.config.ProjectPath)
+	if err := scriptExecutor.ExecuteScript("Pre-scan", p.config.Scripts.PreScan); err != nil {
+		return fmt.Errorf("pre-scan script failed: %w", err)
+	}
+
 	logrus.Info("Running Security Scanning...")
 
 	scannerInstance, err := scanner.NewScanner(p.config.ProjectPath, p.config.Scanner)
@@ -82,7 +88,7 @@ func (p *Pipeline) Run() error {
 	logrus.Infof("Found %d vulnerabilities to update", len(vulnerabilities))
 
 	logrus.Info("Updating vulnerable packages...")
-	updater := updater.New(p.config.ProjectPath)
+	updater := updater.New(p.config.ProjectPath, p.config.Updater)
 	updateSummary, err := updater.UpdatePackages(vulnerabilities)
 	if err != nil {
 		// Even if some updates failed, we might still have successful ones
@@ -97,8 +103,14 @@ func (p *Pipeline) Run() error {
 
 	logrus.Debugf("Successfully updated %d packages", len(fixedVulns))
 	logrus.Debugf("PR Description:\n%s", pr.GeneratePRBody(updateSummary))
-	if !p.config.PR.NeedCreatePR() {
-		logrus.Info("Auto PR creation is disabled, skipping Git and PR operations")
+
+	// Execute pre-commit script if configured
+	if err := scriptExecutor.ExecuteScript("Pre-commit", p.config.Scripts.PreCommit); err != nil {
+		return fmt.Errorf("pre-commit script failed: %w", err)
+	}
+
+	if !p.config.PR.NeedPushBranch() {
+		logrus.Info("Auto push branch is disabled, skipping Git and PR operations")
 		return nil
 	}
 
@@ -106,6 +118,11 @@ func (p *Pipeline) Run() error {
 	branchName, err := p.commitChanges(updateSummary)
 	if err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	if !p.config.PR.NeedCreatePR() {
+		logrus.Info("Auto PR creation is disabled, skipping Git and PR operations")
+		return nil
 	}
 
 	logrus.Info("Creating Pull Request...")

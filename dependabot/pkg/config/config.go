@@ -18,6 +18,7 @@ limitations under the License.
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,6 +39,10 @@ type DependaBotConfig struct {
 	Git GitProviderConfig `yaml:"git" json:"git" mapstructure:"git"`
 	// Notice contains notice configuration
 	Notice NoticeConfig `yaml:"notice" json:"notice" mapstructure:"notice"`
+	// Scripts contains custom script configuration for pipeline hooks
+	Scripts ScriptsConfig `yaml:"scripts" json:"scripts" mapstructure:"scripts"`
+	// Updater contains updater-specific configuration
+	Updater UpdaterConfig `yaml:"updater" json:"updater" mapstructure:"updater"`
 }
 
 type NoticeConfig struct {
@@ -52,6 +57,8 @@ type RepoConfig struct {
 	URL string `yaml:"url" json:"url" mapstructure:"url"`
 	// Branch is the repository branch (e.g., "main")
 	Branch string `yaml:"branch" json:"branch" mapstructure:"branch"`
+	// IncludeSubmodules indicates whether to clone submodules
+	IncludeSubmodules *bool `yaml:"includeSubmodules" json:"includeSubmodules" mapstructure:"includeSubmodules"`
 }
 
 type GitProviderConfig struct {
@@ -66,14 +73,40 @@ type GitProviderConfig struct {
 // PRConfig contains pull request configuration
 type PRConfig struct {
 	AutoCreate *bool `yaml:"autoCreate" json:"autoCreate" mapstructure:"autoCreate"`
+	// PushBranch controls whether to push the branch to remote repository
+	PushBranch *bool `yaml:"pushBranch" json:"pushBranch" mapstructure:"pushBranch"`
 	// Labels are labels to add to the created PR
 	Labels []string `yaml:"labels" json:"labels" mapstructure:"labels"`
 	// Assignees are users to assign to the created PR
 	Assignees []string `yaml:"assignees" json:"assignees" mapstructure:"assignees"`
 }
 
+// UpdaterConfig contains updater-specific configuration
+type UpdaterConfig struct {
+	// Go contains Go-specific updater configuration
+	Go *GoUpdaterConfig `yaml:"go" json:"go" mapstructure:"go"`
+}
+
+// GoUpdaterConfig contains Go-specific updater configuration
+type GoUpdaterConfig struct {
+	// CommandOutputFile is the file path to output successful go get commands
+	// If empty, no output will be written
+	CommandOutputFile string `yaml:"commandOutputFile" json:"commandOutputFile" mapstructure:"commandOutputFile"`
+}
+
 func (p *PRConfig) NeedCreatePR() bool {
 	return p.AutoCreate != nil && *p.AutoCreate
+}
+
+// NeedPushBranch determines whether to push branch based on configuration
+// If autocreate is true, push branch automatically becomes true
+func (p *PRConfig) NeedPushBranch() bool {
+	// If autocreate is true, automatically push branch
+	if p.NeedCreatePR() {
+		return true
+	}
+	// Otherwise, check the explicit pushBranch setting
+	return p.PushBranch != nil && *p.PushBranch
 }
 
 // ScannerConfig contains generic scanner configuration
@@ -88,6 +121,24 @@ type ScannerConfig struct {
 
 // PipelineScannerConfig represents scanner config for pipeline
 type PipelineScannerConfig = ScannerConfig
+
+// ScriptsConfig contains custom script configuration for pipeline hooks
+type ScriptsConfig struct {
+	// PreScan contains script to execute before security scanning
+	PreScan *ScriptConfig `yaml:"preScan" json:"preScan" mapstructure:"preScan"`
+	// PreCommit contains script to execute before committing changes
+	PreCommit *ScriptConfig `yaml:"preCommit" json:"preCommit" mapstructure:"preCommit"`
+}
+
+// ScriptConfig contains configuration for a single script
+type ScriptConfig struct {
+	// Script contains the script content to execute
+	Script string `yaml:"script" json:"script" mapstructure:"script"`
+	// Timeout for script execution (e.g., "5m", "30s")
+	Timeout string `yaml:"timeout" json:"timeout" mapstructure:"timeout"`
+	// ContinueOnError determines whether to continue pipeline execution if script fails
+	ContinueOnError bool `yaml:"continueOnError" json:"continueOnError" mapstructure:"continueOnError"`
+}
 
 // ConfigReader handles reading and merging configuration files
 type ConfigReader struct{}
@@ -194,9 +245,15 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		if config.Repo.Branch != "" {
 			merged.Repo.Branch = config.Repo.Branch
 		}
+		if config.Repo.IncludeSubmodules != nil {
+			merged.Repo.IncludeSubmodules = config.Repo.IncludeSubmodules
+		}
 		// Merge PR config
 		if config.PR.AutoCreate != nil {
 			merged.PR.AutoCreate = config.PR.AutoCreate
+		}
+		if config.PR.PushBranch != nil {
+			merged.PR.PushBranch = config.PR.PushBranch
 		}
 		if len(config.PR.Labels) > 0 {
 			merged.PR.Labels = config.PR.Labels
@@ -230,6 +287,16 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		if len(config.Notice.Params) > 0 {
 			merged.Notice.Params = config.Notice.Params
 		}
+		// Merge Scripts configuration
+		if config.Scripts.PreScan != nil {
+			merged.Scripts.PreScan = config.Scripts.PreScan
+		}
+		if config.Scripts.PreCommit != nil {
+			merged.Scripts.PreCommit = config.Scripts.PreCommit
+		}
+		if config.Updater.Go != nil {
+			merged.Updater.Go = config.Updater.Go
+		}
 	}
 
 	return merged
@@ -246,5 +313,26 @@ func (c *ConfigReader) ApplyDefaults(config *DependaBotConfig) *DependaBotConfig
 		config.Scanner.Params = []string{"--scanners", "vuln"}
 	}
 
+	// Apply default for IncludeSubmodules if not set
+	if config.Repo.IncludeSubmodules == nil {
+		defaultIncludeSubmodules := false
+		config.Repo.IncludeSubmodules = &defaultIncludeSubmodules
+	}
+
 	return config
+}
+
+// GetIncludeSubmodules returns the IncludeSubmodules value with default fallback
+func (r *RepoConfig) GetIncludeSubmodules() bool {
+	return r.IncludeSubmodules != nil && *r.IncludeSubmodules
+}
+
+// String implements fmt.Stringer interface for better debugging experience
+func (c *DependaBotConfig) String() string {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		logrus.Errorf("Failed to marshal config to JSON: %v", err)
+		return fmt.Sprintf("%+v", c)
+	}
+	return string(data)
 }

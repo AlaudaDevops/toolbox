@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/sirupsen/logrus"
 )
@@ -32,12 +33,15 @@ import (
 type GoUpdater struct {
 	// projectPath is the path to the project containing go.mod
 	projectPath string
+	// config contains Go-specific updater configuration
+	config *config.GoUpdaterConfig
 }
 
 // NewGoUpdater creates a new Go language updater
-func NewGoUpdater(projectPath string) *GoUpdater {
+func NewGoUpdater(projectPath string, goConfig *config.GoUpdaterConfig) *GoUpdater {
 	return &GoUpdater{
 		projectPath: projectPath,
+		config:      goConfig,
 	}
 }
 
@@ -115,11 +119,46 @@ func (g *GoUpdater) updatePackage(vuln types.Vulnerability) error {
 		return fmt.Errorf("no matching version found for %s", packageWithVersion)
 	}
 
+	// Log successful command to output file if configured
+	if g.config != nil && g.config.CommandOutputFile != "" {
+		if err := g.logSuccessfulCommand(packageWithVersion); err != nil {
+			logrus.Warnf("Failed to log successful command: %v", err)
+		}
+	}
+
 	err = g.runGoModTidy(goModDir)
 	if err != nil {
 		return fmt.Errorf("go mod tidy failed: %w", err)
 	}
 
+	return nil
+}
+
+// logSuccessfulCommand logs the successful go get command to the configured output file
+func (g *GoUpdater) logSuccessfulCommand(packageWithVersion string) error {
+	outputFilePath := filepath.Join(g.projectPath, g.config.CommandOutputFile)
+	// Create output directory if it doesn't exist
+	outputDir := filepath.Dir(outputFilePath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Open file in append mode
+	file, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open output file: %w", err)
+	}
+	defer file.Close()
+
+	// Format the log entry
+	logEntry := fmt.Sprintf("go get %s", packageWithVersion)
+
+	// Write to file
+	if _, err := file.WriteString(logEntry + "\n"); err != nil {
+		return fmt.Errorf("failed to write to output file: %w", err)
+	}
+
+	logrus.Debugf("Logged successful command [%s] to: %s", logEntry, outputFilePath)
 	return nil
 }
 
