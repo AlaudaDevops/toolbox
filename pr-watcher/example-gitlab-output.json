@@ -1,0 +1,45 @@
+{
+  "group": "example-group",
+  "scan_date": "2025-06-10T10:30:00Z",
+  "min_days_open": 7,
+  "total_projects": 3,
+  "total_old_mrs": 2,
+  "merge_requests": [
+    {
+      "project": "example-group/frontend-app",
+      "iid": 123,
+      "title": "Add dark mode support",
+      "author": "developer1",
+      "created_at": "2025-05-20T15:30:00Z",
+      "updated_at": "2025-05-25T09:15:00Z",
+      "web_url": "https://gitlab.com/example-group/frontend-app/-/merge_requests/123",
+      "state": "opened",
+      "draft": false,
+      "days_open": 21,
+      "labels": ["enhancement", "needs-review", "ui"],
+      "assignees": ["reviewer1"],
+      "reviewers": ["reviewer2", "reviewer3"],
+      "target_branch": "main",
+      "source_branch": "feature/dark-mode",
+      "pipeline_status": "success"
+    },
+    {
+      "project": "example-group/backend-api",
+      "iid": 87,
+      "title": "Implement user authentication",
+      "author": "developer2",
+      "created_at": "2025-05-15T10:45:00Z",
+      "updated_at": "2025-05-28T14:20:00Z",
+      "web_url": "https://gitlab.com/example-group/backend-api/-/merge_requests/87",
+      "state": "opened",
+      "draft": true,
+      "days_open": 26,
+      "labels": ["security", "work-in-progress"],
+      "assignees": [],
+      "reviewers": ["security-team"],
+      "target_branch": "develop",
+      "source_branch": "feature/auth-system",
+      "pipeline_status": "failed"
+    }
+  ]
+}
