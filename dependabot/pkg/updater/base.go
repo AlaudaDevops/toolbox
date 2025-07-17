@@ -1,0 +1,71 @@
+/*
+Copyright 2025 The AlaudaDevops Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// Package updater provides language-agnostic vulnerability package updating functionality.
+package updater
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/sirupsen/logrus"
+)
+
+// BaseUpdater provides common functionality for language-specific updaters
+type BaseUpdater struct {
+	// projectPath is the path to the project
+	projectPath string
+	// commandOutputFile is the file path to output successful commands
+	commandOutputFile string
+}
+
+// NewBaseUpdater creates a new base updater with common functionality
+func NewBaseUpdater(projectPath string, commandOutputFile string) *BaseUpdater {
+	return &BaseUpdater{
+		projectPath:       projectPath,
+		commandOutputFile: commandOutputFile,
+	}
+}
+
+// LogSuccessfulCommand logs the successful command to the configured output file
+func (b *BaseUpdater) LogSuccessfulCommand(command string) error {
+	if b.commandOutputFile == "" {
+		return nil
+	}
+
+	outputFilePath := filepath.Join(b.projectPath, b.commandOutputFile)
+	// Create output directory if it doesn't exist
+	outputDir := filepath.Dir(outputFilePath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Open file in append mode
+	file, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open output file: %w", err)
+	}
+	defer file.Close()
+
+	// Write to file
+	if _, err := file.WriteString(command + "\n"); err != nil {
+		return fmt.Errorf("failed to write to output file: %w", err)
+	}
+
+	logrus.Debugf("Logged successful command [%s] to: %s", command, outputFilePath)
+	return nil
+}

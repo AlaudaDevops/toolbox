@@ -29,7 +29,7 @@ func init() {
 	rootCmd.Flags().String("git.token", "", "Access token for the Git provider (used for authentication and PR creation)")
 	rootCmd.Flags().String("git.baseUrl", "https://api.github.com", "Base API URL of the Git provider (e.g., https://api.github.com for GitHub, https://gitlab.example.com for GitLab)")
 	rootCmd.Flags().Bool("pr.autoCreate", false, "enable automatic PR creation")
-	rootCmd.Flags().Bool("pr.pushBranch", false, "enable automatic push branch")
+	rootCmd.Flags().Bool("pr.pushBranch", false, "enable automatic push branch (automatically enabled when pr.autoCreate is true)")
 	rootCmd.Flags().StringSlice("pr.labels", []string{}, "labels to add to the PR")
 	rootCmd.Flags().StringSlice("pr.assignees", []string{}, "assignees to add to the PR")
 	rootCmd.Flags().Bool("debug", false, "enable debug log output")

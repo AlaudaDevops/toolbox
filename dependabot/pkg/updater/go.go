@@ -31,16 +31,20 @@ import (
 
 // GoUpdater handles updating Go packages
 type GoUpdater struct {
-	// projectPath is the path to the project containing go.mod
-	projectPath string
+	*BaseUpdater
 	// config contains Go-specific updater configuration
 	config *config.GoUpdaterConfig
 }
 
 // NewGoUpdater creates a new Go language updater
 func NewGoUpdater(projectPath string, goConfig *config.GoUpdaterConfig) *GoUpdater {
+	commandOutputFile := ""
+	if goConfig != nil {
+		commandOutputFile = goConfig.CommandOutputFile
+	}
+
 	return &GoUpdater{
-		projectPath: projectPath,
+		BaseUpdater: NewBaseUpdater(projectPath, commandOutputFile),
 		config:      goConfig,
 	}
 }
@@ -120,10 +124,8 @@ func (g *GoUpdater) updatePackage(vuln types.Vulnerability) error {
 	}
 
 	// Log successful command to output file if configured
-	if g.config != nil && g.config.CommandOutputFile != "" {
-		if err := g.logSuccessfulCommand(packageWithVersion); err != nil {
-			logrus.Warnf("Failed to log successful command: %v", err)
-		}
+	if err := g.LogSuccessfulCommand("go get " + packageWithVersion); err != nil {
+		logrus.Warnf("Failed to log successful command: %v", err)
 	}
 
 	err = g.runGoModTidy(goModDir)
@@ -131,34 +133,6 @@ func (g *GoUpdater) updatePackage(vuln types.Vulnerability) error {
 		return fmt.Errorf("go mod tidy failed: %w", err)
 	}
 
-	return nil
-}
-
-// logSuccessfulCommand logs the successful go get command to the configured output file
-func (g *GoUpdater) logSuccessfulCommand(packageWithVersion string) error {
-	outputFilePath := filepath.Join(g.projectPath, g.config.CommandOutputFile)
-	// Create output directory if it doesn't exist
-	outputDir := filepath.Dir(outputFilePath)
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	// Open file in append mode
-	file, err := os.OpenFile(outputFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open output file: %w", err)
-	}
-	defer file.Close()
-
-	// Format the log entry
-	logEntry := fmt.Sprintf("go get %s", packageWithVersion)
-
-	// Write to file
-	if _, err := file.WriteString(logEntry + "\n"); err != nil {
-		return fmt.Errorf("failed to write to output file: %w", err)
-	}
-
-	logrus.Debugf("Logged successful command [%s] to: %s", logEntry, outputFilePath)
 	return nil
 }
 
@@ -175,6 +149,11 @@ func (g *GoUpdater) runGoModTidy(goModDir string) error {
 
 	if err != nil {
 		return fmt.Errorf("go mod tidy failed: %w, output: %s", err, string(output))
+	}
+
+	// Log successful command to output file if configured
+	if err := g.LogSuccessfulCommand("go mod tidy"); err != nil {
+		logrus.Warnf("Failed to log successful command: %v", err)
 	}
 
 	return nil

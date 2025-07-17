@@ -64,10 +64,10 @@ dependabot --repo.url https://github.com/user/repo.git
 # Specify branch
 dependabot --repo.url https://github.com/user/repo.git --repo.branch develop
 
-# Enable automatic PR creation
+# Enable automatic PR creation (this will also enable branch push)
 dependabot --repo.url https://github.com/user/repo.git --pr.autoCreate
 
-# Enable automatic branch push
+# Enable automatic branch push only (without PR creation)
 dependabot --repo.url https://github.com/user/repo.git --pr.pushBranch
 
 # Clone with submodules
@@ -86,7 +86,7 @@ dependabot --help
 -  `--git.provider`    Git provider type (e.g., github, gitlab) (default "github")
 -  `--git.token`       Access token for the Git provider (used for authentication and PR creation)
 -  `--pr.autoCreate`   enable automatic PR creation
--  `--pr.pushBranch`   enable automatic push branch
+-  `--pr.pushBranch`   enable automatic push branch (automatically enabled when --pr.autoCreate is true)
 -  `--repo.branch`     branch to clone and create PR against (default "main")
 -  `--repo.url`        repository URL to clone and analyze (alternative to dir)
 -  `--repo.includeSubmodules` include submodules when cloning repository (default: false)
@@ -228,6 +228,7 @@ go get github.com/go-jose/go-jose/v3@v3.0.4
 go get github.com/go-jose/go-jose/v4@v4.0.5
 go get github.com/golang-jwt/jwt/v4@v4.5.2
 go get github.com/open-policy-agent/opa@v1.4.0
+go mod tidy
 ```
 
 These commands can be executed manually or integrated into CI/CD pipelines to automatically apply the security updates.
