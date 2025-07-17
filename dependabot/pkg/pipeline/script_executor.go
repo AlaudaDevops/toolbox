@@ -44,7 +44,7 @@ func NewScriptExecutor(projectPath string) *ScriptExecutor {
 }
 
 // ExecuteScript executes a custom script with the given configuration
-func (e *ScriptExecutor) ExecuteScript(stage string, scriptConfig *config.ScriptConfig) error {
+func (e *ScriptExecutor) ExecuteScript(stage string, scriptConfig *config.HookConfig) error {
 	if scriptConfig == nil || scriptConfig.Script == "" {
 		return nil
 	}

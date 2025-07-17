@@ -125,17 +125,17 @@ type PipelineScannerConfig = ScannerConfig
 // HooksConfig contains custom script configuration for pipeline hooks
 type HooksConfig struct {
 	// PreScan contains script to execute before security scanning
-	PreScan *ScriptConfig `yaml:"preScan" json:"preScan" mapstructure:"preScan"`
+	PreScan *HookConfig `yaml:"preScan" json:"preScan" mapstructure:"preScan"`
 	// PostScan contains script to execute after security scanning
-	PostScan *ScriptConfig `yaml:"postScan" json:"postScan" mapstructure:"postScan"`
+	PostScan *HookConfig `yaml:"postScan" json:"postScan" mapstructure:"postScan"`
 	// PreCommit contains script to execute before committing changes
-	PreCommit *ScriptConfig `yaml:"preCommit" json:"preCommit" mapstructure:"preCommit"`
+	PreCommit *HookConfig `yaml:"preCommit" json:"preCommit" mapstructure:"preCommit"`
 	// PostCommit contains script to execute after committing changes
-	PostCommit *ScriptConfig `yaml:"postCommit" json:"postCommit" mapstructure:"postCommit"`
+	PostCommit *HookConfig `yaml:"postCommit" json:"postCommit" mapstructure:"postCommit"`
 }
 
-// ScriptConfig contains configuration for a single script
-type ScriptConfig struct {
+// HookConfig contains configuration for a single pipeline hook
+type HookConfig struct {
 	// Script contains the script content to execute
 	Script string `yaml:"script" json:"script" mapstructure:"script"`
 	// Timeout for script execution (e.g., "5m", "30s")

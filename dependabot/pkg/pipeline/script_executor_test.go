@@ -44,7 +44,7 @@ func TestExecuteScript_NilConfig(t *testing.T) {
 
 func TestExecuteScript_EmptyScript(t *testing.T) {
 	executor := NewScriptExecutor("/test/project")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: "",
 	}
 
@@ -54,7 +54,7 @@ func TestExecuteScript_EmptyScript(t *testing.T) {
 
 func TestExecuteScript_SuccessfulExecution(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: "echo 'Hello World'",
 	}
 
@@ -64,7 +64,7 @@ func TestExecuteScript_SuccessfulExecution(t *testing.T) {
 
 func TestExecuteScript_WithOutput(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: "echo 'Test Output' && echo 'Second Line'",
 	}
 
@@ -74,7 +74,7 @@ func TestExecuteScript_WithOutput(t *testing.T) {
 
 func TestExecuteScript_WithTimeout(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:  "sleep 1 && echo 'Completed'",
 		Timeout: "5s",
 	}
@@ -85,7 +85,7 @@ func TestExecuteScript_WithTimeout(t *testing.T) {
 
 func TestExecuteScript_TimeoutExceeded(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:  "sleep 10",
 		Timeout: "1s",
 	}
@@ -97,7 +97,7 @@ func TestExecuteScript_TimeoutExceeded(t *testing.T) {
 
 func TestExecuteScript_InvalidTimeoutFormat(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:  "echo 'Test'",
 		Timeout: "invalid-timeout",
 	}
@@ -108,7 +108,7 @@ func TestExecuteScript_InvalidTimeoutFormat(t *testing.T) {
 
 func TestExecuteScript_ContinueOnError(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:          "exit 1",
 		ContinueOnError: true,
 	}
@@ -119,7 +119,7 @@ func TestExecuteScript_ContinueOnError(t *testing.T) {
 
 func TestExecuteScript_ErrorWithoutContinue(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:          "exit 1",
 		ContinueOnError: false,
 	}
@@ -131,7 +131,7 @@ func TestExecuteScript_ErrorWithoutContinue(t *testing.T) {
 
 func TestExecuteScript_ErrorWithOutput(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:          "echo 'Error output' && exit 1",
 		ContinueOnError: false,
 	}
@@ -144,7 +144,7 @@ func TestExecuteScript_ErrorWithOutput(t *testing.T) {
 
 func TestExecuteScript_ComplexScript(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: `
 echo "Starting complex script"
 for i in {1..3}; do
@@ -160,7 +160,7 @@ echo "Script completed"
 
 func TestExecuteScript_WithEnvironmentVariables(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: `
 echo "PATH: $PATH"
 echo "PWD: $PWD"
@@ -282,7 +282,7 @@ func TestExecuteScript_WorkingDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	executor := NewScriptExecutor(tempDir)
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: "ls -la test.txt",
 	}
 
@@ -292,7 +292,7 @@ func TestExecuteScript_WorkingDirectory(t *testing.T) {
 
 func TestExecuteScript_WithStderrOutput(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: "echo 'stdout message' >&1 && echo 'stderr message' >&2",
 	}
 
@@ -302,7 +302,7 @@ func TestExecuteScript_WithStderrOutput(t *testing.T) {
 
 func TestExecuteScript_WithLongTimeout(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:  "echo 'Quick execution'",
 		Timeout: "1h", // Very long timeout
 	}
@@ -317,7 +317,7 @@ func TestExecuteScript_WithLongTimeout(t *testing.T) {
 
 func TestExecuteScript_WithZeroTimeout(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:  "echo 'Test'",
 		Timeout: "0s",
 	}
@@ -328,7 +328,7 @@ func TestExecuteScript_WithZeroTimeout(t *testing.T) {
 
 func TestExecuteScript_WithNegativeTimeout(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script:  "echo 'Test'",
 		Timeout: "-1s",
 	}
@@ -339,7 +339,7 @@ func TestExecuteScript_WithNegativeTimeout(t *testing.T) {
 
 func TestExecuteScript_WithSpecialCharacters(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: `echo "Special chars: !@#$%^&*()_+-=[]{}|;':\",./<>?"`,
 	}
 
@@ -349,7 +349,7 @@ func TestExecuteScript_WithSpecialCharacters(t *testing.T) {
 
 func TestExecuteScript_WithUnicodeCharacters(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: `echo "Unicode: 你好世界 🌍"`,
 	}
 
@@ -359,7 +359,7 @@ func TestExecuteScript_WithUnicodeCharacters(t *testing.T) {
 
 func TestExecuteScript_WithMultilineScript(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: `#!/bin/bash
 # This is a multiline script
 echo "Line 1"
@@ -374,7 +374,7 @@ echo "Line 3"
 
 func TestExecuteScript_StageNameInFilename(t *testing.T) {
 	executor := NewScriptExecutor("/tmp")
-	scriptConfig := &config.ScriptConfig{
+	scriptConfig := &config.HookConfig{
 		Script: "echo 'test'",
 	}
 
