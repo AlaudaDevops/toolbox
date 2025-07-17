@@ -39,8 +39,8 @@ type DependaBotConfig struct {
 	Git GitProviderConfig `yaml:"git" json:"git" mapstructure:"git"`
 	// Notice contains notice configuration
 	Notice NoticeConfig `yaml:"notice" json:"notice" mapstructure:"notice"`
-	// Scripts contains custom script configuration for pipeline hooks
-	Scripts ScriptsConfig `yaml:"scripts" json:"scripts" mapstructure:"scripts"`
+	// Hooks contains custom script configuration for pipeline hooks
+	Hooks HooksConfig `yaml:"hooks" json:"hooks" mapstructure:"hooks"`
 	// Updater contains updater-specific configuration
 	Updater UpdaterConfig `yaml:"updater" json:"updater" mapstructure:"updater"`
 }
@@ -122,12 +122,16 @@ type ScannerConfig struct {
 // PipelineScannerConfig represents scanner config for pipeline
 type PipelineScannerConfig = ScannerConfig
 
-// ScriptsConfig contains custom script configuration for pipeline hooks
-type ScriptsConfig struct {
+// HooksConfig contains custom script configuration for pipeline hooks
+type HooksConfig struct {
 	// PreScan contains script to execute before security scanning
 	PreScan *ScriptConfig `yaml:"preScan" json:"preScan" mapstructure:"preScan"`
+	// PostScan contains script to execute after security scanning
+	PostScan *ScriptConfig `yaml:"postScan" json:"postScan" mapstructure:"postScan"`
 	// PreCommit contains script to execute before committing changes
 	PreCommit *ScriptConfig `yaml:"preCommit" json:"preCommit" mapstructure:"preCommit"`
+	// PostCommit contains script to execute after committing changes
+	PostCommit *ScriptConfig `yaml:"postCommit" json:"postCommit" mapstructure:"postCommit"`
 }
 
 // ScriptConfig contains configuration for a single script
@@ -287,12 +291,18 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		if len(config.Notice.Params) > 0 {
 			merged.Notice.Params = config.Notice.Params
 		}
-		// Merge Scripts configuration
-		if config.Scripts.PreScan != nil {
-			merged.Scripts.PreScan = config.Scripts.PreScan
+		// Merge Hooks configuration
+		if config.Hooks.PreScan != nil {
+			merged.Hooks.PreScan = config.Hooks.PreScan
 		}
-		if config.Scripts.PreCommit != nil {
-			merged.Scripts.PreCommit = config.Scripts.PreCommit
+		if config.Hooks.PostScan != nil {
+			merged.Hooks.PostScan = config.Hooks.PostScan
+		}
+		if config.Hooks.PreCommit != nil {
+			merged.Hooks.PreCommit = config.Hooks.PreCommit
+		}
+		if config.Hooks.PostCommit != nil {
+			merged.Hooks.PostCommit = config.Hooks.PostCommit
 		}
 		if config.Updater.Go != nil {
 			merged.Updater.Go = config.Updater.Go
@@ -329,10 +339,14 @@ func (r *RepoConfig) GetIncludeSubmodules() bool {
 
 // String implements fmt.Stringer interface for better debugging experience
 func (c *DependaBotConfig) String() string {
+	if c == nil {
+		return ""
+	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
 		logrus.Errorf("Failed to marshal config to JSON: %v", err)
-		return fmt.Sprintf("%+v", c)
+		// Avoid recursive call to String() by using %#v
+		return fmt.Sprintf("%#v", *c)
 	}
 	return string(data)
 }

@@ -57,7 +57,7 @@ func (p *Pipeline) Run() error {
 
 	// Execute pre-scan script if configured
 	scriptExecutor := NewScriptExecutor(p.config.ProjectPath)
-	if err := scriptExecutor.ExecuteScript("Pre-scan", p.config.Scripts.PreScan); err != nil {
+	if err := scriptExecutor.ExecuteScript("Pre-scan", p.config.Hooks.PreScan); err != nil {
 		return fmt.Errorf("pre-scan script failed: %w", err)
 	}
 
@@ -77,6 +77,11 @@ func (p *Pipeline) Run() error {
 	vulnerabilities, err := scannerInstance.Scan()
 	if err != nil {
 		return fmt.Errorf("failed to run security scan: %w", err)
+	}
+
+	// Execute post-scan script if configured
+	if err := scriptExecutor.ExecuteScript("Post-scan", p.config.Hooks.PostScan); err != nil {
+		return fmt.Errorf("post-scan script failed: %w", err)
 	}
 
 	logrus.Info("Processing scan results...")
@@ -105,7 +110,7 @@ func (p *Pipeline) Run() error {
 	logrus.Debugf("PR Description:\n%s", pr.GeneratePRBody(updateSummary))
 
 	// Execute pre-commit script if configured
-	if err := scriptExecutor.ExecuteScript("Pre-commit", p.config.Scripts.PreCommit); err != nil {
+	if err := scriptExecutor.ExecuteScript("Pre-commit", p.config.Hooks.PreCommit); err != nil {
 		return fmt.Errorf("pre-commit script failed: %w", err)
 	}
 
@@ -118,6 +123,11 @@ func (p *Pipeline) Run() error {
 	branchName, err := p.commitChanges(updateSummary)
 	if err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
+	}
+
+	// Execute post-commit script if configured
+	if err := scriptExecutor.ExecuteScript("Post-commit", p.config.Hooks.PostCommit); err != nil {
+		return fmt.Errorf("post-commit script failed: %w", err)
 	}
 
 	if !p.config.PR.NeedCreatePR() {

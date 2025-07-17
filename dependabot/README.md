@@ -26,7 +26,7 @@ This project is a dependency management bot that helps manage project dependenci
 - ⚙️ Support for configuration files and command-line parameters
 - 🌿 Automatic Pull Request creation
 - 📁 Submodule cloning suprt
-- 🚀 Custom script execution hooks
+- 🚀 Custom script execution hooks (Pre-scan, Post-scan, Pre-commit, Post-commit)
 - 📝 Go get commands output generation
 
 ## Installation
@@ -158,7 +158,7 @@ scanner:
     - "vuln,secret"
 
 # Custom script configuration for pipeline hooks
-scripts:
+hooks:
   # Pre-scan script: executed before security scanning
   # Use case: prepare environment, install dependencies, run tests
   preScan:
@@ -168,6 +168,16 @@ scripts:
     timeout: "10m"
     continueOnError: false  # Pipeline will stop if this script fails
 
+  # Post-scan script: executed after security scanning
+  # Use case: process scan results, generate reports, send notifications
+  postScan:
+    script: |
+      #!/bin/bash
+      echo "Processing scan results..."
+      # Add custom logic to process vulnerability scan results
+    timeout: "5m"
+    continueOnError: true  # Pipeline will continue even if this script fails
+
   # Pre-commit script: executed before committing changes
   # Use case: validate changes, run additional checks, format code
   preCommit:
@@ -175,6 +185,16 @@ scripts:
       #!/bin/bash
       echo "Running pre-commit checks..."
     timeout: "10m"
+    continueOnError: true  # Pipeline will continue even if this script fails
+
+  # Post-commit script: executed after committing changes
+  # Use case: run tests, trigger CI/CD, send notifications
+  postCommit:
+    script: |
+      #!/bin/bash
+      echo "Running post-commit tasks..."
+      # Add custom logic like running tests, triggering CI/CD
+    timeout: "15m"
     continueOnError: true  # Pipeline will continue even if this script fails
 
 # Updater configuration
@@ -232,3 +252,20 @@ go mod tidy
 ```
 
 These commands can be executed manually or integrated into CI/CD pipelines to automatically apply the security updates.
+
+### Pipeline Execution Flow
+
+DependaBot pipeline executes in the following order:
+
+1. **Git Clone** - Clone the repository
+2. **Pre-scan Hook** - Prepare environment before security scanning
+3. **Security Scanning** - Scan for vulnerabilities using configured scanner
+4. **Post-scan Hook** - Process scan results, generate reports
+5. **Package Updates** - Update vulnerable packages to fixed versions
+5. **Pre-commit Hook** - Validate changes before committing
+6. **Commit Changes** - Create branch, commit and push changes
+7. **Post-commit Hook** - Run tests, trigger CI/CD after commit
+8. **PR Creation** - Create pull request (if enabled)
+9. **Notification** - Send notification about updates (if configured)
+
+Each hook is optional and can be configured with custom scripts, timeout settings, and error handling behavior.

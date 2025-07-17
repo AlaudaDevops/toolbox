@@ -19,6 +19,7 @@ package updater
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -105,9 +106,15 @@ func TestBaseUpdater_LogSuccessfulCommand(t *testing.T) {
 					t.Errorf("Failed to read output file: %v", err)
 				}
 
-				expectedContent := tt.command + "\n"
-				if string(content) != expectedContent {
-					t.Errorf("File content = %q, want %q", string(content), expectedContent)
+				// Check that the file contains the expected header
+				if !strings.HasPrefix(string(content), CommandOutputHeader) {
+					t.Errorf("File content does not start with expected header. Got: %q", string(content))
+				}
+
+				// Check that the command was appended after the header
+				expectedCommand := tt.command + "\n"
+				if !strings.Contains(string(content), expectedCommand) {
+					t.Errorf("File content does not contain expected command. Got: %q, want to contain: %q", string(content), expectedCommand)
 				}
 			}
 		})
@@ -138,7 +145,13 @@ func TestBaseUpdater_LogSuccessfulCommand_AppendMode(t *testing.T) {
 		t.Fatalf("Failed to read output file: %v", err)
 	}
 
-	expectedContent := "first command\nsecond command\n"
+	// Check that the file contains the expected header
+	if !strings.HasPrefix(string(content), CommandOutputHeader) {
+		t.Errorf("File content does not start with expected header. Got: %q", string(content))
+	}
+
+	// Check that both commands are appended after the header
+	expectedContent := CommandOutputHeader + "first command\nsecond command\n"
 	if string(content) != expectedContent {
 		t.Errorf("File content = %q, want %q", string(content), expectedContent)
 	}
