@@ -39,19 +39,36 @@ in your projects based on Trivy security scan results.
 It supports multiple programming languages and can automatically create
 pull requests with the security fixes.
 
-Example usage:
-  # Local project mode (automatic scan)
-  dependabot --dir /path/to/project
-  dependabot --dir /path/to/project
-  dependabot --dir /path/to/project --create-pr=false
+Repository configuration files are searched in the following order:
+1. .dependabot.yml in project root directory
+2. .dependabot.yaml in project root directory
+3. .github/dependabot.yml
+4. .github/dependabot.yaml
 
-  # Remote repository mode (clone + automatic scan)
+Example usage:
+  # Local project mode (automatic scanning)
+  dependabot --dir /path/to/your/project
+
+  # Remote repository mode (clone + automatic scanning)
   dependabot --repo.url https://github.com/user/repo.git
+
+  # Specify branch
   dependabot --repo.url git@github.com:user/repo.git --repo.branch main
-  dependabot --repo.url https://github.com/user/repo.git --pr.autoCreate=false
+
+  # Enable automatic PR creation (this will also enable branch push)
+  dependabot --repo.url https://github.com/user/repo.git --repo.branch main --pr.autoCreate
+
+  # Enable automatic branch push only (without PR creation)
+  dependabot --repo.url https://github.com/user/repo.git --repo.branch main --pr.pushBranch
+
+  # Clone with submodules
+  dependabot --repo.url https://github.com/user/repo.git --repo.branch main --repo.includeSubmodules
 
   # Using external configuration file
-  dependabot --repo.url https://github.com/user/repo.git --config my-config.yml`,
+  dependabot --repo.url https://github.com/user/repo.git --repo.branch main --config my-config.yml
+
+  # View help information
+  dependabot --help`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runDependaBot()

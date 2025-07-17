@@ -152,11 +152,18 @@ func NewConfigReader() *ConfigReader {
 	return &ConfigReader{}
 }
 
-// ReadRepoConfig reads configuration from repository .github/dependabot.yml
+// ReadRepoConfig reads configuration from repository configuration files
 // Supports both legacy format and GitHub Dependabot format
+// Searches for configuration files in the following order:
+// 1. .dependabot.yml in project root directory
+// 2. .dependabot.yaml in project root directory
+// 3. .github/dependabot.yml
+// 4. .github/dependabot.yaml
 func (c *ConfigReader) ReadRepoConfig(projectPath string) (*DependaBotConfig, error) {
-	// Try both .yml and .yaml extensions
+	// Try configuration files in order of priority
 	configPaths := []string{
+		filepath.Join(projectPath, ".dependabot.yml"),
+		filepath.Join(projectPath, ".dependabot.yaml"),
 		filepath.Join(projectPath, ".github", "dependabot.yml"),
 		filepath.Join(projectPath, ".github", "dependabot.yaml"),
 	}

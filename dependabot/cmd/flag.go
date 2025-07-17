@@ -45,11 +45,11 @@ func initConfig() {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
-		// Search config in home directory with name ".cobra" (without extension).
+		// Search config in home directory with name ".dependabot.yaml"
 		viper.AddConfigPath(".")
 		viper.AddConfigPath("$HOME")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".dependabot.yaml")
+		viper.SetConfigName(".dependabot")
 	}
 	if err := viper.ReadInConfig(); err != nil {
 		logrus.Warn("Can't read config:", err)
