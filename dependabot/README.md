@@ -95,7 +95,11 @@ dependabot --help
 
 DependaBot supports a three-tier configuration system, with priority from lowest to highest:
 
-1. **Repository Configuration** (`.github/dependabot.yml` or `.github/dependabot.yaml`)
+1. **Repository Configuration** (searched in order):
+   - `.dependabot.yml` in project root directory
+   - `.dependabot.yaml` in project root directory
+   - `.github/dependabot.yml`
+   - `.github/dependabot.yaml`
 2. **Local Configuration File**: The first-matched configuration file from the following locations (in order of priority):
    1. specified by `--config` parameter
    2. `.dependabot.yaml` in the current directory
@@ -104,7 +108,7 @@ DependaBot supports a three-tier configuration system, with priority from lowest
 
 #### Repository Configuration File
 
-The repository configuration file supports the GitHub dependabot configuration format, allowing seamless transition to this project for vulnerability management.
+The repository configuration file supports both the GitHub dependabot configuration format and our custom format, allowing seamless transition to this project for vulnerability management.
 
 Example GitHub dependabot configuration:
 
