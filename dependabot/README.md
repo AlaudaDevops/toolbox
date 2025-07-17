@@ -25,6 +25,9 @@ This project is a dependency management bot that helps manage project dependenci
 - 📊 Detailed update logs and error reports
 - ⚙️ Support for configuration files and command-line parameters
 - 🌿 Automatic Pull Request creation
+- 📁 Submodule cloning suprt
+- 🚀 Custom script execution hooks (Pre-scan, Post-scan, Pre-commit, Post-commit)
+- 📝 Go get commands output generation
 
 ## Installation
 
@@ -61,8 +64,14 @@ dependabot --repo.url https://github.com/user/repo.git
 # Specify branch
 dependabot --repo.url https://github.com/user/repo.git --repo.branch develop
 
-# Enable automatic PR creation
+# Enable automatic PR creation (this will also enable branch push)
 dependabot --repo.url https://github.com/user/repo.git --pr.autoCreate
+
+# Enable automatic branch push only (without PR creation)
+dependabot --repo.url https://github.com/user/repo.git --pr.pushBranch
+
+# Clone with submodules
+dependabot --repo.url https://github.com/user/repo.git --repo.includeSubmodules
 
 # View help information
 dependabot --help
@@ -77,8 +86,10 @@ dependabot --help
 -  `--git.provider`    Git provider type (e.g., github, gitlab) (default "github")
 -  `--git.token`       Access token for the Git provider (used for authentication and PR creation)
 -  `--pr.autoCreate`   enable automatic PR creation
+-  `--pr.pushBranch`   enable automatic push branch (automatically enabled when --pr.autoCreate is true)
 -  `--repo.branch`     branch to clone and create PR against (default "main")
 -  `--repo.url`        repository URL to clone and analyze (alternative to dir)
+-  `--repo.includeSubmodules` include submodules when cloning repository (default: false)
 
 ### Configuration System
 
@@ -127,6 +138,7 @@ Create a configuration file anywhere and specify it using the `--config` paramet
 ```yaml
 pr:
   autoCreate: false
+  pushBranch: false
   labels:
     - dependencies
   assignees:
@@ -144,12 +156,57 @@ scanner:
     - "--ignore-unfixed"
     - "--scanners"
     - "vuln,secret"
+
+# Custom script configuration for pipeline hooks
+hooks:
+  # Pre-scan script: executed before security scanning
+  # Use case: prepare environment, install dependencies, run tests
+  preScan:
+    script: |
+      #!/bin/bash
+      echo "Running pre-scan setup..."
+    timeout: "10m"
+    continueOnError: false  # Pipeline will stop if this script fails
+
+  # Post-scan script: executed after security scanning
+  # Use case: process scan results, generate reports, send notifications
+  postScan:
+    script: |
+      #!/bin/bash
+      echo "Processing scan results..."
+      # Add custom logic to process vulnerability scan results
+    timeout: "5m"
+    continueOnError: true  # Pipeline will continue even if this script fails
+
+  # Pre-commit script: executed before committing changes
+  # Use case: validate changes, run additional checks, format code
+  preCommit:
+    script: |
+      #!/bin/bash
+      echo "Running pre-commit checks..."
+    timeout: "10m"
+    continueOnError: true  # Pipeline will continue even if this script fails
+
+  # Post-commit script: executed after committing changes
+  # Use case: run tests, trigger CI/CD, send notifications
+  postCommit:
+    script: |
+      #!/bin/bash
+      echo "Running post-commit tasks..."
+      # Add custom logic like running tests, triggering CI/CD
+    timeout: "15m"
+    continueOnError: true  # Pipeline will continue even if this script fails
+
+# Updater configuration
+updater:
+  go:
+    # Indicate the file to store the go get commands
+    commandOutputFile: ".tekton/patches/dependabot-go-get-commands.sh"
 ```
 
 ### Git Provider Support
 
-Dependabot currently supports GitHub and Gitlab providers. You can specify the provider using the `--git.provider` parameter or configure it in the local configuration file.
-
+DependaBot currently supports GitHub and Gitlab providers. You can specify the provider using the `--git.provider` parameter or configure it in the local configuration file.
 
 ```yaml
 # github provider example
@@ -178,3 +235,37 @@ notice:
   params:
     webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
 ```
+
+### Generated Go Get Commands
+
+When DependaBot detects vulnerabilities in Go dependencies, it generates a script file containing the necessary `go get` commands to upgrade the vulnerable packages to their fixed versions. This file is created at the path specified in the `updater.go.commandOutputFile` configuration.
+
+Example of generated commands:
+
+```bash
+go get github.com/cloudflare/circl@v1.6.1
+go get github.com/go-jose/go-jose/v3@v3.0.4
+go get github.com/go-jose/go-jose/v4@v4.0.5
+go get github.com/golang-jwt/jwt/v4@v4.5.2
+go get github.com/open-policy-agent/opa@v1.4.0
+go mod tidy
+```
+
+These commands can be executed manually or integrated into CI/CD pipelines to automatically apply the security updates.
+
+### Pipeline Execution Flow
+
+DependaBot pipeline executes in the following order:
+
+1. **Git Clone** - Clone the repository
+2. **Pre-scan Hook** - Prepare environment before security scanning
+3. **Security Scanning** - Scan for vulnerabilities using configured scanner
+4. **Post-scan Hook** - Process scan results, generate reports
+5. **Package Updates** - Update vulnerable packages to fixed versions
+5. **Pre-commit Hook** - Validate changes before committing
+6. **Commit Changes** - Create branch, commit and push changes
+7. **Post-commit Hook** - Run tests, trigger CI/CD after commit
+8. **PR Creation** - Create pull request (if enabled)
+9. **Notification** - Send notification about updates (if configured)
+
+Each hook is optional and can be configured with custom scripts, timeout settings, and error handling behavior.

@@ -104,8 +104,8 @@ func runDependaBot() error {
 			return fmt.Errorf("git CLI check failed: %w", err)
 		}
 
-		// Clone repository with specified branch
-		gitCloner = git.NewGitCloner(cfg.Repo.URL, cfg.Repo.Branch)
+		// Clone repository with specified branch and submodule configuration
+		gitCloner = git.NewGitClonerFromConfig(&cfg.Repo)
 
 		clonedPath, err := gitCloner.CloneRepository()
 		if err != nil {
@@ -146,6 +146,7 @@ func runDependaBot() error {
 	// CLI config has highest priority
 	finalConfig := configReader.MergeConfigs(repoConfig, &cfg)
 	finalConfig = configReader.ApplyDefaults(finalConfig)
+	logrus.Debug("Final config:", finalConfig.String())
 
 	// Step 2: Convert to pipeline configuration
 	pipelineConfig := &pipeline.Config{

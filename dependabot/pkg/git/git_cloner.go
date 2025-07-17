@@ -25,6 +25,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,13 +39,16 @@ type GitCloner struct {
 	tempDir string
 	// clonedPath is the full path to the cloned repository
 	clonedPath string
+	// includeSubmodules indicates whether to clone submodules
+	includeSubmodules bool
 }
 
-// NewGitClonerWithBranch creates a new git cloner for specific branch
-func NewGitCloner(repoURL, branch string) *GitCloner {
+// NewGitClonerFromConfig creates a new git cloner from repository configuration
+func NewGitClonerFromConfig(repoConfig *config.RepoConfig) *GitCloner {
 	return &GitCloner{
-		repoURL: repoURL,
-		branch:  branch,
+		repoURL:           repoConfig.URL,
+		branch:            repoConfig.Branch,
+		includeSubmodules: repoConfig.GetIncludeSubmodules(),
 	}
 }
 
@@ -73,6 +77,12 @@ func (g *GitCloner) CloneRepository() (string, error) {
 	args := []string{
 		"clone",
 		"--depth", "1",
+	}
+
+	// Add submodule support if enabled
+	if g.includeSubmodules {
+		args = append(args, "--recurse-submodules")
+		logrus.Debugf("Cloning with submodules enabled")
 	}
 
 	// Add branch specification if provided

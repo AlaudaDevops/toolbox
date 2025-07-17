@@ -24,20 +24,28 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/sirupsen/logrus"
 )
 
 // GoUpdater handles updating Go packages
 type GoUpdater struct {
-	// projectPath is the path to the project containing go.mod
-	projectPath string
+	*BaseUpdater
+	// config contains Go-specific updater configuration
+	config *config.GoUpdaterConfig
 }
 
 // NewGoUpdater creates a new Go language updater
-func NewGoUpdater(projectPath string) *GoUpdater {
+func NewGoUpdater(projectPath string, goConfig *config.GoUpdaterConfig) *GoUpdater {
+	commandOutputFile := ""
+	if goConfig != nil {
+		commandOutputFile = goConfig.CommandOutputFile
+	}
+
 	return &GoUpdater{
-		projectPath: projectPath,
+		BaseUpdater: NewBaseUpdater(projectPath, commandOutputFile),
+		config:      goConfig,
 	}
 }
 
@@ -50,6 +58,9 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 
 	result := types.VulnFixResults{}
 	failedErrors := make([]error, 0, len(vulnerabilities))
+	// Track directories that need go mod tidy
+	tidyDirs := make(map[string]bool)
+
 	// Process each directory separately
 	for _, vuln := range vulnerabilities {
 		fixResult := types.VulnFixResult{
@@ -61,8 +72,28 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 			fixResult.Success = false
 			fixResult.Error = err.Error()
 			failedErrors = append(failedErrors, err)
+		} else {
+			// Mark directory for go mod tidy if update was successful
+			goModDir := filepath.Join(g.projectPath, strings.TrimSuffix(vuln.PackageDir, "go.mod"))
+			tidyDirs[goModDir] = true
 		}
 		result = append(result, fixResult)
+	}
+
+	// Run go mod tidy for all affected directories
+	for goModDir := range tidyDirs {
+		if err := g.runGoModTidy(goModDir); err != nil {
+			logrus.Warnf("go mod tidy failed for directory %s: %v", goModDir, err)
+			// Don't fail the entire operation for go mod tidy errors
+		}
+
+		// Check if vendor directory exists and run go mod vendor
+		if g.hasVendorDirectory(goModDir) {
+			if err := g.runGoModVendor(goModDir); err != nil {
+				logrus.Warnf("go mod vendor failed for directory %s: %v", goModDir, err)
+				// Don't fail the entire operation for go mod vendor errors
+			}
+		}
 	}
 
 	// Print overall summary
@@ -115,9 +146,9 @@ func (g *GoUpdater) updatePackage(vuln types.Vulnerability) error {
 		return fmt.Errorf("no matching version found for %s", packageWithVersion)
 	}
 
-	err = g.runGoModTidy(goModDir)
-	if err != nil {
-		return fmt.Errorf("go mod tidy failed: %w", err)
+	// Log successful command to output file if configured
+	if err := g.LogSuccessfulCommand("go get " + packageWithVersion); err != nil {
+		logrus.Warnf("Failed to log successful command: %v", err)
 	}
 
 	return nil
@@ -136,6 +167,41 @@ func (g *GoUpdater) runGoModTidy(goModDir string) error {
 
 	if err != nil {
 		return fmt.Errorf("go mod tidy failed: %w, output: %s", err, string(output))
+	}
+
+	// Log successful command to output file if configured
+	if err := g.LogSuccessfulCommand("go mod tidy"); err != nil {
+		logrus.Warnf("Failed to log successful command: %v", err)
+	}
+
+	return nil
+}
+
+// hasVendorDirectory checks if a vendor directory exists in the given directory
+func (g *GoUpdater) hasVendorDirectory(goModDir string) bool {
+	vendorPath := filepath.Join(goModDir, "vendor")
+	info, err := os.Stat(vendorPath)
+	return err == nil && info.IsDir()
+}
+
+// runGoModVendor runs 'go mod vendor' command to update vendor directory
+func (g *GoUpdater) runGoModVendor(goModDir string) error {
+	cmd := exec.Command("go", "mod", "vendor")
+	cmd.Dir = goModDir
+
+	// Set environment variables for go command
+	cmd.Env = os.Environ()
+
+	// Capture both stdout and stderr
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		return fmt.Errorf("go mod vendor failed: %w, output: %s", err, string(output))
+	}
+
+	// Log successful command to output file if configured
+	if err := g.LogSuccessfulCommand("go mod vendor"); err != nil {
+		logrus.Warnf("Failed to log successful command: %v", err)
 	}
 
 	return nil

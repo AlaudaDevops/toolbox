@@ -19,7 +19,10 @@ package updater
 
 import (
 	"fmt"
+	"sort"
+	"strings"
 
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/sirupsen/logrus"
 )
@@ -36,11 +39,11 @@ type Updater struct {
 // New creates a new Updater instance with automatic language detection
 // projectPath: the path to the project to be updated
 // Returns a pointer to an Updater instance
-func New(projectPath string) *Updater {
+func New(projectPath string, updaterConfig config.UpdaterConfig) *Updater {
 	updaters := make(map[types.LanguageType]LanguageUpdater)
 
 	// Pre-register Go updater
-	updaters[types.LanguageGo] = NewGoUpdater(projectPath)
+	updaters[types.LanguageGo] = NewGoUpdater(projectPath, updaterConfig.Go)
 
 	return &Updater{
 		projectPath:      projectPath,
@@ -116,8 +119,46 @@ func (u *Updater) UpdatePackages(vulnerabilities []types.Vulnerability) (types.V
 	return result, nil
 }
 
+// sortVulnerabilities sorts vulnerabilities by multiple fields for stable ordering
+// vulns: list of vulnerabilities to process
+// Returns sorted vulnerabilities with stable ordering based on field declaration order
+func sortVulnerabilities(vulns []types.Vulnerability) []types.Vulnerability {
+	// Create a copy to avoid modifying the original slice
+	sortedVulns := make([]types.Vulnerability, len(vulns))
+	copy(sortedVulns, vulns)
+
+	// Sort by multiple fields in declaration order for stable ordering
+	sort.Slice(sortedVulns, func(i, j int) bool {
+		keyI := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s",
+			sortedVulns[i].PackageDir,
+			sortedVulns[i].PackageName,
+			sortedVulns[i].CurrentVersion,
+			sortedVulns[i].FixedVersion,
+			sortedVulns[i].Severity,
+			sortedVulns[i].Language,
+			strings.Join(sortedVulns[i].VulnerabilityIDs, ","))
+
+		keyJ := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s",
+			sortedVulns[j].PackageDir,
+			sortedVulns[j].PackageName,
+			sortedVulns[j].CurrentVersion,
+			sortedVulns[j].FixedVersion,
+			sortedVulns[j].Severity,
+			sortedVulns[j].Language,
+			strings.Join(sortedVulns[j].VulnerabilityIDs, ","))
+
+		return keyI < keyJ
+	})
+
+	for _, vuln := range sortedVulns {
+		logrus.Debugf(vuln.String())
+	}
+
+	return sortedVulns
+}
+
 // groupVulnerabilitiesByLanguage groups vulnerabilities by their target language
-// and merges multiple vulnerabilities for the same package, selecting the highest fixed version
+// Returns a map with stable ordering of languages and vulnerabilities
 func groupVulnerabilitiesByLanguage(vulnerabilities []types.Vulnerability) map[types.LanguageType][]types.Vulnerability {
 	// First, group by language
 	languageVulns := make(map[types.LanguageType][]types.Vulnerability)
@@ -144,6 +185,11 @@ func groupVulnerabilitiesByLanguage(vulnerabilities []types.Vulnerability) map[t
 		}
 
 		languageVulns[language] = append(languageVulns[language], vuln)
+	}
+
+	// Sort vulnerabilities within each language for stable ordering
+	for language, vulns := range languageVulns {
+		languageVulns[language] = sortVulnerabilities(vulns)
 	}
 
 	return languageVulns

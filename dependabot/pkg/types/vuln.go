@@ -17,6 +17,8 @@ limitations under the License.
 // Package types provides common types for the dependabot package
 package types
 
+import "fmt"
+
 // LanguageType represents different programming languages
 type LanguageType string
 
@@ -47,4 +49,10 @@ type Vulnerability struct {
 	Severity string `json:"severity"`
 	// Language indicates the programming language ecosystem this vulnerability belongs to
 	Language string `json:"language,omitempty"`
+}
+
+// String returns a formatted string representation of the vulnerability
+func (v Vulnerability) String() string {
+	return fmt.Sprintf("Vulnerability{Package: %s@%s (fixed: %s), Severity: %s, Language: %s, Dir: %s, IDs: %s}",
+		v.PackageName, v.CurrentVersion, v.FixedVersion, v.Severity, v.Language, v.PackageDir, v.VulnerabilityIDs)
 }
