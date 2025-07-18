@@ -19,6 +19,7 @@ package pr
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
@@ -147,6 +148,11 @@ func (g *GitHubPRCreator) checkExistingPR(gitRepo *git.Repository, sourceBranch,
 
 	if len(prs) == 0 {
 		return nil, nil // No existing PR found
+	}
+
+	if prs[0].GetHead().GetRef() != sourceBranch {
+		logrus.Warnf("Warning: existing PR #%d is not for the current branch: %s. It must be the query condition is incorrect: %#v", prs[0].GetNumber(), sourceBranch, opts)
+		return nil, errors.New("existing PR is not for the current branch")
 	}
 
 	return &types.PRInfo{
