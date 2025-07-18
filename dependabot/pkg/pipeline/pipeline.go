@@ -123,6 +123,9 @@ func (p *Pipeline) Run() error {
 	branchName, err := p.commitChanges(updateSummary)
 	if err != nil {
 		return fmt.Errorf("failed to commit changes: %w", err)
+	} else if branchName == "" {
+		// No changes to commit, skipping PR creation
+		return nil
 	}
 
 	// Execute post-commit script if configured
