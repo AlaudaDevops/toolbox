@@ -1,8 +1,6 @@
 module github.com/AlaudaDevops/toolbox/dependabot
 
-go 1.23.0
-
-toolchain go1.23.9
+go 1.24.5
 
 require (
 	github.com/Masterminds/semver/v3 v3.3.1

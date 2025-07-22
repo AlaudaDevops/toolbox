@@ -1,6 +1,6 @@
 module github.com/AlaudaDevops/toolbox/plugin-releaser
 
-go 1.23.9
+go 1.24.5
 
 require (
 	github.com/andygrunwald/go-jira v1.16.0
