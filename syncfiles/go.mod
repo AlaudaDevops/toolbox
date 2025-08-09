@@ -1,6 +1,6 @@
 module github.com/AlaudaDevops/toolbox/syncfiles
 
-go 1.24.0
+go 1.24.6
 
 require (
 	github.com/google/go-cmp v0.7.0
