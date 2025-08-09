@@ -1,7 +1,9 @@
-ARG BUILDER_IMAGE=golang:1.24-alpine
-ARG BASE_IMAGE=alpine:3.22
+ARG BUILDER_IMAGE=build-harbor.alauda.cn/devops/nonroot/builder-go:latest@sha256:9e65584ae990290fd3ec70b4a8c28c949ec8bb7d909089401aac53db292c7edf
+ARG BASE_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202502271510
 
 FROM ${BUILDER_IMAGE} AS builder
+
+USER root
 
 WORKDIR /app
 

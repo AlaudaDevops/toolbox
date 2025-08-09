@@ -33,9 +33,9 @@ spec:
       value: "{{ registry_host }}/devops/artifact-scanner"
 
     - name: build-extra-args
-      value:
-        - "--build-arg BUILDER_IMAGE={{ docker_mirror_host }}/library/golang:1.24-alpine"
-        - "--build-arg BASE_IMAGE={{ registry_host }}/ops/alpine:3.20"
+      value: []
+        # - "--build-arg BUILDER_IMAGE={{ docker_mirror_host }}/library/golang:1.24-alpine"
+        # - "--build-arg BASE_IMAGE={{ registry_host }}/ops/alpine:3.20"
 
     - name: dockerfile-path
       value: "./artifact-scanner/Dockerfile"
