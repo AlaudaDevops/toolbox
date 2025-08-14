@@ -1,0 +1,33 @@
+@baseURL =
+@issueIdOrKey =
+@jiraUsername =
+@jiraPassword =
+@jiraProject =
+
+GET {{baseURL}}/rest/api/2/issue/{{issueIdOrKey}}
+Authorization: Basic {{jiraUsername}}:{{jiraPassword}}
+Accept: application/json
+
+
+###
+
+GET {{baseURL}}/rest/api/latest/user/assignable/search?username=&projectKeys={{jiraProject}}&issueKey={{issueIdOrKey}}
+Authorization: Basic {{jiraUsername}}:{{jiraPassword}}
+
+###
+
+
+GET {{baseURL}}/rest/api/latest/field
+Authorization: Basic {{jiraUsername}}:{{jiraPassword}}
+###
+
+GET {{baseURL}}/rest/api/latest/field/customfield_12242/contexts
+Authorization: Basic {{jiraUsername}}:{{jiraPassword}}
+
+###
+
+
+GET {{baseURL}}/rest/api/latest/customField/customfield_12242/option
+Authorization: Basic {{jiraUsername}}:{{jiraPassword}}
+
+###

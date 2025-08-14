@@ -1,0 +1,54 @@
+{
+  "name": "roadmap-planner-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for the Roadmap Planner application",
+  "private": true,
+  "dependencies": {
+    "@testing-library/jest-dom": "^6.7.0",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-scripts": "5.0.1",
+    "react-beautiful-dnd": "^13.1.1",
+    "axios": "^1.11.0",
+    "react-modal": "^3.16.3",
+    "react-select": "^5.10.2",
+    "react-hook-form": "^7.62.0",
+    "react-hot-toast": "^2.6.0",
+    "lucide-react": "^0.539.0",
+    "clsx": "^2.1.1",
+    "web-vitals": "^5.1.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.23",
+    "@types/react-dom": "^18.3.7",
+    "@types/react-beautiful-dnd": "^13.1.8",
+    "@types/react-modal": "^3.16.3"
+  },
+  "proxy": "http://localhost:8080"
+}

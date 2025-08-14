@@ -160,5 +160,5 @@ cache:
 ## Additional Notes
 - Follow the existing codebase patterns for Jira integration (see `artifact-scanner` and `plugin-releaser` examples)
 - Use the same Go modules and dependencies where possible
-- Implement proper logging using `logrus` (already used in the codebase)
+- Implement proper logging using uber zap logger
 - Consider using the existing Jira client patterns from other tools in the repository

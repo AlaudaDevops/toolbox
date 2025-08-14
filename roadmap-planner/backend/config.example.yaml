@@ -1,0 +1,30 @@
+# Example configuration file for Roadmap Planner
+# Copy this file to config.yaml and update with your values
+
+# Debug mode - set to true for development
+debug: false
+
+# Jira configuration
+jira:
+  base_url: "https://your-jira-instance.atlassian.net"
+  username: "your-username"
+  password: "your-api-token"  # Use API token for better security
+  project: "DEVOPS"
+
+# Server configuration
+server:
+  port: 8080
+  cors:
+    allowed_origins:
+      - "http://localhost:3000"
+      - "https://your-frontend-domain.com"
+
+logger:
+  level: "info"           # debug, info, warn, error
+  development: false      # enables colored console output
+  encoding: "json"        # json or console
+
+# Cache configuration
+cache:
+  ttl: "5m"              # Time to live for cached data
+  refresh_interval: "1m"  # How often to refresh cache

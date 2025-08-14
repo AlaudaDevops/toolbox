@@ -1,0 +1,300 @@
+# Roadmap Planner API Tests
+# Base URL: http://localhost:8080
+
+### Variables
+@baseUrl = http://localhost:8080
+@jiraUsername =
+@jiraPassword =
+@jiraBaseUrl =
+@jiraProject =
+@assigneeId =
+@issueKey =
+
+### Health Check
+GET {{baseUrl}}/health
+
+###
+
+### Authentication - Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "{{jiraUsername}}",
+  "password": "{{jiraPassword}}",
+  "base_url": "{{jiraBaseUrl}}"
+}
+
+
+### Authentication - Check Status
+GET {{baseUrl}}/api/auth/status
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Authentication - Logout
+POST {{baseUrl}}/api/auth/logout
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Get Complete Roadmap Data
+GET {{baseUrl}}/api/roadmap
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Get Assignable Users (with required issueKey)
+GET {{baseUrl}}/api/users/assignable?issueKey={{issueKey}}&query=
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+
+### Get All Pillars
+GET {{baseUrl}}/api/pillars
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Create New Milestone
+POST {{baseUrl}}/api/milestones
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Q2 Integration Milestone",
+  "quarter": "2025Q4",
+  "pillar_id": "129851",
+  "assignee": {
+    "account_id": "{{assigneeId}}",
+    "name": "{{assigneeName}}",
+    "display_name": "{{assigneeDisplayName}}",
+    "email_address": "{{assigneeEmail}}"
+  }
+}
+
+###
+
+### Create New Epic
+POST {{baseUrl}}/api/epics
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Implement SAML Integration",
+  "component": "connectors-operator",
+  "version": "connectors-operator-1.3.0",
+  "priority": "High",
+  "milestone_id": "456",
+  "assignee": {
+    "account_id": "{{assigneeId}}",
+    "name": "{{assigneeName}}",
+    "display_name": "{{assigneeDisplayName}}",
+    "email_address": "{{assigneeEmail}}"
+  }
+}
+
+###
+
+### Move Epic to Different Milestone
+PUT {{baseUrl}}/api/epics/790/milestone
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "milestone_id": "457"
+}
+
+###
+
+### Get Component Versions
+GET {{baseUrl}}/api/components/connectors-operator/versions
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Test with Different Component
+GET {{baseUrl}}/api/components/tektoncd-operator/versions
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Create Epic with Different Priority
+POST {{baseUrl}}/api/epics
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Implement OAuth Integration",
+  "component": "connectors-operator",
+  "version": "connectors-operator-1.2.0",
+  "priority": "Medium",
+  "milestone_id": "456",
+  "assignee_id": "{{assigneeId}}"
+}
+
+###
+
+### Create Milestone for Different Quarter
+POST {{baseUrl}}/api/milestones
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Q3 Security Milestone",
+  "quarter": "2025Q3",
+  "pillar_id": "123",
+  "assignee_id": "{{assigneeId}}"
+}
+
+###
+
+### Create Epic with Low Priority
+POST {{baseUrl}}/api/epics
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Implement Logging Enhancement",
+  "component": "connectors-operator",
+  "version": "connectors-operator-1.4.0",
+  "priority": "Low",
+  "milestone_id": "456",
+  "assignee_id": "{{assigneeId}}"
+}
+
+###
+
+### Move Epic to Another Milestone (Different Epic ID)
+PUT {{baseUrl}}/api/epics/789/milestone
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "milestone_id": "458"
+}
+
+###
+
+### Error Test Cases
+
+### Create Milestone without Assignee (Should Fail)
+POST {{baseUrl}}/api/milestones
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Test Milestone Without Assignee",
+  "quarter": "2025Q4",
+  "pillar_id": "123"
+}
+
+###
+
+### Create Epic without Assignee (Should Fail)
+POST {{baseUrl}}/api/epics
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Test Epic Without Assignee",
+  "component": "connectors-operator",
+  "priority": "Medium",
+  "milestone_id": "456"
+}
+
+###
+
+### Create Milestone with Invalid Quarter Format (Should Fail)
+POST {{baseUrl}}/api/milestones
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Invalid Quarter Milestone",
+  "quarter": "2025-Q1",
+  "pillar_id": "123",
+  "assignee_id": "{{assigneeId}}"
+}
+
+###
+
+### Test with Invalid Authentication (Should Fail)
+GET {{baseUrl}}/api/roadmap
+X-Jira-Username: invalid-user
+X-Jira-Password: invalid-password
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+###
+
+### Create Epic with All Optional Fields
+POST {{baseUrl}}/api/epics
+Content-Type: application/json
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+{
+  "name": "Complete Epic with All Fields",
+  "component": "connectors-operator",
+  "version": "connectors-operator-2.0.0",
+  "priority": "Highest",
+  "milestone_id": "456",
+  "assignee_id": "{{assigneeId}}"
+}
+
+###
