@@ -26,10 +26,12 @@ spec:
       default: rebase
     - name: self_check_name
       default: pr-cli
-    - name: debug
-      default: "false"
     - name: platform
       default: github
+    - name: debug
+      default: "false"
+    - name: verbose
+      default: "false"
   tasks:
     - name: pr-merge-management
       displayName: PR Merge & Management Operations
@@ -77,3 +79,5 @@ spec:
                 value: $(params.self_check_name)
               - name: PR_DEBUG
                 value: $(params.debug)
+              - name: PR_VERBOSE
+                value: $(params.verbose)

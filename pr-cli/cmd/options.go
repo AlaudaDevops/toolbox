@@ -112,7 +112,7 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	p.Logger.Infof("Processing command: %s with args: %v", command, cmdArgs)
-	if p.Config.Debug {
+	if p.Config.Verbose {
 		p.Logger.Debugf("Processing PR %d, config: %s", p.Config.PRNum, p.Config.DebugString())
 	}
 
