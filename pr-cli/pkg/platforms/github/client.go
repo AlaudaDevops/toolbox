@@ -390,10 +390,11 @@ func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool) (int, map[
 			}
 		case lgtmRegexp.MatchString(body):
 			// This regex should be placed at the end because `/lgtm cancel` needs to be matched first
-			if user == c.prSender && !debugMode {
-				return 0, nil, fmt.Errorf("PR author cannot give LGTM to their own PR")
-			}
-			if user == c.prSender && debugMode {
+			if user == c.prSender {
+				if !debugMode {
+					c.logger.Debugf("Skipping LGTM from PR author %s (not allowed)", user)
+					continue
+				}
 				c.logger.Debugf("Debug mode: allowing PR author %s to give LGTM to their own PR", user)
 			}
 			// Only add if user hasn't already approved via latest review

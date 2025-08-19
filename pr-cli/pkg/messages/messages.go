@@ -103,6 +103,22 @@ Approving this PR...`
 **Required permissions:** %s
 
 Only users with the required permissions can use the /lgtm command.`
+
+	LGTMSelfApprovalTemplate = `ℹ️ **Self-approval not allowed**
+
+@%s, as the PR author, you cannot approve your own PR.
+
+However, I can show you the current LGTM status for this PR:`
+)
+
+// Error Messages
+const (
+	CommandErrorTemplate = `❌ **Command Failed**
+
+Command: ` + "`%s`" + `
+Error: %s
+
+Please check the command usage or contact support if the issue persists.`
 )
 
 // Merge Messages

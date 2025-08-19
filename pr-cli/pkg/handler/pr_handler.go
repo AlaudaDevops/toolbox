@@ -150,3 +150,8 @@ func (h *PRHandler) generateLGTMStatusMessage(validVotes int, lgtmUsers map[stri
 func (h *PRHandler) GetComments() ([]git.Comment, error) {
 	return h.client.GetComments()
 }
+
+// PostComment posts a comment to the pull request
+func (h *PRHandler) PostComment(message string) error {
+	return h.client.PostComment(message)
+}

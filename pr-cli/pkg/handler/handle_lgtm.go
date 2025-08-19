@@ -27,6 +27,27 @@ import (
 func (h *PRHandler) HandleLGTM() error {
 	h.Logger.Info("Processing LGTM")
 
+	// Check if the comment sender is the PR author (not in debug mode)
+	if h.config.CommentSender == h.prSender && !h.config.Debug {
+		// PR author is trying to LGTM their own PR - post informational message with status
+		h.Logger.Infof("PR author %s attempted to LGTM their own PR", h.config.CommentSender)
+
+		// Get current LGTM status to include in the message
+		validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+		if err != nil {
+			return fmt.Errorf("failed to get LGTM votes: %w", err)
+		}
+
+		// Create message with self-approval notice and current status
+		selfApprovalMessage := fmt.Sprintf(messages.LGTMSelfApprovalTemplate, h.config.CommentSender)
+		statusMessage := h.generateLGTMStatusMessage(validVotes, lgtmUsers, true)
+		combinedMessage := selfApprovalMessage + "\n\n" + statusMessage
+
+		return h.client.PostComment(combinedMessage)
+	}
+
+	// Not PR author (or in debug mode), proceed with normal LGTM logic
+
 	// First, check if the current comment sender has permission to approve
 	hasPermission, userPermission, err := h.client.CheckUserPermissions(h.config.CommentSender, h.config.LGTMPermissions)
 	if err != nil {

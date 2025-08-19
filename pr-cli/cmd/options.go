@@ -24,6 +24,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -135,32 +136,41 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Execute command and handle errors gracefully
 	switch command {
 	case "help":
-		return prHandler.HandleHelp()
+		err = prHandler.HandleHelp()
 	case "assign":
-		return prHandler.HandleAssign(cmdArgs)
+		err = prHandler.HandleAssign(cmdArgs)
 	case "unassign":
-		return prHandler.HandleUnassign(cmdArgs)
+		err = prHandler.HandleUnassign(cmdArgs)
 	case "lgtm":
-		return prHandler.HandleLGTM()
+		err = prHandler.HandleLGTM()
 	case "remove-lgtm":
-		return prHandler.HandleRemoveLGTM()
+		err = prHandler.HandleRemoveLGTM()
 	case "merge", "ready":
-		return prHandler.HandleMerge(cmdArgs)
+		err = prHandler.HandleMerge(cmdArgs)
 	case "rebase":
-		return prHandler.HandleRebase()
+		err = prHandler.HandleRebase()
 	case "check":
-		return prHandler.HandleCheck()
+		err = prHandler.HandleCheck()
 	case "cherry-pick", "cherrypick":
-		return prHandler.HandleCherrypick(cmdArgs)
+		err = prHandler.HandleCherrypick(cmdArgs)
 	case "label":
-		return prHandler.HandleLabel(cmdArgs)
+		err = prHandler.HandleLabel(cmdArgs)
 	case "unlabel":
-		return prHandler.HandleUnlabel(cmdArgs)
+		err = prHandler.HandleUnlabel(cmdArgs)
 	default:
-		return fmt.Errorf("unknown command: %s", command)
+		err = fmt.Errorf("unknown command: %s", command)
 	}
+
+	// If command execution failed, try to post error as comment
+	if err != nil {
+		p.Logger.Errorf("Command %s failed: %v", command, err)
+		return p.handleCommandError(prHandler, command, err)
+	}
+
+	return nil
 }
 
 // readAllFromViper reads all configuration values from viper
@@ -284,5 +294,21 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 	}
 
 	p.Logger.Infof("Comment sender validation passed: %s posted a comment containing the trigger", p.Config.CommentSender)
+	return nil
+}
+
+// handleCommandError handles command errors by posting them as PR comments when possible
+func (p *PROption) handleCommandError(prHandler *handler.PRHandler, command string, err error) error {
+	errorMessage := fmt.Sprintf(messages.CommandErrorTemplate, command, err.Error())
+
+	// Try to post error message as PR comment
+	if commentErr := prHandler.PostComment(errorMessage); commentErr != nil {
+		// If we can't post the comment, return the original error plus comment error
+		p.Logger.Errorf("Failed to post error comment: %v", commentErr)
+		return fmt.Errorf("command failed: %w (and failed to post error comment: %v)", err, commentErr)
+	}
+
+	// Successfully posted error as comment, return nil to avoid terminal error
+	p.Logger.Infof("Posted command error as PR comment for command: %s", command)
 	return nil
 }
