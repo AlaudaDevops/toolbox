@@ -19,6 +19,8 @@ package cli
 import (
 	"fmt"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Platform represents the Git platform type
@@ -30,7 +32,7 @@ const (
 )
 
 // NewCherryPickerForPlatform creates a CherryPicker instance for the specified platform
-func NewCherryPickerForPlatform(platform Platform, token, owner, repo, baseURL string, prID int) (*CherryPicker, error) {
+func NewCherryPickerForPlatform(logger *logrus.Logger, platform Platform, token, owner, repo, baseURL string, prID int) (*CherryPicker, error) {
 	var repoURL string
 
 	switch platform {
@@ -39,10 +41,10 @@ func NewCherryPickerForPlatform(platform Platform, token, owner, repo, baseURL s
 			// GitHub Enterprise - extract hostname from API URL
 			gitHost := strings.Replace(baseURL, "https://api.", "https://", 1)
 			gitHost = strings.Replace(gitHost, "/api/v3", "", 1)
-			repoURL = fmt.Sprintf("https://%s@%s/%s/%s.git", token, strings.TrimPrefix(gitHost, "https://"), owner, repo)
+			repoURL = fmt.Sprintf("https://oauth2:%s@%s/%s/%s.git", token, strings.TrimPrefix(gitHost, "https://"), owner, repo)
 		} else {
 			// GitHub.com
-			repoURL = fmt.Sprintf("https://%s@github.com/%s/%s.git", token, owner, repo)
+			repoURL = fmt.Sprintf("https://oauth2:%s@github.com/%s/%s.git", token, owner, repo)
 		}
 	case PlatformGitLab:
 		if baseURL != "" && baseURL != "https://gitlab.com" {
@@ -57,5 +59,5 @@ func NewCherryPickerForPlatform(platform Platform, token, owner, repo, baseURL s
 		return nil, fmt.Errorf("unsupported platform: %s", platform)
 	}
 
-	return NewCherryPicker(repoURL, token, owner, repo, prID), nil
+	return NewCherryPicker(logger, repoURL, token, owner, repo, prID), nil
 }

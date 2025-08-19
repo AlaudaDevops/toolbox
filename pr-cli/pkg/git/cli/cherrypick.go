@@ -20,13 +20,43 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
+	"github.com/sirupsen/logrus"
 )
+
+// cleanBranchNameForTempDir removes path separators from branch names for use in temp directory names
+func cleanBranchNameForTempDir(branchName string) string {
+	clean := strings.ReplaceAll(branchName, "/", "-")
+	return strings.ReplaceAll(clean, "\\", "-")
+}
+
+// sanitizeErrorMessage removes sensitive information (tokens, credentials) from error messages
+func sanitizeErrorMessage(message string) string {
+	// First handle OAuth2 tokens in URLs (oauth2:token@host) before general URL pattern
+	oauth2Pattern := regexp.MustCompile(`oauth2:[^@\s]+@`)
+	message = oauth2Pattern.ReplaceAllString(message, "oauth2:[TOKEN_REDACTED]@")
+
+	// Pattern to match GitHub tokens (ghp_, gho_, ghu_, ghs_, ghr_, ghco_)
+	// GitHub tokens can vary in length but are typically 36-40 characters after the prefix
+	githubTokenPattern := regexp.MustCompile(`gh[pousr][_a-zA-Z0-9]+`)
+	message = githubTokenPattern.ReplaceAllString(message, "[TOKEN_REDACTED]")
+
+	// Pattern to match GitLab tokens (glpat-)
+	gitlabTokenPattern := regexp.MustCompile(`glpat-[a-zA-Z0-9_-]{20,}`)
+	message = gitlabTokenPattern.ReplaceAllString(message, "[TOKEN_REDACTED]")
+
+	// Don't replace any more credentials in URLs since we've already handled oauth2 format
+	// The oauth2 format is now the standard for both GitHub and GitLab
+
+	return message
+}
 
 // CherryPicker handles Git CLI cherry-pick operations
 type CherryPicker struct {
+	logger     *logrus.Logger
 	repoURL    string
 	token      string
 	owner      string
@@ -37,9 +67,10 @@ type CherryPicker struct {
 }
 
 // NewCherryPicker creates a new CherryPicker instance
-func NewCherryPicker(repoURL, token, owner, repo string, prID int) *CherryPicker {
+func NewCherryPicker(logger *logrus.Logger, repoURL, token, owner, repo string, prID int) *CherryPicker {
 	currentDir, _ := os.Getwd()
 	return &CherryPicker{
+		logger:     logger,
 		repoURL:    repoURL,
 		token:      token,
 		owner:      owner,
@@ -52,7 +83,7 @@ func NewCherryPicker(repoURL, token, owner, repo string, prID int) *CherryPicker
 // CherryPickCommit performs a cherry-pick operation using Git CLI
 func (cp *CherryPicker) CherryPickCommit(commitSHA, targetBranch string) error {
 	// Create a temporary directory for the repository
-	tempDir, err := os.MkdirTemp("", fmt.Sprintf("cherrypick-%s-%s", cp.repo, targetBranch))
+	tempDir, err := os.MkdirTemp("", fmt.Sprintf("cherrypick-%s-%s-x", cp.repo, cleanBranchNameForTempDir(targetBranch)))
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -107,7 +138,7 @@ func (cp *CherryPicker) CherryPickCommits(commits []git.Commit, targetBranch str
 	}
 
 	// Create a temporary directory for the repository
-	tempDir, err := os.MkdirTemp("", fmt.Sprintf("cherrypick-%s-%s", cp.repo, targetBranch))
+	tempDir, err := os.MkdirTemp("", fmt.Sprintf("cherrypick-%s-%s-x", cp.repo, cleanBranchNameForTempDir(targetBranch)))
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
@@ -165,12 +196,102 @@ func (cp *CherryPicker) CherryPickCommits(commits []git.Commit, targetBranch str
 
 // cloneRepository clones the repository to the temporary directory
 func (cp *CherryPicker) cloneRepository() error {
+	cp.logger.Debugf("Cloning repository %s to %s", sanitizeErrorMessage(cp.repoURL), cp.workingDir)
+	// First, try cloning with token in URL (existing method)
 	cloneCmd := exec.Command("git", "clone", cp.repoURL, cp.workingDir)
+
+	// Set environment variables for Git authentication as a fallback
+	env := os.Environ()
+	env = append(env, "GIT_ASKPASS=echo")
+	env = append(env, "GIT_USERNAME=token")
+	env = append(env, fmt.Sprintf("GIT_PASSWORD=%s", cp.token))
+	cloneCmd.Env = env
+
 	output, err := cloneCmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to clone repository: %w, output: %s", err, string(output))
+		sanitizedOutput := sanitizeErrorMessage(string(output))
+
+		// Try alternative clone method using git credential helper
+		if err := cp.cloneWithCredentialHelper(); err != nil {
+			return fmt.Errorf("failed to clone repository with both methods: original error: %w, output: %s", err, sanitizedOutput)
+		}
+		return nil
+	} else {
+		cp.logger.Debugf("Repository cloned successfully: %s", sanitizeErrorMessage(cp.repoURL))
 	}
 	return nil
+}
+
+// cloneWithCredentialHelper attempts to clone using environment variables for authentication
+func (cp *CherryPicker) cloneWithCredentialHelper() error {
+	// Extract the repository URL without credentials
+	repoURLWithoutCreds := cp.getRepositoryURLWithoutCredentials()
+
+	// Use a more direct approach with environment variables
+	cloneCmd := exec.Command("git", "clone", repoURLWithoutCreds, cp.workingDir)
+
+	// Set up environment for Git authentication
+	env := os.Environ()
+
+	// Method 1: Use GIT_ASKPASS with echo for non-interactive authentication
+	env = append(env, "GIT_ASKPASS=echo")
+	env = append(env, "GIT_TERMINAL_PROMPT=0")
+
+	// Method 2: Use credential.helper.username and password via config
+	// This is more reliable than askpass in some environments
+	host := cp.getHostFromURL()
+
+	// For GitHub/GitLab, username should be "token" or "oauth2"
+	username := "token"
+	if strings.Contains(cp.repoURL, "oauth2:") {
+		username = "oauth2"
+	}
+
+	// Set credential environment variables
+	env = append(env, fmt.Sprintf("GIT_CONFIG_KEY_0=credential.https://%s.username", host))
+	env = append(env, fmt.Sprintf("GIT_CONFIG_VALUE_0=%s", username))
+	env = append(env, fmt.Sprintf("GIT_CONFIG_KEY_1=credential.https://%s.password", host))
+	env = append(env, fmt.Sprintf("GIT_CONFIG_VALUE_1=%s", cp.token))
+	env = append(env, "GIT_CONFIG_COUNT=2")
+
+	cloneCmd.Env = env
+
+	output, err := cloneCmd.CombinedOutput()
+	if err != nil {
+		sanitizedOutput := sanitizeErrorMessage(string(output))
+		return fmt.Errorf("credential helper clone failed: %w, output: %s", err, sanitizedOutput)
+	} else {
+		cp.logger.Debugf("Repository cloned successfully: %s", sanitizeErrorMessage(cp.repoURL))
+	}
+
+	return nil
+}
+
+// getRepositoryURLWithoutCredentials returns the repository URL without embedded credentials
+func (cp *CherryPicker) getRepositoryURLWithoutCredentials() string {
+	// Remove credentials from URL
+	if strings.Contains(cp.repoURL, "@") {
+		parts := strings.Split(cp.repoURL, "@")
+		if len(parts) >= 2 {
+			// Reconstruct URL: https:// + host/path
+			return "https://" + strings.Join(parts[1:], "@")
+		}
+	}
+	return cp.repoURL
+}
+
+// getHostFromURL extracts the host from the repository URL
+func (cp *CherryPicker) getHostFromURL() string {
+	url := cp.getRepositoryURLWithoutCredentials()
+	// Remove https:// or http:// prefix
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.TrimPrefix(url, "http://")
+	// Get host part (before first /)
+	parts := strings.Split(url, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return "github.com" // fallback
 }
 
 // configureGit configures git user settings required for cherry-pick commits
@@ -197,7 +318,8 @@ func (cp *CherryPicker) runGitCommand(args ...string) error {
 	cmd := exec.Command("git", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("git %s failed: %w, output: %s", strings.Join(args, " "), err, string(output))
+		sanitizedOutput := sanitizeErrorMessage(string(output))
+		return fmt.Errorf("git %s failed: %w, output: %s", strings.Join(args, " "), err, sanitizedOutput)
 	}
 	return nil
 }

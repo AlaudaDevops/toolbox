@@ -466,6 +466,14 @@ func (c *Client) ApprovePR(message string) error {
 	}
 
 	_, _, err := c.client.PullRequests.CreateReview(c.ctx, c.owner, c.repo, c.prNum, review)
+
+	// Check if the error is due to trying to approve one's own PR
+	if err != nil && strings.Contains(err.Error(), "Can not approve your own pull request") {
+		c.logger.Warnf("Cannot approve own PR (robot account limitation), posting comment instead: %v", err)
+		// Post the approval message as a comment instead
+		return c.PostComment(fmt.Sprintf("✅ **Auto-approved** (LGTM threshold met)\n\n%s\n\n> Note: Cannot create formal approval review due to GitHub's self-approval restriction.", message))
+	}
+
 	return err
 }
 

@@ -139,6 +139,7 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 
 	// Create a platform-agnostic cherrypicker
 	cherryPicker, err := cli.NewCherryPickerForPlatform(
+		h.Logger,
 		cli.Platform(h.config.Platform),
 		h.config.Token,
 		h.config.Owner,
@@ -152,7 +153,7 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 	}
 
 	// Perform the cherry-pick operation for all commits
-	if err := cherryPicker.CherryPickCommits(commits, targetBranch); err != nil {
+	if err = cherryPicker.CherryPickCommits(commits, targetBranch); err != nil {
 		h.Logger.Errorf("Failed to cherry-pick with Git CLI: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to cherry-pick with Git CLI: %v", err))
 	}
@@ -161,7 +162,7 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 	branchName := cherryPicker.GetCherryPickBranchName(lastCommit.SHA, targetBranch)
 
 	// Create a PR for the cherry-pick using the platform-specific client
-	title := fmt.Sprintf("[Cherry-pick] %s", prInfo.Title)
+	title := fmt.Sprintf("[Cherry-pick %d] %s", h.config.PRNum, prInfo.Title)
 	body := fmt.Sprintf("Cherry-pick of PR #%d to %s\n\nOriginal PR: #%d\nRequested by: @%s",
 		h.config.PRNum, targetBranch, h.config.PRNum, h.config.CommentSender)
 
