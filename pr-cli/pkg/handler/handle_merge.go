@@ -53,8 +53,9 @@ func (h *PRHandler) HandleMerge(args []string) error {
 
 		if err = h.client.PostComment(message); err != nil {
 			h.Logger.Errorf("Failed to post permission error comment: %v", err)
+			return fmt.Errorf("insufficient permissions")
 		}
-		return fmt.Errorf("insufficient permissions")
+		return &CommentedError{Err: fmt.Errorf("insufficient permissions")}
 	}
 
 	// Check if all checks are passing
@@ -80,8 +81,9 @@ func (h *PRHandler) HandleMerge(args []string) error {
 
 		if err = h.client.PostComment(message); err != nil {
 			h.Logger.Errorf("Failed to post check status comment: %v", err)
+			return fmt.Errorf("checks not passing")
 		}
-		return fmt.Errorf("checks not passing")
+		return &CommentedError{Err: fmt.Errorf("checks not passing")}
 	}
 
 	// Check LGTM votes
@@ -108,8 +110,9 @@ func (h *PRHandler) HandleMerge(args []string) error {
 
 		if err := h.client.PostComment(message); err != nil {
 			h.Logger.Errorf("Failed to post LGTM status comment: %v", err)
+			return fmt.Errorf("not enough LGTM votes")
 		}
-		return fmt.Errorf("not enough LGTM votes")
+		return &CommentedError{Err: fmt.Errorf("not enough LGTM votes")}
 	}
 
 	// Determine merge method

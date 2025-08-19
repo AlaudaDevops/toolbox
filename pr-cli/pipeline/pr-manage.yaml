@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: pr-cli
+  name: pr-manage
   annotations:
     pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \\t].*)?$"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
@@ -25,7 +25,7 @@ spec:
     - name: merge_method
       default: squash
     - name: self_check_name
-      default: pr-cli
+      default: pr-manage
     - name: platform
       default: github
     - name: debug

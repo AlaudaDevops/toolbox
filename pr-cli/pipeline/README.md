@@ -58,7 +58,7 @@ The Pipeline supports the following configurable parameters:
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
 | `lgtm_review_event` | `APPROVE` | LGTM review event type |
 | `merge_method` | `squash` | Default merge method |
-| `self_check_name` | `pr-cli` | Self-check name |
+| `self_check_name` | `pr-manage` | Self-check name |
 | `platform` | `github` | The platform to use (github, gitlab, gitee) |
 | `debug` | `false` | Enable debug mode (skip validation, allow PR creator self-approval) |
 | `verbose` | `true` | Enable verbose logging (debug level logs) |
@@ -99,21 +99,21 @@ Through these comment commands, teams can efficiently manage the entire lifecycl
 
 ## PipelineRun Example
 
-To enable `pr-cli`, add the following `PipelineRun` configuration to your `.tekton` directory:
+To enable `pr-manage`, add the following `PipelineRun` configuration to your `.tekton` directory:
 
 ```yaml
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: pr-cli
+  name: pr-manage
   annotations:
-    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/AlaudaDevops/toolbox/main/pr-cli/pipeline/pr-cli.yaml"
+    pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/AlaudaDevops/toolbox/main/pr-cli/pipeline/pr-manage.yaml"
     pipelinesascode.tekton.dev/on-comment: |
       ^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \t].*)?$
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   pipelineRef:
-    name: pr-cli
+    name: pr-manage
   params:
     - name: trigger_comment
       value: |
@@ -153,9 +153,9 @@ spec:
     # - name: merge_method
     #   value: "squash"
     #
-    # The name used for self-check status (default: pr-cli)
+    # The name used for self-check status (default: pr-manage)
     # - name: self_check_name
-    #   value: "pr-cli"
+    #   value: "pr-manage"
     #
     # Enable debug mode (skip validation, allow PR creator self-approval) (default: false)
     # - name: debug

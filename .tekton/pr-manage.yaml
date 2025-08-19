@@ -1,15 +1,15 @@
 apiVersion: tekton.dev/v1
 kind: PipelineRun
 metadata:
-  name: pr-cli
+  name: pr-manage
   annotations:
-    # pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/AlaudaDevops/toolbox/main/pr-cli/pipeline/pr-cli.yaml"
-    pipelinesascode.tekton.dev/pipeline: '[pr-cli/pipeline/pr-cli.yaml]'
+    # pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/AlaudaDevops/toolbox/main/pr-cli/pipeline/pr-manage.yaml"
+    pipelinesascode.tekton.dev/pipeline: '[pr-cli/pipeline/pr-manage.yaml]'
     pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \\t].*)?$"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   pipelineRef:
-    name: pr-cli
+    name: pr-manage
   params:
     - name: trigger_comment
       value: |
@@ -49,9 +49,9 @@ spec:
     # - name: merge_method
     #   value: "rebase"
     #
-    # The name used for self-check status (default: pr-cli)
+    # The name used for self-check status (default: pr-manage)
     # - name: self_check_name
-    #   value: "pr-cli"
+    #   value: "pr-manage"
     #
     # Enable debug mode (skip validation, allow PR creator self-approval) (default: false)
     # - name: debug
