@@ -169,13 +169,25 @@ func (p *PROption) readAllFromViper() {
 	// Use viper.Unmarshal to automatically map all values to the config struct
 	viper.Unmarshal(p.Config)
 
+	// Clean up string values by trimming whitespace and newlines
+	p.Config.Platform = strings.TrimSpace(p.Config.Platform)
+	p.Config.Token = strings.TrimSpace(p.Config.Token)
+	p.Config.BaseURL = strings.TrimSpace(p.Config.BaseURL)
+	p.Config.Owner = strings.TrimSpace(p.Config.Owner)
+	p.Config.Repo = strings.TrimSpace(p.Config.Repo)
+	p.Config.CommentSender = strings.TrimSpace(p.Config.CommentSender)
+	p.Config.TriggerComment = strings.TrimSpace(p.Config.TriggerComment)
+	p.Config.LGTMReviewEvent = strings.TrimSpace(p.Config.LGTMReviewEvent)
+	p.Config.MergeMethod = strings.TrimSpace(p.Config.MergeMethod)
+	p.Config.SelfCheckName = strings.TrimSpace(p.Config.SelfCheckName)
+
 	// Handle special string fields that need to be read separately
 	// since they're not directly mapped to Config struct fields
 	if p.prNumStr == "" {
-		p.prNumStr = viper.GetString("pr-num")
+		p.prNumStr = strings.TrimSpace(viper.GetString("pr-num"))
 	}
 	if p.lgtmPermissionsStr == "" {
-		p.lgtmPermissionsStr = viper.GetString("lgtm-permissions")
+		p.lgtmPermissionsStr = strings.TrimSpace(viper.GetString("lgtm-permissions"))
 	}
 }
 
@@ -260,7 +272,8 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 	// Check if any comment from the comment-sender contains the trigger-comment
 	found := false
 	for _, comment := range comments {
-		if comment.User.Login == p.Config.CommentSender && strings.Contains(comment.Body, p.Config.TriggerComment) {
+		if comment.User.Login == p.Config.CommentSender &&
+			(comment.Body == p.Config.TriggerComment || strings.Contains(comment.Body, p.Config.TriggerComment)) {
 			found = true
 			break
 		}
