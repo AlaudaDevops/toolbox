@@ -562,10 +562,14 @@ func (c *Client) findBotApprovals() (map[string]int64, error) {
 	botApprovals := make(map[string]int64) // username -> latest review ID
 	for _, review := range reviews {
 		username := review.GetUser().GetLogin()
-		if c.isBotAccount(username) && review.GetState() == "APPROVED" {
-			if existingID, exists := botApprovals[username]; !exists || review.GetID() > existingID {
-				botApprovals[username] = review.GetID()
-				c.logger.Debugf("Found APPROVED review from bot: %s (review ID: %d)", username, review.GetID())
+		if review.GetState() == "APPROVED" {
+			if c.isBotAccount(username) {
+				if existingID, exists := botApprovals[username]; !exists || review.GetID() > existingID {
+					botApprovals[username] = review.GetID()
+					c.logger.Debugf("Found APPROVED review from bot: %s (review ID: %d)", username, review.GetID())
+				}
+			} else {
+				c.logger.Debugf("Skipping non-bot approval from user: %s (review ID: %d)", username, review.GetID())
 			}
 		}
 	}

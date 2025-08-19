@@ -54,15 +54,15 @@ The Pipeline supports the following configurable parameters:
 | Parameter | Default Value | Description |
 |-----------|---------------|-------------|
 | `git_auth_secret_key` | `git-provider-token` | The key in git_auth_secret that contains the token |
-| `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM |
+| `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM, allow read permission for internal repositories |
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
 | `lgtm_review_event` | `APPROVE` | LGTM review event type |
 | `merge_method` | `rebase` | Default merge method |
 | `self_check_name` | `pr-cli` | Self-check name |
 | `platform` | `github` | The platform to use (github, gitlab, gitee) |
 | `debug` | `false` | Enable debug mode (skip validation, allow PR creator self-approval) |
-| `verbose` | `false` | Enable verbose logging (debug level logs) |
-| `robot_accounts` | `alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2` | List of bot accounts for managing bot approval reviews |
+| `verbose` | `true` | Enable verbose logging (debug level logs) |
+| `robot_accounts` | `alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2,edge-katanomi-app2[bot]` | List of bot accounts for managing bot approval reviews |
 
 ## Permission Description
 
@@ -128,12 +128,6 @@ spec:
       value: "{{ sender }}"
     - name: git_auth_secret
       value: "{{ git_auth_secret }}"
-    - name: lgtm_permissions
-      # Allow read permission users to trigger lgtm in internal repositories
-      value: "admin,write,read"
-    - name: verbose
-      # Enable verbose logging (debug level logs) (default: false)
-      value: "true"
     #
     # Optional parameters (value is the default):
     #
@@ -165,6 +159,10 @@ spec:
     #
     # Enable debug mode (skip validation, allow PR creator self-approval) (default: false)
     # - name: debug
+    #   value: "false"
+    #
+    # Enable verbose logging (debug level logs) (default: false)
+    # - name: verbose
     #   value: "false"
     #
     # The platform to use, can be one of: github, gitlab, gitee (default: github)

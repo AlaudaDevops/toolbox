@@ -31,9 +31,9 @@ spec:
     - name: debug
       default: "false"
     - name: verbose
-      default: "false"
+      default: "true"
     - name: robot_accounts
-      default: "alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2"
+      default: "alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2,edge-katanomi-app2[bot]"
   tasks:
     - name: pr-merge-management
       displayName: PR Merge & Management Operations
