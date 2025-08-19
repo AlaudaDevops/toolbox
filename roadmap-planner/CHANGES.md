@@ -30,9 +30,12 @@ Lets do a number of changes in this code base, we will start with the bellow UI 
 - [X] Upgrade all UI dependencies to newer versions and make any necessary changes
 - [X] Create basic milestone update modal for quickly changing the name and quarter of a milestone
 - [X] Create a basic epic move modal to quickly "move" epic between milestones
-- [ ] Create a basic epic update modal for quickly changing the name, component, version, priority and assignee of an epic
-- [ ] Create an API to fetch only the most basic data which does not change often like pillars, existing versions, quarters. The quarters field is actually a custom field in jira, and in our instance it is the `customfield_12242`. It is necessary to test and find ways to load its values dynamically from Jira, if not possible we can load it from current milestone data or a static list in the configuration file. The whole idea is to reduce initial load time and make each API call faster and easier to process, making the app more reactive. You can also add or change the optmizations as you find to be more productive or find a better solution to improve user experience
-- [ ] Create another API to fetch data like milestones of an pillar, epics of a milestone, etc. that will be used more often to refresh specific areas of the board when the user changes the data
-- [ ] Change the UI to load the basic data first (after the backend is already optimized) and display data
+- [X] Create a basic epic update modal for quickly changing the name, component, version, priority and assignee of an epic
+- [X] Create an API to fetch only the most basic data which does not change often like pillars, existing versions, quarters. The quarters field is actually a custom field in jira, and in our instance it is the `customfield_12242`. It is necessary to test and find ways to load its values dynamically from Jira, if not possible we can load it from current milestone data or a static list in the configuration file. The whole idea is to reduce initial load time and make each API call faster and easier to process, making the app more reactive. You can also add or change the optmizations as you find to be more productive or find a better solution to improve user experience
+- [X] Create another API to fetch data like milestones of an pillar, epics of a milestone, etc. that will be used more often to refresh specific areas of the board when the user changes the data
+- [X] Change the UI to load the basic data first (after the backend is already optimized) and display data
 - [X] Make (create milestones) modal load the specific quarter it was clicked on.
-- [ ] Make milestones draggable and droppable between quarters. Also create a simple form to update the milestone and quarter information.
+- [X] Refactor the API and UI optmizations, current issues:
+  - [X] UI is doing multiple calls to load all the data which did not improve startup time. Please make sure only one call to the basic api is done when starting the app, all subsequent calls should be done after the app is loaded.
+  - [X] Epics and milestone APIs should support filtering instead of making it a subresource API for pillars and milestones. This way we can load milestones from multiple pillars at once, we can also load epics from multiple milestones at once.
+  - [X] After UI calls the UI is not displaying milestones or epics. This should be checked and fixed

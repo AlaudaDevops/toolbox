@@ -1,9 +1,9 @@
 import React from 'react';
-import { AlertCircle, CheckCircle, Clock, ExternalLink, ArrowRightLeft } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, ExternalLink, ArrowRightLeft, Edit } from 'lucide-react';
 import { getJiraIssueUrl } from '../utils/jiraUtils';
 import './EpicCard.css';
 
-const EpicCard = ({ epic, isDragging, onMoveEpic, currentMilestone }) => {
+const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone }) => {
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
       case 'done':
@@ -75,6 +75,13 @@ const EpicCard = ({ epic, isDragging, onMoveEpic, currentMilestone }) => {
     }
   };
 
+  const handleEditClick = (e) => {
+    e.stopPropagation(); // Prevent card click and drag
+    if (onUpdateEpic) {
+      onUpdateEpic(epic);
+    }
+  };
+
   return (
     <div className={`epic-card-content ${isDragging ? 'dragging' : ''}`} onClick={handleCardClick}>
       {/* First Row: Name and Priority */}
@@ -99,6 +106,15 @@ const EpicCard = ({ epic, isDragging, onMoveEpic, currentMilestone }) => {
               {getStatusIcon(epic.status)}
               <span>{epic.status}</span>
             </div>
+          )}
+          {onUpdateEpic && (
+            <button
+              onClick={handleEditClick}
+              className="epic-edit-btn"
+              title="Edit epic details"
+            >
+              <Edit size={12} />
+            </button>
           )}
           {onMoveEpic && (
             <button

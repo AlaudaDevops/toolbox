@@ -3,3 +3,4 @@ backend/config.yaml
 .env
 backend/server
 frontend/build
+.vscode/

@@ -89,6 +89,52 @@ export const roadmapAPI = {
     return response.data;
   },
 
+  getBasicData: async () => {
+    const response = await api.get('/api/basic');
+    return response.data;
+  },
+
+  getPillarMilestones: async (pillarId) => {
+    const response = await api.get(`/api/pillars/${pillarId}/milestones`);
+    return response.data;
+  },
+
+  getMilestoneEpics: async (milestoneId) => {
+    const response = await api.get(`/api/milestones/${milestoneId}/epics`);
+    return response.data;
+  },
+
+  // Filtering APIs for batch operations
+  getMilestones: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.pillarIds) {
+      filters.pillarIds.forEach(id => params.append('pillar_id', id));
+    }
+    if (filters.quarters) {
+      filters.quarters.forEach(quarter => params.append('quarter', quarter));
+    }
+    const response = await api.get(`/api/milestones?${params.toString()}`);
+    return response.data;
+  },
+
+  getEpics: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.milestoneIds) {
+      filters.milestoneIds.forEach(id => params.append('milestone_id', id));
+    }
+    if (filters.pillarIds) {
+      filters.pillarIds.forEach(id => params.append('pillar_id', id));
+    }
+    if (filters.components) {
+      filters.components.forEach(component => params.append('component', component));
+    }
+    if (filters.versions) {
+      filters.versions.forEach(version => params.append('version', version));
+    }
+    const response = await api.get(`/api/epics?${params.toString()}`);
+    return response.data;
+  },
+
   createMilestone: async (milestoneData) => {
     const response = await api.post('/api/milestones', milestoneData);
     return response.data;
@@ -101,6 +147,11 @@ export const roadmapAPI = {
 
   createEpic: async (epicData) => {
     const response = await api.post('/api/epics', epicData);
+    return response.data;
+  },
+
+  updateEpic: async (epicId, epicData) => {
+    const response = await api.put(`/api/epics/${epicId}`, epicData);
     return response.data;
   },
 

@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/andygrunwald/go-jira"
 )
 
@@ -33,7 +34,7 @@ type Pillar struct {
 	Key        string      `json:"key"`
 	Name       string      `json:"name"`
 	Priority   string      `json:"priority"`
-	Component  string      `json:"component"`
+	Components  []string      `json:"components"`
 	Sequence   int         `json:"sequence"`   // For ordering pillars
 	Milestones []Milestone `json:"milestones"`
 }
@@ -55,9 +56,9 @@ type Epic struct {
 	ID          string `json:"id"`
 	Key         string `json:"key"`
 	Name        string `json:"name"`
-	Version     string `json:"version"`     // Fix version for sorting
-	Component   string `json:"component"`
-	MilestoneID string `json:"milestone_id"`
+	Versions     []string `json:"versions"`     // Fix version for sorting
+	Components  []string `json:"components"`
+	MilestoneIDs []string `json:"milestone_ids"`
 	Status      string `json:"status"`
 	Priority    string `json:"priority"`
 }
@@ -99,6 +100,15 @@ type UpdateMilestoneRequest struct {
 	Quarter string `json:"quarter" binding:"required"`
 }
 
+// UpdateEpicRequest represents the request to update an epic
+type UpdateEpicRequest struct {
+	Name      string `json:"name" binding:"required"`
+	Component string `json:"component"`
+	Version   string `json:"version"`
+	Priority  string `json:"priority"`
+	Assignee  *User  `json:"assignee"`
+}
+
 // AuthRequest represents the authentication request
 type AuthRequest struct {
 	Username string `json:"username" binding:"required"`
@@ -110,6 +120,53 @@ type AuthRequest struct {
 type RoadmapData struct {
 	Pillars  []Pillar `json:"pillars"`
 	Quarters []string `json:"quarters"`
+}
+
+// BasicData represents the basic/static roadmap data that doesn't change often
+type BasicData struct {
+	Pillars    []BasicPillar `json:"pillars"`
+	Quarters   []string      `json:"quarters"`
+	Components []string      `json:"components"`
+	Versions   []string      `json:"versions"`
+	Project  	*Project 	 `json:"project"`
+}
+
+// BasicPillar represents a pillar without its milestones and epics
+type BasicPillar struct {
+	ID        string `json:"id"`
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	Priority  string `json:"priority"`
+	Component string `json:"component"`
+	Sequence  int    `json:"sequence"`
+}
+
+// Project is a jira project object
+type Project struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Key string `json:"key"`
+	Versions []Version `json:"versions"`
+	Components []Component `json:"components"`
+}
+
+
+// Component in a Jira Project
+type Component struct {
+	Name string `json:"name"`
+	ID string `json:"id"`
+	Description string `json:"description"`
+}
+
+
+// Version represents a version in a Jira project
+type Version struct {
+	ID string `json:"id"`
+	Name string `json:"name"`
+	Archieved bool `json:"archived"`
+	Released bool `json:"released"`
+	ReleaseDate string `json:"releaseDate"`
+	UserReleaseDate string `json:"userReleaseDate"`
 }
 
 // Validate validates the quarter format (YYYYQX)
@@ -128,7 +185,7 @@ func ConvertJiraIssueToPillar(issue *jira.Issue) *Pillar {
 		Key:        issue.Key,
 		Name:       issue.Fields.Summary,
 		Priority:   extractPriorityFromIssue(issue),
-		Component:  extractComponentFromIssue(issue),
+		Components:  extractComponentsFromIssue(issue),
 		Sequence:   extractSequenceFromIssue(issue),
 		Milestones: []Milestone{},
 	}
@@ -158,14 +215,66 @@ func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
 		ID:          issue.ID,
 		Key:         issue.Key,
 		Name:        issue.Fields.Summary,
-		Version:     extractVersionFromIssue(issue),
-		Component:   extractComponentFromIssue(issue),
-		MilestoneID: milestoneID,
+		Versions:     extractVersionsFromIssue(issue),
+		Components:   extractComponentsFromIssue(issue),
+		MilestoneIDs: extractMilestoneIdsFromIssue(issue),
 		Status:      extractStatusFromIssue(issue),
 		Priority:    extractPriorityFromIssue(issue),
 	}
 
 	return epic
+}
+
+// ConvertJiraProjectToProject converts a Jira project to a Project model
+func ConvertJiraProjectToProject(project *jira.Project) *Project {
+	p := &Project{
+		ID:         project.ID,
+		Name:       project.Name,
+		Key:        project.Key,
+		Versions:   make([]Version, 0, len(project.Versions)),
+		Components: make([]Component, 0, len(project.Components)),
+	}
+
+	// Convert versions
+	for _, version := range project.Versions {
+		p.Versions = append(p.Versions, *ConvertJiraVersionToVersion(&version))
+	}
+
+	// Convert components
+	for _, component := range project.Components {
+		p.Components = append(p.Components, *ConvertJiraComponentToComponent(&component))
+	}
+
+	return p
+}
+
+// ConvertJiraComponentToComponent converts a Jira component to a Component model
+func ConvertJiraComponentToComponent(component *jira.ProjectComponent) *Component {
+	return &Component{
+		ID:          component.ID,
+		Name:        component.Name,
+		Description: component.Description,
+	}
+}
+
+// ConvertJiraVersionToVersion converts a Jira version to a Version model
+func ConvertJiraVersionToVersion(version *jira.Version) *Version {
+	v := &Version{
+		ID:              version.ID,
+		Name:            version.Name,
+		ReleaseDate:     version.ReleaseDate,
+		UserReleaseDate: version.UserReleaseDate,
+	}
+
+	// Handle boolean pointers
+	if version.Archived != nil {
+		v.Archieved = *version.Archived
+	}
+	if version.Released != nil {
+		v.Released = *version.Released
+	}
+
+	return v
 }
 
 // GenerateQuarters generates a list of quarters for the roadmap
@@ -195,20 +304,24 @@ func extractPriorityFromIssue(issue *jira.Issue) string {
 	return ""
 }
 
-// extractComponentFromIssue extracts the primary component from a Jira issue
-func extractComponentFromIssue(issue *jira.Issue) string {
-	if len(issue.Fields.Components) > 0 {
-		return issue.Fields.Components[0].Name
+// extractComponentsFromIssue extracts the components from a Jira issue
+func extractComponentsFromIssue(issue *jira.Issue) (components []string) {
+	if issue.Fields != nil {
+		for _, component := range issue.Fields.Components {
+			components = append(components, component.Name)
+		}
 	}
-	return ""
+	return
 }
 
-// extractVersionFromIssue extracts the primary fix version from a Jira issue
-func extractVersionFromIssue(issue *jira.Issue) string {
-	if len(issue.Fields.FixVersions) > 0 {
-		return issue.Fields.FixVersions[0].Name
+// extractVersionsFromIssue extracts fix versions from a Jira issue
+func extractVersionsFromIssue(issue *jira.Issue) (fixVersion []string) {
+	if issue.Fields != nil {
+		for _, version := range issue.Fields.FixVersions {
+			fixVersion = append(fixVersion, version.Name)
+		}
 	}
-	return ""
+	return
 }
 
 // extractStatusFromIssue extracts the status from a Jira issue
@@ -232,20 +345,26 @@ func extractQuarterFromIssue(issue *jira.Issue) string {
 
 	// Fallback: try to extract from description
 	if issue.Fields.Summary != "" {
-		return strings.SplitN(issue.Fields.Summary, ":", 2)[0]
-		// issue.Fields.Summary
-		// lines := strings.Split(issue.Fields.Description, "\n")
-		// for _, line := range lines {
-		// 	if strings.HasPrefix(strings.ToLower(line), "quarter:") {
-		// 		parts := strings.SplitN(line, ":", 2)
-		// 		if len(parts) == 2 {
-		// 			return strings.TrimSpace(parts[1])
-		// 		}
-		// 	}
-		// }
+		return strings.SplitN(issue.Fields.Summary, "：", 2)[0]
 	}
 
 	return ""
+}
+
+// extractMilestoneIdsFromIssue extracts the milestone IDs from a Jira issue
+func extractMilestoneIdsFromIssue(issue *jira.Issue) (milestoneIDs []string) {
+	if issue.Fields != nil && len(issue.Fields.IssueLinks) > 0 {
+		for _, link := range issue.Fields.IssueLinks {
+			logger.GetSugar().Debugw("inspecting links", "link", link, "outward", link.OutwardIssue)
+			if link.Type.Name == "Blocks" && link.OutwardIssue != nil && link.OutwardIssue.Fields.Type.Name == "Milestone" {
+				logger.GetSugar().Debugw("GOT IT")
+				milestoneIDs = append(milestoneIDs, link.OutwardIssue.ID)
+			} else {
+				// logger.GetSugar().Debugw("NOPE", "link_type", link.Type.Name, "outward_issue", link.OutwardIssue, "issue type", link.OutwardIssue.Fields.Type.Name)
+			}
+		}
+	}
+	return
 }
 
 // extractSequenceFromIssue extracts the sequence/rank from a Jira issue
@@ -256,7 +375,7 @@ func extractSequenceFromIssue(issue *jira.Issue) int {
 		sequenceFields := []string{
 			"customfield_10020", // Common rank field
 			"customfield_10021", // Alternative rank field
-			"customfield_12801",
+			"customfield_12801", // custom sequence field
 			"customfield_sequence",
 			"customfield_rank",
 		}
@@ -282,10 +401,96 @@ func extractSequenceFromIssue(issue *jira.Issue) int {
 	return 0
 }
 
+// extractQuartersFromMilestones extracts unique quarters from milestone data
+func ExtractQuartersFromMilestones(milestones []Milestone) []string {
+	quarterSet := make(map[string]bool)
+
+	for _, milestone := range milestones {
+		if milestone.Quarter != "" {
+			quarterSet[milestone.Quarter] = true
+		}
+	}
+
+	quarters := make([]string, 0, len(quarterSet))
+	for quarter := range quarterSet {
+		quarters = append(quarters, quarter)
+	}
+
+	// Sort quarters chronologically
+	SortQuarters(quarters)
+
+	return quarters
+}
+
+// // extractComponentsFromPillars extracts unique components from pillar data
+// func ExtractComponentsFromPillars(pillars []Pillar) []string {
+// 	componentSet := make(map[string]bool)
+
+// 	for _, pillar := range pillars {
+// 		if pillar.Component != "" {
+// 			componentSet[pillar.Component] = true
+// 		}
+
+// 		// Also extract from milestones and epics
+// 		for _, milestone := range pillar.Milestones {
+// 			for _, epic := range milestone.Epics {
+// 				if epic.Component != "" {
+// 					componentSet[epic.Component] = true
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	components := make([]string, 0, len(componentSet))
+// 	for component := range componentSet {
+// 		components = append(components, component)
+// 	}
+
+// 	// Sort components alphabetically
+// 	sort.Strings(components)
+
+// 	return components
+// }
+
+// // extractVersionsFromEpics extracts unique versions from epic data
+// func ExtractVersionsFromEpics(pillars []Pillar) []string {
+// 	versionSet := make(map[string]bool)
+
+// 	for _, pillar := range pillars {
+// 		for _, milestone := range pillar.Milestones {
+// 			for _, epic := range milestone.Epics {
+// 				if epic.Version != "" {
+// 					versionSet[epic.Version] = true
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	versions := make([]string, 0, len(versionSet))
+// 	for version := range versionSet {
+// 		versions = append(versions, version)
+// 	}
+
+// 	// Sort versions alphabetically
+// 	sort.Strings(versions)
+
+// 	return versions
+// }
+
 // Sorting functions
 
 // SortPillars sorts pillars by sequence, then by name
 func SortPillars(pillars []Pillar) {
+	sort.Slice(pillars, func(i, j int) bool {
+		if pillars[i].Sequence != pillars[j].Sequence {
+			return pillars[i].Sequence < pillars[j].Sequence
+		}
+		return pillars[i].Name < pillars[j].Name
+	})
+}
+
+// SortBasicPillars sorts basic pillars by sequence, then by name
+func SortBasicPillars(pillars []BasicPillar) {
 	sort.Slice(pillars, func(i, j int) bool {
 		if pillars[i].Sequence != pillars[j].Sequence {
 			return pillars[i].Sequence < pillars[j].Sequence
@@ -307,18 +512,24 @@ func SortMilestones(milestones []Milestone) {
 // SortEpics sorts epics by fix version (blanks first), then by name
 func SortEpics(epics []Epic) {
 	sort.Slice(epics, func(i, j int) bool {
-		// Blanks (empty versions) should come first
-		if epics[i].Version == "" && epics[j].Version != "" {
+
+		// // Blanks (empty versions) should come first
+		// if epics[i].Version == "" && epics[j].Version != "" {
+		// 	return true
+		// }
+		// if epics[i].Version != "" && epics[j].Version == "" {
+		// 	return false
+		// }
+
+		// // If both have versions or both are blank, sort by version then name
+		// if epics[i].Version != epics[j].Version {
+		// 	return epics[i].Version < epics[j].Version
+		// }
+
+		if epics[i].Priority < epics[j].Priority {
 			return true
 		}
-		if epics[i].Version != "" && epics[j].Version == "" {
-			return false
-		}
 
-		// If both have versions or both are blank, sort by version then name
-		if epics[i].Version != epics[j].Version {
-			return epics[i].Version < epics[j].Version
-		}
 		return epics[i].Name < epics[j].Name
 	})
 }
@@ -352,4 +563,14 @@ func parseQuarter(quarter string) int {
 	// Convert to comparable integer: year * 10 + quarter
 	// e.g., 2025Q1 -> 20251, 2025Q2 -> 20252
 	return year*10 + q
+}
+
+// HasItem checks if any item in the slice exists in the index
+func HasItem(index map[string]struct{}, item []string) bool {
+	for _, i := range item {
+		if _, exists := index[i]; exists {
+			return true
+		}
+	}
+	return false
 }

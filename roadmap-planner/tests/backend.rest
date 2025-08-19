@@ -3,12 +3,12 @@
 
 ### Variables
 @baseUrl = http://localhost:8080
-@jiraUsername =
-@jiraPassword =
-@jiraBaseUrl =
-@jiraProject =
-@assigneeId =
-@issueKey =
+# @jiraUsername = {{jiraUsername}}
+# @jiraPassword = {{jiraPassword}}
+# @jiraBaseUrl = {{$jiraBaseUrl}}
+# @jiraProject = {{$jiraProject}}
+# @assigneeId = {{$shared assigneeId}}
+# @issueKey =
 
 ### Health Check
 GET {{baseUrl}}/health
@@ -51,7 +51,31 @@ X-Jira-Password: {{jiraPassword}}
 X-Jira-BaseURL: {{jiraBaseUrl}}
 X-Jira-Project: {{jiraProject}}
 
-###
+
+### Get Basic Roadmap Data
+GET {{baseUrl}}/api/basic
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+
+### List Milestones with Filters
+
+
+GET  {{baseUrl}}/api/milestones?quarter=2025Q2&pillar_id=129853
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+### List epics with filters
+
+GET  {{baseUrl}}/api/epics?version=connectors-operator-v1.3&connectors-operator-v1.4
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
 
 ### Get Assignable Users (with required issueKey)
 GET {{baseUrl}}/api/users/assignable?issueKey={{issueKey}}&query=

@@ -114,6 +114,7 @@
   gap: 0.25rem;
 }
 
+.epic-edit-btn,
 .epic-move-btn {
   background: none;
   border: none;
@@ -128,12 +129,14 @@
   opacity: 0.7;
 }
 
+.epic-edit-btn:hover,
 .epic-move-btn:hover {
   background-color: #f3f4f6;
   color: #374151;
   opacity: 1;
 }
 
+.epic-card-content:hover .epic-edit-btn,
 .epic-card-content:hover .epic-move-btn {
   opacity: 1;
 }

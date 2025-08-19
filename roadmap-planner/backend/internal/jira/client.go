@@ -451,6 +451,63 @@ func (c *Client) UpdateMilestone(ctx context.Context, milestoneID string, req mo
 	return nil
 }
 
+// UpdateEpic updates an epic's details
+func (c *Client) UpdateEpic(ctx context.Context, epicID string, req models.UpdateEpicRequest) error {
+	// Get the epic issue first to check if it exists
+	epic, resp, err := c.inner.Issue.GetWithContext(ctx, epicID, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get epic %s: %s", epicID, c.handleError(resp, err))
+	}
+
+	// Update the basic fields
+	epic.Fields.Summary = req.Name
+
+	// Update component if specified
+	if req.Component != "" {
+		epic.Fields.Components = []*jira.Component{
+			{Name: req.Component},
+		}
+	} else {
+		epic.Fields.Components = nil
+	}
+
+	// Update version if specified
+	if req.Version != "" {
+		epic.Fields.FixVersions = []*jira.FixVersion{
+			{Name: req.Version},
+		}
+	} else {
+		epic.Fields.FixVersions = nil
+	}
+
+	// Update priority if specified
+	if req.Priority != "" {
+		epic.Fields.Priority = &jira.Priority{Name: req.Priority}
+	}
+
+	// Update assignee if specified
+	if req.Assignee != nil {
+		epic.Fields.Assignee = &jira.User{
+			Name: req.Assignee.Name,
+		}
+	}
+
+	// Update the issue
+	_, resp, err = c.inner.Issue.UpdateWithContext(ctx, epic)
+	if err != nil {
+		return fmt.Errorf("failed to update epic %s: %s", epicID, c.handleError(resp, err))
+	}
+
+	c.logger.Info("Updated epic",
+		zap.String("epic_id", epicID),
+		zap.String("name", req.Name),
+		zap.String("component", req.Component),
+		zap.String("version", req.Version),
+		zap.String("priority", req.Priority))
+
+	return nil
+}
+
 // GetComponentVersions fetches available versions for a component
 func (c *Client) GetComponentVersions(ctx context.Context, component string) ([]string, error) {
 	// Get project information to access versions
@@ -469,6 +526,21 @@ func (c *Client) GetComponentVersions(ctx context.Context, component string) ([]
 
 	return componentVersions, nil
 }
+
+
+// GetProjectDetails fetches details of the project
+func (c *Client) GetProjectDetails(ctx context.Context, projectKey string) (*models.Project, error) {
+	// Get project information to access versions
+	if projectKey == "" {
+		projectKey = c.project
+	}
+	project, resp, err := c.inner.Project.Get(projectKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project: %s", c.handleError(resp, err))
+	}
+	return models.ConvertJiraProjectToProject(project), nil
+}
+
 
 // GetAssignableUsers fetches users that can be assigned to issues in the project
 func (c *Client) GetAssignableUsers(ctx context.Context, query string, projectKey string, issueKey string) ([]models.User, error) {
@@ -515,6 +587,255 @@ func (c *Client) GetAssignableUsers(ctx context.Context, query string, projectKe
 	}
 
 	return assignableUsers, nil
+}
+
+// GetQuartersFromMilestones extracts quarters from existing milestone data
+func (c *Client) GetQuartersFromMilestones(ctx context.Context) ([]string, error) {
+	// Get all pillars to extract quarters from their milestones
+	pillars, err := c.GetPillars(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch pillars for quarter extraction: %w", err)
+	}
+
+	// Extract quarters from all milestones
+	var allMilestones []models.Milestone
+	for _, pillar := range pillars {
+		allMilestones = append(allMilestones, pillar.Milestones...)
+	}
+
+	quarters := models.ExtractQuartersFromMilestones(allMilestones)
+
+	// If no quarters found from milestones, fall back to generated quarters
+	if len(quarters) == 0 {
+		c.logger.Warn("No quarters found in milestone data, falling back to generated quarters")
+		quarters = models.GenerateQuarters()
+	}
+
+	c.logger.Info("Extracted quarters from milestones",
+		zap.Strings("quarters", quarters),
+		zap.Int("count", len(quarters)))
+
+	return quarters, nil
+}
+
+// GetBasicPillars fetches pillar information without milestones and epics
+func (c *Client) GetBasicPillars(ctx context.Context) ([]models.BasicPillar, error) {
+	// JQL to find only pillars (not milestones or epics)
+	jqlQuery := fmt.Sprintf("project = %s AND issuetype = Pillar AND resolution is empty ORDER BY priority DESC, created ASC", c.project)
+
+	searchOptions := &jira.SearchOptions{
+		Fields: []string{"summary", "priority", "components", "status", "customfield_10020", "customfield_10021", "customfield_12801", "created"},
+		MaxResults: 1000,
+	}
+
+	issues, resp, err := c.inner.Issue.SearchWithContext(ctx, jqlQuery, searchOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch basic pillars: %s", c.handleError(resp, err))
+	}
+
+	c.logger.Info("Found basic pillars", zap.Int("count", len(issues)))
+
+	basicPillars := make([]models.BasicPillar, 0, len(issues))
+	for _, issue := range issues {
+		// Extract basic pillar information
+		priority := ""
+		if issue.Fields.Priority != nil {
+			priority = issue.Fields.Priority.Name
+		}
+
+		component := ""
+		if len(issue.Fields.Components) > 0 {
+			component = issue.Fields.Components[0].Name
+		}
+
+		// Extract sequence from custom fields
+		sequence := 0
+		if issue.Fields.Unknowns != nil {
+			sequenceFields := []string{"customfield_10020", "customfield_10021", "customfield_12801"}
+			for _, fieldName := range sequenceFields {
+				if seq, exists := issue.Fields.Unknowns[fieldName]; exists && seq != nil {
+					if seqFloat, ok := seq.(float64); ok {
+						sequence = int(seqFloat)
+						break
+					}
+					if seqInt, ok := seq.(int); ok {
+						sequence = seqInt
+						break
+					}
+				}
+			}
+		}
+
+		pillar := models.BasicPillar{
+			ID:        issue.ID,
+			Key:       issue.Key,
+			Name:      issue.Fields.Summary,
+			Priority:  priority,
+			Component: component,
+			Sequence:  sequence,
+		}
+		basicPillars = append(basicPillars, pillar)
+	}
+
+	// Sort pillars by sequence
+	models.SortBasicPillars(basicPillars)
+
+	return basicPillars, nil
+}
+
+// GetMilestonesWithFilter fetches milestones with optional filtering
+func (c *Client) GetMilestonesWithFilter(ctx context.Context, pillarIDs []string, quarters []string) ([]models.Milestone, error) {
+	// Build JQL query with filters
+	var jqlParts []string
+	jqlParts = append(jqlParts, fmt.Sprintf("project = %s", c.project))
+	jqlParts = append(jqlParts, "issuetype = Milestone")
+	jqlParts = append(jqlParts, "resolution is empty")
+
+	// Add pillar ID filter if provided
+	if len(pillarIDs) > 0 {
+		pillarFilter := fmt.Sprintf("parent in (%s)", strings.Join(pillarIDs, ","))
+		jqlParts = append(jqlParts, pillarFilter)
+	}
+
+	// Add quarter filter if provided (this would need custom field filtering)
+	if len(quarters) > 0 {
+		// For now, we'll filter quarters in post-processing since JQL custom field filtering is complex
+	}
+
+	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
+
+	searchOptions := &jira.SearchOptions{
+		Fields: []string{"summary", "status", "parent", "customfield_*", "quater", "quater", "issuelinks", "extras", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank", "created"},
+		MaxResults: 1000,
+	}
+
+	issues, resp, err := c.inner.Issue.SearchWithContext(ctx, jqlQuery, searchOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch milestones: %s", c.handleError(resp, err))
+	}
+
+	c.logger.Info("Found milestones with filter",
+		zap.Int("count", len(issues)),
+		zap.Strings("pillar_ids", pillarIDs),
+		zap.Strings("quarters", quarters))
+
+	quarterFilter := map[string]struct{}{}
+	for _, quarter := range quarters {
+		quarterFilter[quarter] = struct{}{}
+	}
+
+	milestones := make([]models.Milestone, 0, len(issues))
+	for _, issue := range issues {
+		// Get the pillar ID from the parent
+		pillarID := ""
+		if issue.Fields.Parent != nil {
+			pillarID = issue.Fields.Parent.ID
+		}
+
+		milestone := models.ConvertJiraIssueToMilestone(&issue, pillarID)
+
+		// Post-process quarter filtering if needed
+		if _, ok := quarterFilter[milestone.Quarter]; len(quarters) > 0 && !ok {
+			continue
+		}
+
+		milestones = append(milestones, *milestone)
+	}
+
+	// Sort milestones
+	models.SortMilestones(milestones)
+
+	return milestones, nil
+}
+
+// GetEpicsWithFilter fetches epics with optional filtering
+func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, pillarIDs []string, components []string, versions []string) ([]models.Epic, error) {
+	// Build JQL query with filters
+	var jqlParts []string
+	jqlParts = append(jqlParts, fmt.Sprintf("project = %s", c.project))
+	jqlParts = append(jqlParts, "issuetype = Epic")
+	jqlParts = append(jqlParts, "resolution is empty")
+
+	// Add milestone ID filter if provided
+	// if len(milestoneIDs) > 0 {
+	// 	milestoneFilter := fmt.Sprintf(`parent in (%s)`, strings.Join(milestoneIDs, ","))
+	// 	jqlParts = append(jqlParts, milestoneFilter)
+	// }
+	// milestones
+	if len(milestoneIDs) > 0 {
+		milestoneFilter := fmt.Sprintf(`issueFunction in linkedIssuesOf("id in (%s)", "is blocked by")`, strings.Join(milestoneIDs, ","))
+		jqlParts = append(jqlParts, milestoneFilter)
+	}
+
+
+	// Add pillar ID filter if provided (epics are grandchildren of pillars)
+	if len(pillarIDs) > 0 {
+		// This is more complex - we'd need to get milestones first, then filter epics
+		// For now, we'll handle this in post-processing
+	}
+
+	// Add component filter if provided
+	if len(components) > 0 {
+		componentFilter := fmt.Sprintf(`component in (%q)`, strings.Join(components, ","))
+		jqlParts = append(jqlParts, componentFilter)
+	}
+
+	// Add version filter if provided
+	if len(versions) > 0 {
+		versionFilter := fmt.Sprintf(`fixVersion in (%q)`, strings.Join(versions, ","))
+		jqlParts = append(jqlParts, versionFilter)
+	}
+
+	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
+
+	searchOptions := &jira.SearchOptions{
+		Fields: []string{"summary", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		MaxResults: 2000,
+	}
+
+	issues, resp, err := c.inner.Issue.SearchWithContext(ctx, jqlQuery, searchOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch epics: %s", c.handleError(resp, err))
+	}
+
+	c.logger.Info("Found epics with filter",
+		zap.Int("count", len(issues)),
+		zap.Strings("milestone_ids", milestoneIDs),
+		zap.Strings("pillar_ids", pillarIDs),
+		zap.Strings("components", components),
+		zap.Strings("versions", versions))
+
+
+	milestoneIDsIndex := map[string]struct{}{}
+
+	for _, milestoneID := range milestoneIDs {
+		milestoneIDsIndex[milestoneID] = struct{}{}
+	}
+
+	epics := make([]models.Epic, 0, len(issues))
+	for _, issue := range issues {
+		// Get the milestone ID from the parent
+		// if issue.Fields.Parent != nil {
+		// 	milestoneID = issue.Fields.Parent.ID
+		// }
+
+		c.logger.Sugar().Debugw("epic issue", "epic", issue)
+
+		epic := models.ConvertJiraIssueToEpic(&issue, "")
+
+		c.logger.Sugar().Debugw("got epic", "epic", *epic)
+
+		if len(milestoneIDsIndex) > 0 && !models.HasItem(milestoneIDsIndex, epic.MilestoneIDs) {
+			continue
+		}
+
+		epics = append(epics, *epic)
+	}
+
+	// Sort epics
+	models.SortEpics(epics)
+
+	return epics, nil
 }
 
 // removeIssueLink removes an issue link

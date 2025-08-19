@@ -45,6 +45,7 @@ type Jira struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	Project  string `mapstructure:"project"`
+	Quarters []string `mapstructure:"quarters"`
 }
 
 // Server represents server configuration settings
@@ -80,6 +81,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("server.port", 8080)
 	viper.SetDefault("server.cors.allowed_origins", []string{"http://localhost:3000"})
 	viper.SetDefault("jira.project", "DEVOPS")
+	viper.SetDefault("jira.quarters", []string{"2025Q1","2025Q2","2025Q3","2025Q4","2026Q1","2026Q2","2026Q4"})
 	viper.SetDefault("cache.ttl", "5m")
 	viper.SetDefault("cache.refresh_interval", "1m")
 

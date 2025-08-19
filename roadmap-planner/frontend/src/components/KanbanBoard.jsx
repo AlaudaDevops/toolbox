@@ -7,6 +7,7 @@ import CreateMilestoneModal from './modals/CreateMilestoneModal';
 import CreateEpicModal from './modals/CreateEpicModal';
 import UpdateMilestoneModal from './modals/UpdateMilestoneModal';
 import EpicMoveModal from './modals/EpicMoveModal';
+import UpdateEpicModal from './modals/UpdateEpicModal';
 import { Plus, RefreshCw, GripVertical } from 'lucide-react';
 import {
   saveSelectedQuarters,
@@ -23,6 +24,7 @@ const KanbanBoard = () => {
   const [showCreateEpic, setShowCreateEpic] = useState(false);
   const [showUpdateMilestone, setShowUpdateMilestone] = useState(false);
   const [showEpicMove, setShowEpicMove] = useState(false);
+  const [showUpdateEpic, setShowUpdateEpic] = useState(false);
   const [selectedPillar, setSelectedPillar] = useState(null);
   const [selectedMilestone, setSelectedMilestone] = useState(null);
   const [selectedEpic, setSelectedEpic] = useState(null);
@@ -102,6 +104,11 @@ const KanbanBoard = () => {
     setSelectedEpic(epic);
     setSelectedMilestone(currentMilestone);
     setShowEpicMove(true);
+  };
+
+  const handleUpdateEpic = (epic) => {
+    setSelectedEpic(epic);
+    setShowUpdateEpic(true);
   };
 
   const handleQuarterToggle = (quarter) => {
@@ -307,6 +314,7 @@ const KanbanBoard = () => {
                                                 epic={epic}
                                                 isDragging={snapshot.isDragging}
                                                 onMoveEpic={handleMoveEpic}
+                                                onUpdateEpic={handleUpdateEpic}
                                                 currentMilestone={milestone}
                                               />
                                             </div>
@@ -394,6 +402,16 @@ const KanbanBoard = () => {
             setShowEpicMove(false);
             setSelectedEpic(null);
             setSelectedMilestone(null);
+          }}
+        />
+      )}
+
+      {showUpdateEpic && (
+        <UpdateEpicModal
+          epic={selectedEpic}
+          onClose={() => {
+            setShowUpdateEpic(false);
+            setSelectedEpic(null);
           }}
         />
       )}

@@ -18,14 +18,43 @@ export const RoadmapProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load roadmap data
+  // Load basic data first (fast) - simplified approach
+  const loadBasicData = useCallback(async () => {
+    try {
+      const basicData = await roadmapAPI.getBasicData();
+      console.log('Basic data loaded:', basicData); // Debug log
+
+      // Set basic data immediately for fast UI rendering
+      setRoadmapData(prevData => ({
+        ...prevData,
+        pillars: basicData.pillars.map(pillar => ({
+          ...pillar,
+          milestones: [] // Will be loaded with full data
+        })),
+        quarters: basicData.quarters,
+        components: basicData.components,
+        versions: basicData.versions,
+      }));
+
+      return basicData;
+    } catch (error) {
+      console.warn('Failed to load basic data, will load full data:', error);
+      return null;
+    }
+  }, []);
+
+  // Load roadmap data (simplified approach)
   const loadRoadmap = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
+      // Try to load basic data first for fast UI feedback
+      await loadBasicData();
+
+      // Then load complete data using the original API
       const data = await roadmapAPI.getRoadmap();
-      console.log('Roadmap data loaded:', data); // Debug log
+      console.log('Complete roadmap data loaded:', data); // Debug log
 
       // Sort the roadmap data
       const sortedData = sortRoadmapData(data);
@@ -40,7 +69,7 @@ export const RoadmapProvider = ({ children }) => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadBasicData]);
 
   // Load roadmap on mount
   useEffect(() => {
@@ -135,6 +164,23 @@ export const RoadmapProvider = ({ children }) => {
     }
   };
 
+  // Update epic
+  const updateEpic = async (epicId, epicData) => {
+    try {
+      const response = await roadmapAPI.updateEpic(epicId, epicData);
+
+      // Reload roadmap data to get the updated state
+      await loadRoadmap();
+
+      toast.success('Epic updated successfully!');
+      return { success: true, data: response };
+    } catch (error) {
+      const errorInfo = handleAPIError(error);
+      toast.error(`Failed to update epic: ${errorInfo.message}`);
+      return { success: false, error: errorInfo.message };
+    }
+  };
+
   // Move epic to different milestone
   const moveEpic = async (epicId, newMilestoneId) => {
     try {
@@ -219,9 +265,11 @@ export const RoadmapProvider = ({ children }) => {
     isLoading,
     error,
     loadRoadmap,
+    loadBasicData,
     createMilestone,
     updateMilestone,
     createEpic,
+    updateEpic,
     moveEpic,
     getComponentVersions,
     getAssignableUsers,
