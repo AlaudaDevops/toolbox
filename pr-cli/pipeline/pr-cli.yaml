@@ -3,8 +3,7 @@ kind: Pipeline
 metadata:
   name: pr-cli
   annotations:
-    pipelinesascode.tekton.dev/on-comment: |
-      ^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \t].*)?$
+    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \\t].*)?$"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   params:
@@ -35,9 +34,18 @@ spec:
       displayName: PR Merge & Management Operations
       taskSpec:
         steps:
-          - name: manage-pr
+          - name: cli
             image: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest
+            imagePullPolicy: Always
             command: ["/usr/local/bin/pr-cli"]
+            computeResources:
+              requests:
+                cpu: "200m"
+                memory: "192Mi"
+              # Because we may use git to cherrypick, we set the limits a bit larger to avoid OOM issues.
+              limits:
+                cpu: "1"
+                memory: "1Gi"
             env:
               - name: PR_PLATFORM
                 value: $(params.platform)

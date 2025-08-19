@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
 // PROption option for PR CLI command
@@ -81,6 +82,9 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 
 // Run executes the PR CLI logic
 func (p *PROption) Run(cmd *cobra.Command, args []string) error {
+	// Read all values from viper (which includes environment variables)
+	p.readAllFromViper()
+
 	// Parse string fields into config
 	if err := p.parseStringFields(); err != nil {
 		return fmt.Errorf("failed to parse CLI fields: %w", err)
@@ -106,6 +110,9 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	p.Logger.Infof("Processing command: %s with args: %v", command, cmdArgs)
+	if p.Config.Debug {
+		p.Logger.Debugf("Processing PR %d, config: %+v", p.Config.PRNum, p.Config)
+	}
 
 	// Initialize PR handler
 	prHandler, err := handler.NewPRHandler(p.Logger, p.Config)
@@ -126,8 +133,6 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		if err := p.validateCommentSender(prHandler); err != nil {
 			return fmt.Errorf("comment sender validation failed: %w", err)
 		}
-	} else {
-		p.Logger.Debugf("Processing PR %d, config: %+v", p.Config.PRNum, p.Config)
 	}
 
 	switch command {
@@ -155,6 +160,22 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		return prHandler.HandleUnlabel(cmdArgs)
 	default:
 		return fmt.Errorf("unknown command: %s", command)
+	}
+}
+
+// readAllFromViper reads all configuration values from viper
+// This includes environment variables with PR_ prefix
+func (p *PROption) readAllFromViper() {
+	// Use viper.Unmarshal to automatically map all values to the config struct
+	viper.Unmarshal(p.Config)
+
+	// Handle special string fields that need to be read separately
+	// since they're not directly mapped to Config struct fields
+	if p.prNumStr == "" {
+		p.prNumStr = viper.GetString("pr-num")
+	}
+	if p.lgtmPermissionsStr == "" {
+		p.lgtmPermissionsStr = viper.GetString("lgtm-permissions")
 	}
 }
 

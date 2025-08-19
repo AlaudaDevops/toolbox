@@ -64,13 +64,16 @@ export PR_CLI_REPO_NAME=repo
 | `/assign` | Assign reviewers to PR | `user1 user2 ...` | `/assign alice bob` |
 | `/unassign` | Remove reviewers from PR | `user1 user2 ...` | `/unassign alice` |
 | `/lgtm` | Add LGTM approval | `[message]` | `/lgtm` or `/lgtm Great work!` |
+| `/lgtm cancel` | Remove LGTM approval (alias) | - | `/lgtm cancel` |
 | `/remove-lgtm` | Remove LGTM approval | `[message]` | `/remove-lgtm` |
-| `/merge` or `/ready` | Merge the PR | `[method]` | `/merge` or `/merge squash` |
+| `/merge` | Merge the PR | `[method]` | `/merge` or `/merge squash` |
+| `/ready` | Merge the PR (alias for `/merge`) | `[method]` | `/ready` or `/ready squash` |
 | `/rebase` | Rebase the PR | - | `/rebase` |
 | `/check` | Check PR status | - | `/check` |
 | `/label` | Add labels to PR | `label1 label2 ...` | `/label bug enhancement` |
 | `/unlabel` | Remove labels from PR | `label1 label2 ...` | `/unlabel bug` |
 | `/cherry-pick` | Cherry-pick to branches | `branch1 branch2 ...` | `/cherry-pick release/v1.0` |
+| `/cherrypick` | Cherry-pick to branches (alias) | `branch1 branch2 ...` | `/cherrypick release/v1.0` |
 | `/help` | Show available commands | - | `/help` |
 
 ### Merge Methods

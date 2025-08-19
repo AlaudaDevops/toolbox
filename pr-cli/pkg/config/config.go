@@ -22,36 +22,36 @@ type Config struct {
 	// Platform configuration
 	Platform string `json:"platform" yaml:"platform" mapstructure:"platform"`
 	Token    string `json:"token" yaml:"token" mapstructure:"token"`
-	BaseURL  string `json:"base_url,omitempty" yaml:"base_url,omitempty" mapstructure:"base_url"`
+	BaseURL  string `json:"base_url,omitempty" yaml:"base_url,omitempty" mapstructure:"base-url"`
 
 	// Repository configuration
-	Owner string `json:"owner" yaml:"owner" mapstructure:"owner"`
-	Repo  string `json:"repo" yaml:"repo" mapstructure:"repo"`
+	Owner string `json:"owner" yaml:"owner" mapstructure:"repo-owner"`
+	Repo  string `json:"repo" yaml:"repo" mapstructure:"repo-name"`
 
 	// PR configuration
-	PRNum         int    `json:"pr_num" yaml:"pr_num" mapstructure:"pr_num"`
-	CommentSender string `json:"comment_sender" yaml:"comment_sender" mapstructure:"comment_sender"`
+	PRNum         int    `json:"pr_num" yaml:"pr_num" mapstructure:"pr-num"`
+	CommentSender string `json:"comment_sender" yaml:"comment_sender" mapstructure:"comment-sender"`
 
 	// CLI-specific configuration
-	TriggerComment string `json:"trigger_comment,omitempty" yaml:"trigger_comment,omitempty" mapstructure:"trigger_comment"`
+	TriggerComment string `json:"trigger_comment,omitempty" yaml:"trigger_comment,omitempty" mapstructure:"trigger-comment"`
 	Debug          bool   `json:"debug,omitempty" yaml:"debug,omitempty" mapstructure:"debug"`
 
 	// LGTM configuration
-	LGTMThreshold   int      `json:"lgtm_threshold" yaml:"lgtm_threshold" mapstructure:"lgtm_threshold"`
-	LGTMPermissions []string `json:"lgtm_permissions" yaml:"lgtm_permissions" mapstructure:"lgtm_permissions"`
-	LGTMReviewEvent string   `json:"lgtm_review_event,omitempty" yaml:"lgtm_review_event,omitempty" mapstructure:"lgtm_review_event"`
+	LGTMThreshold   int      `json:"lgtm_threshold" yaml:"lgtm_threshold" mapstructure:"lgtm-threshold"`
+	LGTMPermissions []string `json:"lgtm_permissions" yaml:"lgtm_permissions" mapstructure:"lgtm-permissions"`
+	LGTMReviewEvent string   `json:"lgtm_review_event,omitempty" yaml:"lgtm_review_event,omitempty" mapstructure:"lgtm-review-event"`
 
 	// Merge configuration
-	MergeMethod string `json:"merge_method" yaml:"merge_method" mapstructure:"merge_method"`
+	MergeMethod string `json:"merge_method" yaml:"merge_method" mapstructure:"merge-method"`
 
 	// Check configuration
-	SelfCheckName string `json:"self_check_name,omitempty" yaml:"self_check_name,omitempty" mapstructure:"self_check_name"`
+	SelfCheckName string `json:"self_check_name,omitempty" yaml:"self_check_name,omitempty" mapstructure:"self-check-name"`
 
 	// Cherry-pick configuration
-	UseGitCLIForCherryPick bool `json:"use_git_cli_for_cherrypick,omitempty" yaml:"use_git_cli_for_cherrypick,omitempty" mapstructure:"use_git_cli_for_cherrypick"`
+	UseGitCLIForCherryPick bool `json:"use_git_cli_for_cherrypick,omitempty" yaml:"use_git_cli_for_cherrypick,omitempty" mapstructure:"use-git-cli-for-cherrypick"`
 
 	// Logging configuration
-	LogLevel string `json:"log_level" yaml:"log_level" mapstructure:"log_level"`
+	LogLevel string `json:"log_level" yaml:"log_level" mapstructure:"log-level"`
 }
 
 // NewDefaultConfig returns a new Config with default values
