@@ -26,6 +26,7 @@ const KanbanBoard = () => {
   const [selectedPillar, setSelectedPillar] = useState(null);
   const [selectedMilestone, setSelectedMilestone] = useState(null);
   const [selectedEpic, setSelectedEpic] = useState(null);
+  const [selectedQuarter, setSelectedQuarter] = useState(null);
   const [selectedQuarters, setSelectedQuarters] = useState([]);
 
   // Initialize selected quarters when roadmap data loads
@@ -81,8 +82,9 @@ const KanbanBoard = () => {
     await moveEpic(draggableId, newMilestoneId);
   };
 
-  const handleCreateMilestone = (pillar) => {
+  const handleCreateMilestone = (pillar, preselectedQuarter = null) => {
     setSelectedPillar(pillar);
+    setSelectedQuarter(preselectedQuarter);
     setShowCreateMilestone(true);
   };
 
@@ -332,7 +334,7 @@ const KanbanBoard = () => {
                     ) : (
                       <div className="empty-quarter">
                         <button
-                          onClick={() => handleCreateMilestone(pillar)}
+                          onClick={() => handleCreateMilestone(pillar, quarter)}
                           className="btn btn-sm btn-secondary create-milestone-btn"
                         >
                           <Plus size={14} />
@@ -353,9 +355,11 @@ const KanbanBoard = () => {
         <CreateMilestoneModal
           pillar={selectedPillar}
           quarters={quarters || []}
+          preselectedQuarter={selectedQuarter}
           onClose={() => {
             setShowCreateMilestone(false);
             setSelectedPillar(null);
+            setSelectedQuarter(null);
           }}
         />
       )}

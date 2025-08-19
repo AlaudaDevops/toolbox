@@ -5,7 +5,7 @@ import { X } from 'lucide-react';
 import AssigneeSelect from '../AssigneeSelect';
 import './Modal.css';
 
-const CreateMilestoneModal = ({ pillar, quarters, onClose }) => {
+const CreateMilestoneModal = ({ pillar, quarters, preselectedQuarter, onClose }) => {
   const { createMilestone } = useRoadmap();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -16,7 +16,11 @@ const CreateMilestoneModal = ({ pillar, quarters, onClose }) => {
     trigger,
     formState: { errors },
     setError,
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      quarter: preselectedQuarter || '',
+    },
+  });
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);

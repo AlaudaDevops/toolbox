@@ -34,5 +34,5 @@ Lets do a number of changes in this code base, we will start with the bellow UI 
 - [ ] Create an API to fetch only the most basic data which does not change often like pillars, existing versions, quarters. The quarters field is actually a custom field in jira, and in our instance it is the `customfield_12242`. It is necessary to test and find ways to load its values dynamically from Jira, if not possible we can load it from current milestone data or a static list in the configuration file. The whole idea is to reduce initial load time and make each API call faster and easier to process, making the app more reactive. You can also add or change the optmizations as you find to be more productive or find a better solution to improve user experience
 - [ ] Create another API to fetch data like milestones of an pillar, epics of a milestone, etc. that will be used more often to refresh specific areas of the board when the user changes the data
 - [ ] Change the UI to load the basic data first (after the backend is already optimized) and display data
-- [ ] Make (create milestones) modal load the specific quarter it was clicked on.
+- [X] Make (create milestones) modal load the specific quarter it was clicked on.
 - [ ] Make milestones draggable and droppable between quarters. Also create a simple form to update the milestone and quarter information.
