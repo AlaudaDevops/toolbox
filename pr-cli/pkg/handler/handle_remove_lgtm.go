@@ -23,7 +23,7 @@ import (
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
 
-// HandleRemoveLGTM processes the removal of LGTM by providing information about manual dismissal
+// HandleRemoveLGTM processes the removal of LGTM by dismissing approval if threshold was met
 func (h *PRHandler) HandleRemoveLGTM() error {
 	h.Logger.Info("Processing remove LGTM")
 
@@ -41,15 +41,52 @@ func (h *PRHandler) HandleRemoveLGTM() error {
 		return h.client.PostComment(message)
 	}
 
-	// User has permission, show current LGTM status and provide information
+	// User has permission, check current LGTM status
 	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return fmt.Errorf("failed to get LGTM votes: %w", err)
 	}
 
-	h.Logger.Infof("User %s requested remove LGTM information with permission: %s", h.config.CommentSender, userPermission)
+	// Check if current user has an LGTM vote and if removing it would drop below threshold
+	currentUserHasVote := false
+	for user := range lgtmUsers {
+		if user == h.config.CommentSender {
+			currentUserHasVote = true
+			break
+		}
+	}
 
-	// Generate informational message about manual dismissal
+	// If current user has a vote and removing it would drop below threshold, dismiss approval
+	if currentUserHasVote && validVotes >= h.config.LGTMThreshold && (validVotes-1) < h.config.LGTMThreshold {
+		dismissMessage := fmt.Sprintf(messages.RemoveLGTMDismissTemplate, h.config.CommentSender)
+		if err = h.client.DismissApprove(dismissMessage); err != nil {
+			// Check if the error is because no approval was found to dismiss
+			if !strings.Contains(err.Error(), "no approval review found") {
+				h.Logger.Errorf("Failed to dismiss approval: %v", err)
+			}
+		} else {
+			h.Logger.Infof("✅ User %s successfully dismissed approval (removing vote would drop below threshold) with permission: %s", h.config.CommentSender, userPermission)
+		}
+
+		// Get updated LGTM status after dismissal
+		validVotes, lgtmUsers, err = h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+		if err != nil {
+			// If we can't get LGTM status, just confirm the dismissal
+			confirmMessage := fmt.Sprintf(messages.RemoveLGTMSuccessTemplate,
+				h.config.CommentSender, userPermission)
+
+			return h.client.PostComment(confirmMessage)
+		}
+	} else {
+		if !currentUserHasVote {
+			h.Logger.Infof("User %s requested remove LGTM but has no existing vote with permission: %s", h.config.CommentSender, userPermission)
+		} else {
+			h.Logger.Infof("User %s requested remove LGTM but removing vote would not drop below threshold (votes: %d, threshold: %d) with permission: %s",
+				h.config.CommentSender, validVotes, h.config.LGTMThreshold, userPermission)
+		}
+	}
+
+	// Generate status message
 	statusMessage := fmt.Sprintf(messages.RemoveLGTMStatusTemplate,
 		h.config.CommentSender, validVotes, h.config.LGTMThreshold, max(0, h.config.LGTMThreshold-validVotes))
 

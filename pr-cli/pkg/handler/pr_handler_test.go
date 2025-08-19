@@ -296,7 +296,7 @@ func TestPRHandler_HandleLGTM_NoPermission(t *testing.T) {
 	}
 }
 
-// TestPRHandler_HandleRemoveLGTM tests removing LGTM information when user has permission
+// TestPRHandler_HandleRemoveLGTM tests removing LGTM when user has vote and removing it would drop below threshold
 func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -309,14 +309,31 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		Return(true, "admin", nil).
 		Times(1)
 
-	// Mock LGTM votes response for current status
+	// Mock LGTM votes response - threshold is met (2 >= 2) and commenter has a vote
 	lgtmUsers := map[string]string{
+		"commenter": "admin", // The current user has a vote
 		"reviewer1": "write",
 	}
 
 	mockClient.EXPECT().
 		GetLGTMVotes([]string{"admin", "write"}, false).
-		Return(1, lgtmUsers, nil).
+		Return(2, lgtmUsers, nil).
+		Times(1)
+
+	// Mock the DismissApprove call since removing commenter's vote would drop below threshold (2-1=1 < 2)
+	mockClient.EXPECT().
+		DismissApprove(gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	// Mock LGTM votes response after dismissal
+	updatedLgtmUsers := map[string]string{
+		"reviewer1": "write",
+	}
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false).
+		Return(1, updatedLgtmUsers, nil).
 		Times(1)
 
 	// Mock CheckRunsStatus call from generateLGTMStatusMessage
@@ -325,7 +342,7 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		Return(true, []git.CheckRun{}, nil).
 		Times(1)
 
-	// Mock PostComment for status information
+	// Mock PostComment for status update
 	mockClient.EXPECT().
 		PostComment(gomock.Any()).
 		Return(nil).
@@ -362,6 +379,178 @@ func TestPRHandler_HandleRemoveLGTM_NoPermission(t *testing.T) {
 		Times(1)
 
 	// Mock PostComment for permission denied message
+	mockClient.EXPECT().
+		PostComment(gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	cfg := &config.Config{
+		LGTMThreshold:   2,
+		LGTMPermissions: []string{"admin", "write"},
+		CommentSender:   "commenter",
+	}
+	handler := &PRHandler{
+		Logger: logrus.New(),
+		client: mockClient,
+		config: cfg,
+	}
+
+	err := handler.HandleRemoveLGTM()
+	if err != nil {
+		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
+	}
+}
+
+// TestPRHandler_HandleRemoveLGTM_NoUserVote tests removing LGTM when user has no existing vote
+func TestPRHandler_HandleRemoveLGTM_NoUserVote(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock_git.NewMockGitClient(ctrl)
+
+	// Mock user permission check - user has admin permission
+	mockClient.EXPECT().
+		CheckUserPermissions("commenter", []string{"admin", "write"}).
+		Return(true, "admin", nil).
+		Times(1)
+
+	// Mock LGTM votes response - commenter has no vote
+	lgtmUsers := map[string]string{
+		"reviewer1": "write",
+	}
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false).
+		Return(1, lgtmUsers, nil).
+		Times(1)
+
+	// Mock CheckRunsStatus call from generateLGTMStatusMessage
+	mockClient.EXPECT().
+		CheckRunsStatus().
+		Return(true, []git.CheckRun{}, nil).
+		Times(1)
+
+	// Mock PostComment for status information (no dismissal needed since user has no vote)
+	mockClient.EXPECT().
+		PostComment(gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	cfg := &config.Config{
+		LGTMThreshold:   2,
+		LGTMPermissions: []string{"admin", "write"},
+		CommentSender:   "commenter",
+	}
+	handler := &PRHandler{
+		Logger: logrus.New(),
+		client: mockClient,
+		config: cfg,
+	}
+
+	err := handler.HandleRemoveLGTM()
+	if err != nil {
+		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
+	}
+}
+
+// TestPRHandler_HandleRemoveLGTM_NoApproval tests removing LGTM when user has vote, removing would drop below threshold, but no approval exists
+func TestPRHandler_HandleRemoveLGTM_NoApproval(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock_git.NewMockGitClient(ctrl)
+
+	// Mock user permission check - user has admin permission
+	mockClient.EXPECT().
+		CheckUserPermissions("commenter", []string{"admin", "write"}).
+		Return(true, "admin", nil).
+		Times(1)
+
+	// Mock LGTM votes response - commenter has a vote and threshold is met (2 >= 2)
+	lgtmUsers := map[string]string{
+		"commenter": "admin", // The current user has a vote
+		"reviewer1": "write",
+	}
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false).
+		Return(2, lgtmUsers, nil).
+		Times(1)
+
+	// Mock the DismissApprove call returning error for no approval found
+	mockClient.EXPECT().
+		DismissApprove(gomock.Any()).
+		Return(fmt.Errorf("no approval review found")).
+		Times(1)
+
+	// Mock LGTM votes response after failed dismissal (continue with normal flow)
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false).
+		Return(2, lgtmUsers, nil).
+		Times(1)
+
+	// Mock CheckRunsStatus call from generateLGTMStatusMessage
+	mockClient.EXPECT().
+		CheckRunsStatus().
+		Return(true, []git.CheckRun{}, nil).
+		Times(1)
+
+	// Mock PostComment for status message
+	mockClient.EXPECT().
+		PostComment(gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	cfg := &config.Config{
+		LGTMThreshold:   2,
+		LGTMPermissions: []string{"admin", "write"},
+		CommentSender:   "commenter",
+	}
+	handler := &PRHandler{
+		Logger: logrus.New(),
+		client: mockClient,
+		config: cfg,
+	}
+
+	err := handler.HandleRemoveLGTM()
+	if err != nil {
+		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
+	}
+}
+
+// TestPRHandler_HandleRemoveLGTM_RemoveWontDropBelowThreshold tests removing LGTM when user has vote but removing won't drop below threshold
+func TestPRHandler_HandleRemoveLGTM_RemoveWontDropBelowThreshold(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClient := mock_git.NewMockGitClient(ctrl)
+
+	// Mock user permission check - user has admin permission
+	mockClient.EXPECT().
+		CheckUserPermissions("commenter", []string{"admin", "write"}).
+		Return(true, "admin", nil).
+		Times(1)
+
+	// Mock LGTM votes response - commenter has a vote, 3 votes total, threshold is 2
+	// Removing commenter's vote would leave 2 votes, still >= threshold
+	lgtmUsers := map[string]string{
+		"commenter": "admin", // The current user has a vote
+		"reviewer1": "write",
+		"reviewer2": "admin",
+	}
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false).
+		Return(3, lgtmUsers, nil).
+		Times(1)
+
+	// Mock CheckRunsStatus call from generateLGTMStatusMessage
+	mockClient.EXPECT().
+		CheckRunsStatus().
+		Return(true, []git.CheckRun{}, nil).
+		Times(1)
+
+	// Mock PostComment for status information (no dismissal needed since removing won't drop below threshold)
 	mockClient.EXPECT().
 		PostComment(gomock.Any()).
 		Return(nil).

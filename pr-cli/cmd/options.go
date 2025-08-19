@@ -65,7 +65,7 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 
 	// LGTM configuration
 	flags.IntVar(&p.Config.LGTMThreshold, "lgtm-threshold", p.Config.LGTMThreshold, "Minimum number of LGTM approvals required")
-	flags.StringVar(&p.lgtmPermissionsStr, "lgtm-permissions", "admin,write", "Required permissions for LGTM (comma-separated)")
+	flags.StringVar(&p.lgtmPermissionsStr, "lgtm-permissions", "", "Required permissions for LGTM (comma-separated)")
 	flags.StringVar(&p.Config.LGTMReviewEvent, "lgtm-review-event", p.Config.LGTMReviewEvent, "Review event type for LGTM")
 
 	// Merge configuration
@@ -219,6 +219,9 @@ func (p *PROption) parseStringFields() error {
 			permissions[i] = strings.TrimSpace(perm)
 		}
 		p.Config.LGTMPermissions = permissions
+	} else if len(p.Config.LGTMPermissions) == 0 {
+		// If no CLI flag and no environment variable, use default
+		p.Config.LGTMPermissions = []string{"admin", "write"}
 	}
 
 	return nil
