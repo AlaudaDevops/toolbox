@@ -24,6 +24,19 @@ import (
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
 
+// CommentedError represents an error where a comment has already been posted to the PR
+type CommentedError struct {
+	Err error
+}
+
+func (e *CommentedError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *CommentedError) Unwrap() error {
+	return e.Err
+}
+
 // HandleMerge merges the PR if conditions are met
 func (h *PRHandler) HandleMerge(args []string) error {
 	// Check user permissions - allow if user has write permission OR is the PR creator
@@ -115,8 +128,9 @@ func (h *PRHandler) HandleMerge(args []string) error {
 
 		if postErr := h.client.PostComment(message); postErr != nil {
 			h.Logger.Errorf("Failed to post merge error comment: %v", postErr)
+			return fmt.Errorf("merge failed: %w", err)
 		}
-		return fmt.Errorf("merge failed: %w", err)
+		return &CommentedError{Err: err}
 	}
 
 	// After successful merge, handle any pending cherry-pick operations

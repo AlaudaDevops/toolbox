@@ -31,7 +31,7 @@ The Pipeline automatically triggers when users post specific comment commands on
 
 **Special Notes:**
 - **Cherry-pick**: Uses Git CLI method by default for reliable operations
-- **LGTM**: Requires `admin` or `write` permissions
+- **LGTM**: Requires `admin`, `write`, or `read` permissions by default (configurable)
 - **Merge**: Checks LGTM threshold and status before merging
 
 ## Pipeline Configuration Parameters
@@ -70,7 +70,7 @@ The Pipeline supports the following configurable parameters:
 - **write**: Write permissions
 - **read**: Read-only permissions
 
-LGTM functionality requires users to have `admin` or `write` permissions by default.
+LGTM functionality requires users to have `admin`, `write` or `read` permissions by default. (configurable via `lgtm_permissions` parameter)
 
 ## Usage Notes
 
@@ -99,7 +99,7 @@ Through these comment commands, teams can efficiently manage the entire lifecycl
 
 ## PipelineRun Example
 
-To enable pr-cli, add the following PipelineRun configuration to your .tekton directory:
+To enable `pr-cli`, add the following `PipelineRun` configuration to your `.tekton` directory:
 
 ```yaml
 apiVersion: tekton.dev/v1

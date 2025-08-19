@@ -30,8 +30,9 @@ func (h *PRHandler) HandleRebase() error {
 		message := fmt.Sprintf(messages.RebaseFailedTemplate, err)
 		if postErr := h.client.PostComment(message); postErr != nil {
 			h.Logger.Errorf("Failed to post rebase error comment: %v", postErr)
+			return fmt.Errorf("rebase failed: %w", err)
 		}
-		return fmt.Errorf("rebase failed: %w", err)
+		return &CommentedError{Err: err}
 	}
 
 	return h.client.PostComment(messages.RebaseSuccessTemplate)

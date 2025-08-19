@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -317,6 +318,14 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 
 // handleCommandError handles command errors by posting them as PR comments when possible
 func (p *PROption) handleCommandError(prHandler *handler.PRHandler, command string, err error) error {
+	// Check if this is a CommentedError (comment already posted)
+	var commentedErr *handler.CommentedError
+	if errors.As(err, &commentedErr) {
+		// Comment already posted, just log and return nil to avoid terminal error
+		p.Logger.Infof("Error comment already posted for command: %s", command)
+		return nil
+	}
+
 	errorMessage := fmt.Sprintf(messages.CommandErrorTemplate, command, err.Error())
 
 	// Try to post error message as PR comment
