@@ -8,20 +8,21 @@ This guide provides detailed information on using the PR CLI tool for managing p
 
 | Flag | Environment Variable | Description | Required |
 |------|---------------------|-------------|----------|
-| `--platform` | `PR_CLI_PLATFORM` | Platform (github/gitlab) (default: github) | Yes |
-| `--token` | `PR_CLI_TOKEN` | API token | Yes |
-| `--repo-owner` | `PR_CLI_REPO_OWNER` | Repository owner | Yes |
-| `--repo-name` | `PR_CLI_REPO_NAME` | Repository name | Yes |
-| `--pr-num` | `PR_CLI_PR_NUM` | Pull request number | Yes |
-| `--comment-sender` | `PR_CLI_COMMENT_SENDER` | Comment author | Yes |
-| `--trigger-comment` | `PR_CLI_TRIGGER_COMMENT` | Comment to process | Yes |
-| `--base-url` | `PR_CLI_BASE_URL` | API base URL (optional, defaults per platform) | No |
-| `--debug` | `PR_CLI_DEBUG` | Enable debug mode | No |
-| `--lgtm-threshold` | `PR_CLI_LGTM_THRESHOLD` | LGTM threshold (default: 1) | No |
-| `--lgtm-permissions` | `PR_CLI_LGTM_PERMISSIONS` | Required permissions for LGTM (default: admin,write) | No |
-| `--lgtm-review-event` | `PR_CLI_LGTM_REVIEW_EVENT` | Review event type for LGTM (default: APPROVE) | No |
-| `--merge-method` | `PR_CLI_MERGE_METHOD` | Merge method (default: rebase) | No |
-| `--self-check-name` | `PR_CLI_SELF_CHECK_NAME` | Name of the tool's own check run to exclude (default: pr-cli) | No |
+| `--platform` | `PR_PLATFORM` | Platform (github/gitlab) (default: github) | Yes |
+| `--token` | `PR_TOKEN` | API token | Yes |
+| `--repo-owner` | `PR_REPO_OWNER` | Repository owner | Yes |
+| `--repo-name` | `PR_REPO_NAME` | Repository name | Yes |
+| `--pr-num` | `PR_PR_NUM` | Pull request number | Yes |
+| `--comment-sender` | `PR_COMMENT_SENDER` | Comment author | Yes |
+| `--trigger-comment` | `PR_TRIGGER_COMMENT` | Comment to process | Yes |
+| `--base-url` | `PR_BASE_URL` | API base URL (optional, defaults per platform) | No |
+| `--verbose` | `PR_VERBOSE` | Enable verbose logging (debug level logs) | No |
+| `--debug` | `PR_DEBUG` | Enable debug mode (skip validations, allow PR self-approval) | No |
+| `--lgtm-threshold` | `PR_LGTM_THRESHOLD` | LGTM threshold (default: 1) | No |
+| `--lgtm-permissions` | `PR_LGTM_PERMISSIONS` | Required permissions for LGTM (default: admin,write) | No |
+| `--lgtm-review-event` | `PR_LGTM_REVIEW_EVENT` | Review event type for LGTM (default: APPROVE) | No |
+| `--merge-method` | `PR_MERGE_METHOD` | Merge method (default: rebase) | No |
+| `--self-check-name` | `PR_SELF_CHECK_NAME` | Name of the tool's own check run to exclude (default: pr-cli) | No |
 
 ### Comment Commands
 
@@ -277,13 +278,13 @@ pr-cli help completion
 ### GitHub Configuration
 
 ```bash
-export PR_CLI_PLATFORM=github
-export PR_CLI_TOKEN=$GITHUB_TOKEN
-export PR_CLI_REPO_OWNER=myorg
-export PR_CLI_REPO_NAME=myrepo
-export PR_CLI_LGTM_THRESHOLD=2
-export PR_CLI_LGTM_PERMISSIONS=admin,write
-export PR_CLI_MERGE_METHOD=rebase
+export PR_PLATFORM=github
+export PR_TOKEN=$GITHUB_TOKEN
+export PR_REPO_OWNER=myorg
+export PR_REPO_NAME=myrepo
+export PR_LGTM_THRESHOLD=2
+export PR_LGTM_PERMISSIONS=admin,write
+export PR_MERGE_METHOD=rebase
 
 pr-cli --pr-num 123 --comment-sender alice --trigger-comment "/lgtm"
 ```
@@ -291,13 +292,13 @@ pr-cli --pr-num 123 --comment-sender alice --trigger-comment "/lgtm"
 ### GitLab Configuration
 
 ```bash
-export PR_CLI_PLATFORM=gitlab
-export PR_CLI_TOKEN=$GITLAB_TOKEN
-export PR_CLI_BASE_URL=https://gitlab.example.com/api/v4
-export PR_CLI_REPO_OWNER=mygroup
-export PR_CLI_REPO_NAME=myproject
-export PR_CLI_DEBUG=true
-export PR_CLI_SELF_CHECK_NAME=pr-cli
+export PR_PLATFORM=gitlab
+export PR_TOKEN=$GITLAB_TOKEN
+export PR_BASE_URL=https://gitlab.example.com/api/v4
+export PR_REPO_OWNER=mygroup
+export PR_REPO_NAME=myproject
+export PR_DEBUG=true
+export PR_SELF_CHECK_NAME=pr-cli
 
 pr-cli --pr-num 456 --comment-sender bob --trigger-comment "/merge"
 ```
@@ -415,12 +416,27 @@ pr-cli:
 
 ## Troubleshooting
 
-### Debug Mode
+### Debug and Verbose Modes
 
-Enable debug mode for verbose logging, skip comment sender validation, and allow PR creators to approve their own PR:
+#### Verbose Mode
+Enable verbose logging to see debug level logs:
+
+```bash
+pr-cli --verbose --trigger-comment "/check"
+```
+
+#### Debug Mode
+Enable debug mode to skip comment sender validation and allow PR creators to approve their own PR:
 
 ```bash
 pr-cli --debug --trigger-comment "/check"
+```
+
+#### Combined Usage
+Use both flags together for full debug capabilities:
+
+```bash
+pr-cli --verbose --debug --trigger-comment "/check"
 ```
 
 ### Common Issues
@@ -433,6 +449,6 @@ pr-cli --debug --trigger-comment "/check"
 ### Support
 
 For issues and support:
-- Check the logs with `--debug`
+- Check the logs with `--verbose` for detailed debugging information
 - Review the [troubleshooting guide](../README.md#troubleshooting)
 - Open an issue in the repository

@@ -46,7 +46,8 @@ The Pipeline supports the following configurable parameters:
 | `merge_method` | `rebase` | Default merge method |
 | `self_check_name` | `pr-cli` | Self-check name |
 | `use_git_cli_for_cherrypick` | `true` | Whether to use Git CLI for cherry-pick operations (more reliable) |
-| `debug` | `false` | Whether to enable debug mode (verbose logging, skip validation, allow PR creator self-approval) |
+| `debug` | `false` | Whether to enable debug mode (skip validation, allow PR creator self-approval) |
+| `verbose` | `false` | Whether to enable verbose logging (debug level logs) |
 
 ## Permission Description
 
@@ -115,6 +116,9 @@ spec:
     - name: lgtm_permissions
       # Allow read permission users to trigger lgtm in internal repositories
       value: "admin,write,read"
+    - name: verbose
+      # Enable verbose logging (debug level logs) (default: false)
+      value: "true"
     #
     # Optional parameters (value is the default):
     #
@@ -144,7 +148,7 @@ spec:
     # - name: self_check_name
     #   value: "pr-cli"
     #
-    # Enable debug mode for troubleshooting (default: false)
+    # Enable debug mode (skip validation, allow PR creator self-approval) (default: false)
     # - name: debug
     #   value: "false"
     #

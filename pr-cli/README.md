@@ -51,10 +51,10 @@ pr-cli --platform github \
 You can use environment variables instead of command line flags:
 
 ```bash
-export PR_CLI_PLATFORM=github
-export PR_CLI_TOKEN=$GITHUB_TOKEN
-export PR_CLI_REPO_OWNER=owner
-export PR_CLI_REPO_NAME=repo
+export PR_PLATFORM=github
+export PR_TOKEN=$GITHUB_TOKEN
+export PR_REPO_OWNER=owner
+export PR_REPO_NAME=repo
 ```
 
 ## Supported Commands

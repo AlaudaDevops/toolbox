@@ -316,7 +316,7 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 	}
 
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
 		Return(2, lgtmUsers, nil).
 		Times(1)
 
@@ -419,6 +419,13 @@ func TestPRHandler_HandleRemoveLGTM_NoUserVote(t *testing.T) {
 		"reviewer1": "write",
 	}
 
+	// First call: Get LGTM votes before processing remove-lgtm (with ignore parameter)
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
+		Return(1, lgtmUsers, nil).
+		Times(1)
+
+	// Second call: Get final LGTM votes after processing all comments (no ignore parameter)
 	mockClient.EXPECT().
 		GetLGTMVotes([]string{"admin", "write"}, false).
 		Return(1, lgtmUsers, nil).
@@ -473,7 +480,7 @@ func TestPRHandler_HandleRemoveLGTM_NoApproval(t *testing.T) {
 	}
 
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
 		Return(2, lgtmUsers, nil).
 		Times(1)
 
@@ -539,9 +546,21 @@ func TestPRHandler_HandleRemoveLGTM_RemoveWontDropBelowThreshold(t *testing.T) {
 		"reviewer2": "admin",
 	}
 
+	// First call: Get LGTM votes before processing remove-lgtm (with ignore parameter)
+	mockClient.EXPECT().
+		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
+		Return(3, lgtmUsers, nil).
+		Times(1)
+
+	// Second call: Get final LGTM votes after processing all comments (no ignore parameter)
+	// Should return 2 votes since commenter's vote was removed
+	lgtmUsersAfter := map[string]string{
+		"reviewer1": "write",
+		"reviewer2": "admin",
+	}
 	mockClient.EXPECT().
 		GetLGTMVotes([]string{"admin", "write"}, false).
-		Return(3, lgtmUsers, nil).
+		Return(2, lgtmUsersAfter, nil).
 		Times(1)
 
 	// Mock CheckRunsStatus call from generateLGTMStatusMessage

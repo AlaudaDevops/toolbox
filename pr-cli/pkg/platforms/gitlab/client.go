@@ -99,7 +99,7 @@ func (c *Client) CheckUserPermissions(username string, requiredPerms []string) (
 	return false, "", fmt.Errorf("GitLab implementation not yet available")
 }
 
-func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool) (int, map[string]string, error) {
+func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
 	return 0, nil, fmt.Errorf("GitLab implementation not yet available")
 }
 

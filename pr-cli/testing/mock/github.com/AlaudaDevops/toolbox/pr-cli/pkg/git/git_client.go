@@ -210,9 +210,13 @@ func (mr *MockGitClientMockRecorder) GetCommits() *gomock.Call {
 }
 
 // GetLGTMVotes mocks base method.
-func (m *MockGitClient) GetLGTMVotes(arg0 []string, arg1 bool) (int, map[string]string, error) {
+func (m *MockGitClient) GetLGTMVotes(arg0 []string, arg1 bool, arg2 ...string) (int, map[string]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLGTMVotes", arg0, arg1)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetLGTMVotes", varargs...)
 	ret0, _ := ret[0].(int)
 	ret1, _ := ret[1].(map[string]string)
 	ret2, _ := ret[2].(error)
@@ -220,9 +224,10 @@ func (m *MockGitClient) GetLGTMVotes(arg0 []string, arg1 bool) (int, map[string]
 }
 
 // GetLGTMVotes indicates an expected call of GetLGTMVotes.
-func (mr *MockGitClientMockRecorder) GetLGTMVotes(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockGitClientMockRecorder) GetLGTMVotes(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLGTMVotes", reflect.TypeOf((*MockGitClient)(nil).GetLGTMVotes), arg0, arg1)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLGTMVotes", reflect.TypeOf((*MockGitClient)(nil).GetLGTMVotes), varargs...)
 }
 
 // GetLabels mocks base method.

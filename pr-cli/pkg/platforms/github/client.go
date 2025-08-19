@@ -326,7 +326,11 @@ func (c *Client) RemoveReviewers(reviewers []string) error {
 }
 
 // GetLGTMVotes retrieves and validates LGTM votes from comments and reviews
-func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool) (int, map[string]string, error) {
+func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
+	var ignoreUser string
+	if len(ignoreUserRemove) > 0 {
+		ignoreUser = ignoreUserRemove[0]
+	}
 	lgtmUsers := make(map[string]string)
 	userLatestReviews := make(map[string]*git.Review) // Track latest review for each user
 
@@ -365,11 +369,32 @@ func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool) (int, map[
 		return 0, nil, fmt.Errorf("failed to get comments: %w", err)
 	}
 
+	// Find the latest comment from the ignored user to skip if it's /remove-lgtm
+	var ignoreCommentIndex = -1
+	if ignoreUser != "" {
+		for i := len(comments) - 1; i >= 0; i-- {
+			if comments[i].User.Login == ignoreUser {
+				// Check if this comment is /remove-lgtm
+				body := strings.TrimSpace(comments[i].Body)
+				if removeLgtmRegexp.MatchString(body) {
+					ignoreCommentIndex = i
+					c.logger.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
+				}
+				break
+			}
+		}
+	}
+
 	// Process LGTM commands from comments
-	for _, comment := range comments {
+	for i, comment := range comments {
 		user := comment.User.Login
 		body := strings.TrimSpace(comment.Body)
-		// c.logger.Debugf("Processing comment from user: %s, body: %s", user, body)
+
+		// Skip the ignored comment
+		if i == ignoreCommentIndex {
+			c.logger.Debugf("Skipping ignored comment at index %d from user: %s", i, user)
+			continue
+		}
 
 		switch {
 		case removeLgtmRegexp.MatchString(body):
@@ -408,7 +433,12 @@ func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool) (int, map[
 			continue
 		}
 	}
-	c.logger.Debugf("Collected LGTM users: %v", lgtmUsers)
+
+	if ignoreUser != "" {
+		c.logger.Debugf("Collected LGTM users (ignoring %s): %v", ignoreUser, lgtmUsers)
+	} else {
+		c.logger.Debugf("Collected LGTM users: %v", lgtmUsers)
+	}
 
 	// Validate permissions for each user
 	validVotes := 0
@@ -437,20 +467,27 @@ func (c *Client) ApprovePR(message string) error {
 	return err
 }
 
-// DismissApprove dismisses the current user's approval review
+// DismissApprove dismisses the token user's approval review
 func (c *Client) DismissApprove(message string) error {
-	// Get all reviews to find the current user's approval
+	// Get the authenticated user (token user) information
+	authenticatedUser, _, err := c.client.Users.Get(c.ctx, "")
+	if err != nil {
+		return fmt.Errorf("failed to get authenticated user: %w", err)
+	}
+	tokenUser := authenticatedUser.GetLogin()
+	c.logger.Debugf("Attempting to dismiss approval review by token user: %s", tokenUser)
+
+	// Get all reviews to find the token user's approval
 	reviews, _, err := c.client.PullRequests.ListReviews(c.ctx, c.owner, c.repo, c.prNum, nil)
 	if err != nil {
 		return fmt.Errorf("failed to get reviews: %w", err)
 	}
 
-	// Find the current user's latest APPROVED review
+	// Find the token user's latest APPROVED review
 	var latestApprovalID int64 = 0
-	currentUser := c.commentSender // The user who is dismissing their own review
 
 	for _, review := range reviews {
-		if review.GetUser().GetLogin() == currentUser && review.GetState() == "APPROVED" {
+		if review.GetUser().GetLogin() == tokenUser && review.GetState() == "APPROVED" {
 			if review.GetID() > latestApprovalID {
 				latestApprovalID = review.GetID()
 			}
@@ -458,7 +495,7 @@ func (c *Client) DismissApprove(message string) error {
 	}
 
 	if latestApprovalID == 0 {
-		return fmt.Errorf("no approval review found for user %s to dismiss", currentUser)
+		return fmt.Errorf("no approval review found for token user %s to dismiss", tokenUser)
 	}
 
 	// Dismiss the review

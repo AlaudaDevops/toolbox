@@ -77,8 +77,9 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	// Cherry-pick configuration
 	flags.BoolVar(&p.Config.UseGitCLIForCherryPick, "use-git-cli-for-cherrypick", p.Config.UseGitCLIForCherryPick, "Use Git CLI for cherry-pick operations (default: true, more reliable than API method)")
 
-	// Debug flag
-	flags.BoolVar(&p.Config.Debug, "debug", false, "Enable debug mode (debug logging, skip comment sender validation, and allow PR creators to approve their own PR)")
+	// Debug and logging flags
+	flags.BoolVar(&p.Config.Verbose, "verbose", false, "Enable verbose logging (debug level logs)")
+	flags.BoolVar(&p.Config.Debug, "debug", false, "Enable debug mode (skip comment sender validation and allow PR creators to approve their own PR)")
 }
 
 // Run executes the PR CLI logic
@@ -91,10 +92,10 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse CLI fields: %w", err)
 	}
 
-	// Set log level based on debug flag
-	if p.Config.Debug {
+	// Set log level based on verbose flag
+	if p.Config.Verbose {
 		p.Logger.SetLevel(logrus.DebugLevel)
-		p.Logger.Debug("Debug logging enabled")
+		p.Logger.Debug("Verbose logging enabled")
 	} else {
 		p.Logger.SetLevel(logrus.InfoLevel)
 	}
@@ -112,7 +113,7 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 
 	p.Logger.Infof("Processing command: %s with args: %v", command, cmdArgs)
 	if p.Config.Debug {
-		p.Logger.Debugf("Processing PR %d, config: %+v", p.Config.PRNum, p.Config)
+		p.Logger.Debugf("Processing PR %d, config: %s", p.Config.PRNum, p.Config.DebugString())
 	}
 
 	// Initialize PR handler
