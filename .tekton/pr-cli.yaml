@@ -24,6 +24,9 @@ spec:
       value: "{{ sender }}"
     - name: git_auth_secret
       value: "{{ git_auth_secret }}"
+    - name: lgtm_permissions
+      # Allow read permission users to trigger lgtm in internal repositories
+      value: "admin,write,read"
     #
     # Optional parameters (value is the default):
     #

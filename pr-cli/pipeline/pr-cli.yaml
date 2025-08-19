@@ -16,7 +16,8 @@ spec:
     - name: git_auth_secret_key
       default: git-provider-token
     - name: lgtm_permissions
-      default: admin,write
+      # Allow read permission users to trigger lgtm in internal repositories
+      default: admin,write,read
     - name: lgtm_threshold
       default: "1"
     - name: lgtm_review_event
