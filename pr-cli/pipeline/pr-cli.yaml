@@ -1,0 +1,87 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: pr-cli
+  annotations:
+    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \\t].*)?$"
+    pipelinesascode.tekton.dev/max-keep-runs: "5"
+spec:
+  params:
+    - name: trigger_comment
+    - name: repo_owner
+    - name: repo_name
+    - name: pull_request_number
+    - name: comment_sender
+    - name: git_auth_secret
+    - name: git_auth_secret_key
+      default: git-provider-token
+    - name: lgtm_permissions
+      # Allow read permission users to trigger lgtm in internal repositories
+      default: admin,write,read
+    - name: lgtm_threshold
+      default: "1"
+    - name: lgtm_review_event
+      default: APPROVE
+    - name: merge_method
+      default: squash
+    - name: self_check_name
+      default: pr-cli
+    - name: platform
+      default: github
+    - name: debug
+      default: "false"
+    - name: verbose
+      default: "true"
+    - name: robot_accounts
+      default: "alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2,edge-katanomi-app2[bot]"
+  tasks:
+    - name: pr-merge-management
+      displayName: PR Merge & Management Operations
+      taskSpec:
+        steps:
+          - name: cli
+            image: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest
+            imagePullPolicy: Always
+            command: ["/usr/local/bin/pr-cli"]
+            computeResources:
+              requests:
+                cpu: "200m"
+                memory: "192Mi"
+              # Because we may use git to cherrypick, we set the limits a bit larger to avoid OOM issues.
+              limits:
+                cpu: "1"
+                memory: "1Gi"
+            env:
+              - name: PR_PLATFORM
+                value: $(params.platform)
+              - name: PR_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.git_auth_secret)
+                    key: $(params.git_auth_secret_key)
+              - name: PR_REPO_OWNER
+                value: $(params.repo_owner)
+              - name: PR_REPO_NAME
+                value: $(params.repo_name)
+              - name: PR_PR_NUM
+                value: $(params.pull_request_number)
+              - name: PR_COMMENT_SENDER
+                value: $(params.comment_sender)
+              - name: PR_TRIGGER_COMMENT
+                value: $(params.trigger_comment)
+              - name: PR_LGTM_THRESHOLD
+                value: $(params.lgtm_threshold)
+              - name: PR_LGTM_PERMISSIONS
+                value: $(params.lgtm_permissions)
+              - name: PR_LGTM_REVIEW_EVENT
+                value: $(params.lgtm_review_event)
+              - name: PR_MERGE_METHOD
+                value: $(params.merge_method)
+              - name: PR_SELF_CHECK_NAME
+                value: $(params.self_check_name)
+              - name: PR_DEBUG
+                value: $(params.debug)
+              - name: PR_VERBOSE
+                value: $(params.verbose)
+              - name: PR_ROBOT_ACCOUNTS
+                value: $(params.robot_accounts)

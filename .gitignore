@@ -7,3 +7,8 @@ kube-bench-report/kube-bench-report
 # Test artifacts
 test.html
 kube-bench-report.html
+
+pr-cli/bin/
+pr-cli/pr-cli
+pr-cli/test-pr-cli.sh
+pr-cli/coverage.*
