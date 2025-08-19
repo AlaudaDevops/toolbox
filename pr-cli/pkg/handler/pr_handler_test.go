@@ -296,7 +296,7 @@ func TestPRHandler_HandleLGTM_NoPermission(t *testing.T) {
 	}
 }
 
-// TestPRHandler_HandleRemoveLGTM tests removing LGTM when user has permission
+// TestPRHandler_HandleRemoveLGTM tests removing LGTM information when user has permission
 func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -309,13 +309,7 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		Return(true, "admin", nil).
 		Times(1)
 
-	// Mock the DismissApprove call
-	mockClient.EXPECT().
-		DismissApprove(gomock.Any()).
-		Return(nil).
-		Times(1)
-
-	// Mock LGTM votes response after dismissal
+	// Mock LGTM votes response for current status
 	lgtmUsers := map[string]string{
 		"reviewer1": "write",
 	}
@@ -331,7 +325,7 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		Return(true, []git.CheckRun{}, nil).
 		Times(1)
 
-	// Mock PostComment for status update
+	// Mock PostComment for status information
 	mockClient.EXPECT().
 		PostComment(gomock.Any()).
 		Return(nil).
@@ -354,27 +348,20 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 	}
 }
 
-// TestPRHandler_HandleRemoveLGTM_NoApproval tests removing LGTM when no approval exists
-func TestPRHandler_HandleRemoveLGTM_NoApproval(t *testing.T) {
+// TestPRHandler_HandleRemoveLGTM_NoPermission tests removing LGTM information when user lacks permission
+func TestPRHandler_HandleRemoveLGTM_NoPermission(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	mockClient := mock_git.NewMockGitClient(ctrl)
 
-	// Mock user permission check - user has admin permission
+	// Mock user permission check - user only has read permission
 	mockClient.EXPECT().
 		CheckUserPermissions("commenter", []string{"admin", "write"}).
-		Return(true, "admin", nil).
+		Return(false, "read", nil).
 		Times(1)
 
-	// Mock the DismissApprove call returning error for no approval found
-	// The error message must exactly match what the code checks for
-	mockClient.EXPECT().
-		DismissApprove(gomock.Any()).
-		Return(fmt.Errorf("no approval review found")).
-		Times(1)
-
-	// Mock PostComment for no approval message
+	// Mock PostComment for permission denied message
 	mockClient.EXPECT().
 		PostComment(gomock.Any()).
 		Return(nil).

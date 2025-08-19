@@ -23,51 +23,33 @@ import (
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
 
-// HandleRemoveLGTM processes the removal of LGTM/Approval by dismissing the user's review
+// HandleRemoveLGTM processes the removal of LGTM by providing information about manual dismissal
 func (h *PRHandler) HandleRemoveLGTM() error {
 	h.Logger.Info("Processing remove LGTM")
 
-	// Check if the current comment sender has permission to dismiss approvals
+	// Check if the current comment sender has permission
 	hasPermission, userPermission, err := h.client.CheckUserPermissions(h.config.CommentSender, h.config.LGTMPermissions)
 	if err != nil {
 		return fmt.Errorf("failed to check user permissions: %w", err)
 	}
 
 	if !hasPermission {
-		// User doesn't have permission to dismiss approvals
+		// User doesn't have permission
 		message := fmt.Sprintf(messages.RemoveLGTMPermissionDeniedTemplate,
 			h.config.CommentSender, userPermission, strings.Join(h.config.LGTMPermissions, ", "))
 
 		return h.client.PostComment(message)
 	}
 
-	// User has permission, try to dismiss their approval
-	dismissMessage := fmt.Sprintf(messages.RemoveLGTMDismissTemplate, h.config.CommentSender)
-	if err = h.client.DismissApprove(dismissMessage); err != nil {
-		// Check if the error is because no approval was found to dismiss
-		if strings.Contains(err.Error(), "no approval review found") {
-			message := fmt.Sprintf(messages.RemoveLGTMNoApprovalTemplate,
-				h.config.CommentSender, userPermission)
-
-			return h.client.PostComment(message)
-		}
-
-		return fmt.Errorf("failed to dismiss approval: %w", err)
-	}
-
-	h.Logger.Infof("✅ User %s successfully dismissed their approval with permission: %s", h.config.CommentSender, userPermission)
-
-	// After dismissing, get updated LGTM status to show current state
+	// User has permission, show current LGTM status and provide information
 	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
-		// If we can't get LGTM status, just confirm the dismissal
-		confirmMessage := fmt.Sprintf(messages.RemoveLGTMSuccessTemplate,
-			h.config.CommentSender, userPermission)
-
-		return h.client.PostComment(confirmMessage)
+		return fmt.Errorf("failed to get LGTM votes: %w", err)
 	}
 
-	// Use the common method to generate status message
+	h.Logger.Infof("User %s requested remove LGTM information with permission: %s", h.config.CommentSender, userPermission)
+
+	// Generate informational message about manual dismissal
 	statusMessage := fmt.Sprintf(messages.RemoveLGTMStatusTemplate,
 		h.config.CommentSender, validVotes, h.config.LGTMThreshold, max(0, h.config.LGTMThreshold-validVotes))
 
