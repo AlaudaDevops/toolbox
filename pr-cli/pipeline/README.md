@@ -99,7 +99,7 @@ Through these comment commands, teams can efficiently manage the entire lifecycl
 
 ## PipelineRun Example
 
-Here's an example of how to manually trigger the PR CLI pipeline using a PipelineRun:
+To enable pr-cli, add the following PipelineRun configuration to your .tekton directory:
 
 ```yaml
 apiVersion: tekton.dev/v1
