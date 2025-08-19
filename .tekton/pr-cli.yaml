@@ -66,3 +66,7 @@ spec:
     # The platform to use, can be one of: github, gitlab, gitee (default: github)
     # - name: platform
     #  value: "github"
+    #
+    # The robot accounts for managing bot approval reviews.
+    # - name: robot_accounts
+    #   value: "alaudabot,dependabot,renovate"

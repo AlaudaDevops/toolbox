@@ -137,13 +137,14 @@ type GitClient interface {
 type Config struct {
 	Platform      string // "github" or "gitlab"
 	Token         string
-	BaseURL       string // API base URL
-	Owner         string // Repository owner/namespace
-	Repo          string // Repository name
-	PRNum         int    // Pull Request number
-	PRSender      string // PR author
-	CommentSender string // Comment author
-	SelfCheckName string // Name of the tool's own check run to exclude from status checks
+	BaseURL       string   // API base URL
+	Owner         string   // Repository owner/namespace
+	Repo          string   // Repository name
+	PRNum         int      // Pull Request number
+	PRSender      string   // PR author
+	CommentSender string   // Comment author
+	SelfCheckName string   // Name of the tool's own check run to exclude from status checks
+	RobotAccounts []string // Robot/bot account usernames
 }
 
 //go:generate mockgen -package=git -destination=../../testing/mock/github.com/AlaudaDevops/toolbox/pr-cli/pkg/git/client_factory.go github.com/AlaudaDevops/toolbox/pr-cli/pkg/git ClientFactory

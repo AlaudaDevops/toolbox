@@ -39,6 +39,7 @@ type PROption struct {
 	// String fields for CLI parsing (will be converted to Config)
 	prNumStr           string
 	lgtmPermissionsStr string
+	robotAccountsStr   string
 }
 
 // NewPROption creates a new PROption instance
@@ -67,6 +68,7 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	flags.IntVar(&p.Config.LGTMThreshold, "lgtm-threshold", p.Config.LGTMThreshold, "Minimum number of LGTM approvals required")
 	flags.StringVar(&p.lgtmPermissionsStr, "lgtm-permissions", "", "Required permissions for LGTM (comma-separated)")
 	flags.StringVar(&p.Config.LGTMReviewEvent, "lgtm-review-event", p.Config.LGTMReviewEvent, "Review event type for LGTM")
+	flags.StringVar(&p.robotAccountsStr, "robot-accounts", "", "Robot/bot account usernames (comma-separated) for managing bot approval reviews")
 
 	// Merge configuration
 	flags.StringVar(&p.Config.MergeMethod, "merge-method", p.Config.MergeMethod, "Default merge method (merge, squash, rebase)")
@@ -200,6 +202,9 @@ func (p *PROption) readAllFromViper() {
 	if p.lgtmPermissionsStr == "" {
 		p.lgtmPermissionsStr = strings.TrimSpace(viper.GetString("lgtm-permissions"))
 	}
+	if p.robotAccountsStr == "" {
+		p.robotAccountsStr = strings.TrimSpace(viper.GetString("robot-accounts"))
+	}
 }
 
 // parseStringFields converts string CLI fields to proper types in config
@@ -223,6 +228,15 @@ func (p *PROption) parseStringFields() error {
 	} else if len(p.Config.LGTMPermissions) == 0 {
 		// If no CLI flag and no environment variable, use default
 		p.Config.LGTMPermissions = []string{"admin", "write"}
+	}
+
+	// Parse robot accounts
+	if p.robotAccountsStr != "" {
+		accounts := strings.Split(p.robotAccountsStr, ",")
+		for i, account := range accounts {
+			accounts[i] = strings.TrimSpace(account)
+		}
+		p.Config.RobotAccounts = accounts
 	}
 
 	return nil

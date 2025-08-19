@@ -47,6 +47,7 @@ type Client struct {
 	prSender      string          // Pull request author
 	commentSender string          // Comment author
 	selfCheckName string          // Name of the tool's own check run to exclude
+	robotAccounts []string        // Robot/bot account usernames
 }
 
 // Factory implements ClientFactory for GitHub
@@ -81,6 +82,7 @@ func (f *Factory) CreateClient(logger *logrus.Logger, config *git.Config) (git.G
 		prSender:      config.PRSender,
 		commentSender: config.CommentSender,
 		selfCheckName: config.SelfCheckName,
+		robotAccounts: config.RobotAccounts,
 	}, nil
 }
 
@@ -469,25 +471,74 @@ func (c *Client) ApprovePR(message string) error {
 
 // DismissApprove dismisses the token user's approval review
 func (c *Client) DismissApprove(message string) error {
-	// Get the authenticated user (token user) information
+	// First try to get the authenticated user (token user) information
 	authenticatedUser, _, err := c.client.Users.Get(c.ctx, "")
+	var tokenUser string
+
 	if err != nil {
+		// If we get a 403 error (insufficient permissions), try to find bot approvals to dismiss
+		if strings.Contains(err.Error(), "403") {
+			c.logger.Debugf("Cannot get authenticated user due to permissions (403), looking for bot approvals to dismiss")
+			return c.dismissBotApproval(message)
+		}
 		return fmt.Errorf("failed to get authenticated user: %w", err)
 	}
-	tokenUser := authenticatedUser.GetLogin()
+
+	tokenUser = authenticatedUser.GetLogin()
 	c.logger.Debugf("Attempting to dismiss approval review by token user: %s", tokenUser)
 
-	// Get all reviews to find the token user's approval
-	reviews, _, err := c.client.PullRequests.ListReviews(c.ctx, c.owner, c.repo, c.prNum, nil)
+	// Find and dismiss the user's approval
+	reviewID, err := c.findLatestApprovalByUser(tokenUser)
 	if err != nil {
-		return fmt.Errorf("failed to get reviews: %w", err)
+		return err
 	}
 
-	// Find the token user's latest APPROVED review
-	var latestApprovalID int64 = 0
+	return c.dismissReview(reviewID, message)
+}
 
+// dismissBotApproval attempts to dismiss approval reviews from bot accounts when we can't identify the token user
+func (c *Client) dismissBotApproval(message string) error {
+	botApprovals, err := c.findBotApprovals()
+	if err != nil {
+		return err
+	}
+
+	if len(botApprovals) == 0 {
+		return fmt.Errorf("no bot approval reviews found to dismiss")
+	}
+
+	// Try to dismiss the bot approvals (typically there should be only one bot doing the approval)
+	var dismissedCount int
+	var lastErr error
+
+	for botUser, reviewID := range botApprovals {
+		if err := c.dismissReview(reviewID, message); err != nil {
+			c.logger.Errorf("Failed to dismiss approval from bot %s (review ID: %d): %v", botUser, reviewID, err)
+			lastErr = err
+		} else {
+			c.logger.Infof("✅ Successfully dismissed approval from bot: %s (review ID: %d)", botUser, reviewID)
+			dismissedCount++
+		}
+	}
+
+	if dismissedCount == 0 {
+		return fmt.Errorf("failed to dismiss any bot approvals, last error: %w", lastErr)
+	}
+
+	c.logger.Infof("Successfully dismissed %d bot approval(s)", dismissedCount)
+	return nil
+}
+
+// findLatestApprovalByUser finds the latest APPROVED review by a specific user
+func (c *Client) findLatestApprovalByUser(username string) (int64, error) {
+	reviews, _, err := c.client.PullRequests.ListReviews(c.ctx, c.owner, c.repo, c.prNum, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get reviews: %w", err)
+	}
+
+	var latestApprovalID int64 = 0
 	for _, review := range reviews {
-		if review.GetUser().GetLogin() == tokenUser && review.GetState() == "APPROVED" {
+		if review.GetUser().GetLogin() == username && review.GetState() == "APPROVED" {
 			if review.GetID() > latestApprovalID {
 				latestApprovalID = review.GetID()
 			}
@@ -495,16 +546,46 @@ func (c *Client) DismissApprove(message string) error {
 	}
 
 	if latestApprovalID == 0 {
-		return fmt.Errorf("no approval review found for token user %s to dismiss", tokenUser)
+		return 0, fmt.Errorf("no approval review found for user %s to dismiss", username)
 	}
 
-	// Dismiss the review
+	return latestApprovalID, nil
+}
+
+// findBotApprovals finds all latest APPROVED reviews by bot accounts
+func (c *Client) findBotApprovals() (map[string]int64, error) {
+	reviews, _, err := c.client.PullRequests.ListReviews(c.ctx, c.owner, c.repo, c.prNum, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reviews: %w", err)
+	}
+
+	botApprovals := make(map[string]int64) // username -> latest review ID
+	for _, review := range reviews {
+		username := review.GetUser().GetLogin()
+		if c.isBotAccount(username) && review.GetState() == "APPROVED" {
+			if existingID, exists := botApprovals[username]; !exists || review.GetID() > existingID {
+				botApprovals[username] = review.GetID()
+				c.logger.Debugf("Found APPROVED review from bot: %s (review ID: %d)", username, review.GetID())
+			}
+		}
+	}
+
+	return botApprovals, nil
+}
+
+// dismissReview dismisses a specific review by ID
+func (c *Client) dismissReview(reviewID int64, message string) error {
 	dismissRequest := &github.PullRequestReviewDismissalRequest{
 		Message: github.Ptr(message),
 	}
 
-	_, _, err = c.client.PullRequests.DismissReview(c.ctx, c.owner, c.repo, c.prNum, latestApprovalID, dismissRequest)
+	_, _, err := c.client.PullRequests.DismissReview(c.ctx, c.owner, c.repo, c.prNum, reviewID, dismissRequest)
 	return err
+}
+
+// isBotAccount checks if a username appears to be a bot account
+func (c *Client) isBotAccount(username string) bool {
+	return slices.Contains(c.robotAccounts, username)
 }
 
 // MergePR merges the pull request with the specified method

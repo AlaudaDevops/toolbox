@@ -32,6 +32,8 @@ spec:
       default: "false"
     - name: verbose
       default: "false"
+    - name: robot_accounts
+      default: "alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2"
   tasks:
     - name: pr-merge-management
       displayName: PR Merge & Management Operations
@@ -81,3 +83,5 @@ spec:
                 value: $(params.debug)
               - name: PR_VERBOSE
                 value: $(params.verbose)
+              - name: PR_ROBOT_ACCOUNTS
+                value: $(params.robot_accounts)

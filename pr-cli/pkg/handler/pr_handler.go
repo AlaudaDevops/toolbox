@@ -47,6 +47,7 @@ func NewPRHandler(logger *logrus.Logger, cfg *config.Config) (*PRHandler, error)
 		PRNum:         cfg.PRNum,
 		CommentSender: cfg.CommentSender,
 		SelfCheckName: cfg.SelfCheckName,
+		RobotAccounts: cfg.RobotAccounts,
 	}
 
 	// Create platform-specific client
@@ -85,8 +86,7 @@ func (h *PRHandler) CheckPRStatus(expectedState string) error {
 
 // isRobotUser checks if the user is a robot user that should be excluded from LGTM status
 func (h *PRHandler) isRobotUser(user string) bool {
-	specialUsers := []string{"alaudabot", "dependabot", "renovate"}
-	return slices.Contains(specialUsers, user)
+	return slices.Contains(h.config.RobotAccounts, user)
 }
 
 // hasLGTMPermission checks if the given permission is in the LGTM permissions list

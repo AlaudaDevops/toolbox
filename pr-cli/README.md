@@ -96,6 +96,12 @@ export PR_REPO_NAME=repo
 - `--trigger-comment`: Comment content to process
 - `--lgtm-threshold`: Minimum LGTM approvals (default: 1)
 - `--merge-method`: Merge method (merge/squash/rebase, default: merge)
+- `--debug`: Enable debug mode (skip validation, allow PR creator self-approval)
+- `--verbose`: Enable verbose logging (debug level logs)
+- `--lgtm-permissions`: Comma-separated list of permissions required for LGTM (default: admin,write)
+- `--lgtm-review-event`: Review event type for LGTM (default: APPRO
+- `--self-check-name`: Name for self-check (default: pr-cli)
+- `--robot-accounts`: Comma-separated list of bot accounts for managing bot approval reviews
 
 ### LGTM Configuration
 

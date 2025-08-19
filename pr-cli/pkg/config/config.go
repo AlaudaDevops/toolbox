@@ -46,6 +46,7 @@ type Config struct {
 	LGTMThreshold   int      `json:"lgtm_threshold" yaml:"lgtm_threshold" mapstructure:"lgtm-threshold"`
 	LGTMPermissions []string `json:"lgtm_permissions" yaml:"lgtm_permissions" mapstructure:"lgtm-permissions"`
 	LGTMReviewEvent string   `json:"lgtm_review_event,omitempty" yaml:"lgtm_review_event,omitempty" mapstructure:"lgtm-review-event"`
+	RobotAccounts   []string `json:"robot_accounts,omitempty" yaml:"robot_accounts,omitempty" mapstructure:"robot-accounts"`
 
 	// Merge configuration
 	MergeMethod string `json:"merge_method" yaml:"merge_method" mapstructure:"merge-method"`

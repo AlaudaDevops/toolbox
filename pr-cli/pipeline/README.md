@@ -38,16 +38,31 @@ The Pipeline automatically triggers when users post specific comment commands on
 
 The Pipeline supports the following configurable parameters:
 
+### Required Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `trigger_comment` | The comment command to execute |
+| `repo_owner` | GitHub/GitLab repository owner |
+| `repo_name` | Repository name |
+| `pull_request_number` | PR number |
+| `comment_sender` | Username of the comment author |
+| `git_auth_secret` | Secret containing the API token |
+
+### Optional Parameters
+
 | Parameter | Default Value | Description |
 |-----------|---------------|-------------|
-| `lgtm_permissions` | `admin,write` | Permission levels required for LGTM |
+| `git_auth_secret_key` | `git-provider-token` | The key in git_auth_secret that contains the token |
+| `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM |
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
 | `lgtm_review_event` | `APPROVE` | LGTM review event type |
 | `merge_method` | `rebase` | Default merge method |
 | `self_check_name` | `pr-cli` | Self-check name |
-| `use_git_cli_for_cherrypick` | `true` | Whether to use Git CLI for cherry-pick operations (more reliable) |
-| `debug` | `false` | Whether to enable debug mode (skip validation, allow PR creator self-approval) |
-| `verbose` | `false` | Whether to enable verbose logging (debug level logs) |
+| `platform` | `github` | The platform to use (github, gitlab, gitee) |
+| `debug` | `false` | Enable debug mode (skip validation, allow PR creator self-approval) |
+| `verbose` | `false` | Enable verbose logging (debug level logs) |
+| `robot_accounts` | `alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2` | List of bot accounts for managing bot approval reviews |
 
 ## Permission Description
 
@@ -155,6 +170,10 @@ spec:
     # The platform to use, can be one of: github, gitlab, gitee (default: github)
     # - name: platform
     #  value: "github"
+    #
+    # The robot accounts for managing bot approval reviews.
+    # - name: robot_accounts
+    #   value: "alaudabot,dependabot,renovate"
 ```
 
 ### Required Parameters
