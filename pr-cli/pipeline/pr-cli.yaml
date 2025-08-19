@@ -23,7 +23,7 @@ spec:
     - name: lgtm_review_event
       default: APPROVE
     - name: merge_method
-      default: rebase
+      default: squash
     - name: self_check_name
       default: pr-cli
     - name: platform

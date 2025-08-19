@@ -70,8 +70,8 @@ Available commands for managing this Pull Request:
 | Method | Description |
 |--------|-------------|
 | `+"`merge`"+` | Create a merge commit |
-| `+"`squash`"+` | Squash and merge all commits |
-| `+"`rebase`"+` | Rebase and merge (default) |
+| `+"`squash`"+` | Squash and merge all commits (default) |
+| `+"`rebase`"+` | Rebase and merge |
 
 ### 🍒 Cherrypick Commands
 | Command | Description | PR State |

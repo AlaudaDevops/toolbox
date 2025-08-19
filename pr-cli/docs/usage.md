@@ -21,7 +21,7 @@ This guide provides detailed information on using the PR CLI tool for managing p
 | `--lgtm-threshold` | `PR_LGTM_THRESHOLD` | LGTM threshold (default: 1) | No |
 | `--lgtm-permissions` | `PR_LGTM_PERMISSIONS` | Required permissions for LGTM (default: admin,write) | No |
 | `--lgtm-review-event` | `PR_LGTM_REVIEW_EVENT` | Review event type for LGTM (default: APPROVE) | No |
-| `--merge-method` | `PR_MERGE_METHOD` | Merge method (default: rebase) | No |
+| `--merge-method` | `PR_MERGE_METHOD` | Merge method (default: squash) | No |
 | `--self-check-name` | `PR_SELF_CHECK_NAME` | Name of the tool's own check run to exclude (default: pr-cli) | No |
 
 ### Comment Commands
@@ -284,7 +284,7 @@ export PR_REPO_OWNER=myorg
 export PR_REPO_NAME=myrepo
 export PR_LGTM_THRESHOLD=2
 export PR_LGTM_PERMISSIONS=admin,write
-export PR_MERGE_METHOD=rebase
+export PR_MERGE_METHOD=squash
 
 pr-cli --pr-num 123 --comment-sender alice --trigger-comment "/lgtm"
 ```

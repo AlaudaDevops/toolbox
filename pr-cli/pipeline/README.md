@@ -57,7 +57,7 @@ The Pipeline supports the following configurable parameters:
 | `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM, allow read permission for internal repositories |
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
 | `lgtm_review_event` | `APPROVE` | LGTM review event type |
-| `merge_method` | `rebase` | Default merge method |
+| `merge_method` | `squash` | Default merge method |
 | `self_check_name` | `pr-cli` | Self-check name |
 | `platform` | `github` | The platform to use (github, gitlab, gitee) |
 | `debug` | `false` | Enable debug mode (skip validation, allow PR creator self-approval) |
@@ -149,9 +149,9 @@ spec:
     # - name: lgtm_review_event
     #   value: "APPROVE"
     #
-    # The merge method to use. Can be one of: merge, squash, rebase (default: rebase)
+    # The merge method to use. Can be one of: merge, squash, rebase (default: squash)
     # - name: merge_method
-    #   value: "rebase"
+    #   value: "squash"
     #
     # The name used for self-check status (default: pr-cli)
     # - name: self_check_name

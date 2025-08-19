@@ -78,8 +78,8 @@ export PR_REPO_NAME=repo
 
 ### Merge Methods
 - `merge` - Create merge commit
-- `squash` - Squash merge  
-- `rebase` - Rebase merge (default)
+- `squash` - Squash merge (default)
+- `rebase` - Rebase merge
 
 > 📘 **Pipeline Integration**: For Tekton Pipeline integration and detailed command usage, see [pipeline/README.md](pipeline/README.md)
 
@@ -95,7 +95,7 @@ export PR_REPO_NAME=repo
 - `--comment-sender`: Comment author
 - `--trigger-comment`: Comment content to process
 - `--lgtm-threshold`: Minimum LGTM approvals (default: 1)
-- `--merge-method`: Merge method (merge/squash/rebase, default: merge)
+- `--merge-method`: Merge method (merge/squash/rebase, default: squash)
 - `--debug`: Enable debug mode (skip validation, allow PR creator self-approval)
 - `--verbose`: Enable verbose logging (debug level logs)
 - `--lgtm-permissions`: Comma-separated list of permissions required for LGTM (default: admin,write)
