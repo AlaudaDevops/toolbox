@@ -9,7 +9,7 @@ import './App.css';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
-  const { logout, user } = useAuth();
+  const { logout } = useAuth();
 
   if (isLoading) {
     return (

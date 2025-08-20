@@ -6,7 +6,7 @@ import './Modal.css';
 const LoginModal = () => {
   const { login, isLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const {
     register,
     handleSubmit,
@@ -14,7 +14,7 @@ const LoginModal = () => {
     setError,
   } = useForm({
     defaultValues: {
-      base_url: 'https://your-jira-instance.atlassian.net',
+      base_url: 'https://jira.alauda.cn',
       username: '',
       password: '',
     },
@@ -34,7 +34,7 @@ const LoginModal = () => {
           <h2>Login to Jira</h2>
           <p>Enter your Jira credentials to access the roadmap planner</p>
         </div>
-        
+
         <form onSubmit={handleSubmit(onSubmit)} className="modal-body">
           <div className="form-group">
             <label htmlFor="base_url" className="form-label">
@@ -44,7 +44,7 @@ const LoginModal = () => {
               id="base_url"
               type="url"
               className={`form-input ${errors.base_url ? 'error' : ''}`}
-              placeholder="https://your-company.atlassian.net"
+              placeholder="https://jira.alauda.cn"
               {...register('base_url', {
                 required: 'Jira Base URL is required',
                 pattern: {

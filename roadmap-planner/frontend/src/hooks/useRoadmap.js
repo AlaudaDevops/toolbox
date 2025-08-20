@@ -53,14 +53,14 @@ export const RoadmapProvider = ({ children }) => {
       await loadBasicData();
 
       // Then load complete data using the original API
-      const data = await roadmapAPI.getRoadmap();
-      console.log('Complete roadmap data loaded:', data); // Debug log
+      // const data = await roadmapAPI.getRoadmap();
+      // console.log('Complete roadmap data loaded:', data); // Debug log
 
       // Sort the roadmap data
-      const sortedData = sortRoadmapData(data);
-      console.log('Roadmap data sorted:', sortedData); // Debug log
+      // const sortedData = sortRoadmapData(data);
+      // console.log('Roadmap data sorted:', sortedData); // Debug log
 
-      setRoadmapData(sortedData);
+      // setRoadmapData(sortedData);
     } catch (error) {
       const errorInfo = handleAPIError(error);
       console.error('Failed to load roadmap:', errorInfo); // Debug log
@@ -70,6 +70,98 @@ export const RoadmapProvider = ({ children }) => {
       setIsLoading(false);
     }
   }, [loadBasicData]);
+
+
+  const loadMilestones = useCallback(async (pillarIds, quarters) => {
+    try {
+      const milestones = await roadmapAPI.getMilestones({ pillarIds, quarters });
+      console.log('Milestones loaded:', milestones); // Debug log
+
+      // Update the roadmap data with the loaded milestones
+      setRoadmapData(prevData => {
+        if (!prevData) return prevData;
+
+        // Create a map of milestones grouped by pillar_id for efficient lookup
+        const milestonesByPillar = {};
+        milestones.forEach(milestone => {
+          const pillarId = milestone.pillar_id;
+          if (!milestonesByPillar[pillarId]) {
+            milestonesByPillar[pillarId] = [];
+          }
+          milestonesByPillar[pillarId].push(milestone);
+        });
+
+        // Merge the new milestones into the existing data
+        const updatedPillars = prevData.pillars.map(pillar => {
+          const pillarMilestones = milestonesByPillar[pillar.id] || [];
+
+          // Merge existing milestones with new ones, avoiding duplicates
+          const existingMilestoneIds = new Set(pillar.milestones.map(m => m.id));
+          const newMilestones = pillarMilestones.filter(m => !existingMilestoneIds.has(m.id));
+
+          return {
+            ...pillar,
+            milestones: [...pillar.milestones, ...newMilestones],
+          };
+        });
+
+        return {
+          ...prevData,
+          pillars: updatedPillars,
+        };
+      });
+
+    } catch (error) {
+      const errorInfo = handleAPIError(error);
+      console.error('Failed to load milestones:', errorInfo);
+    }
+  }, []);
+
+  const loadEpics = useCallback(async (milestoneIds) => {
+    try {
+      const epics = await roadmapAPI.getEpics({ milestoneIds });
+      console.log('Epics loaded:', epics); // Debug log
+      setRoadmapData(prevData => {
+        if (!prevData) return prevData;
+
+        // Create a map of epics grouped by milestone_id for efficient lookup
+        const epicsByMilestone = {};
+        epics.forEach(epic => {
+          const milestoneId = epic.milestone_id;
+          if (!epicsByMilestone[milestoneId]) {
+            epicsByMilestone[milestoneId] = [];
+          }
+          epicsByMilestone[milestoneId].push(epic);
+        });
+
+        // Merge the new epics into the existing data
+        const updatedPillars = prevData.pillars.map(pillar => ({
+          ...pillar,
+          milestones: pillar.milestones.map(milestone => {
+            const milestoneEpics = epicsByMilestone[milestone.id] || [];
+
+            // Merge existing epics with new ones, avoiding duplicates
+            const existingEpicIds = new Set(milestone.epics.map(e => e.id));
+            const newEpics = milestoneEpics.filter(e => !existingEpicIds.has(e.id));
+
+            return {
+              ...milestone,
+              epics: [...milestone.epics, ...newEpics],
+            };
+          }),
+        }));
+
+        return {
+          ...prevData,
+          pillars: updatedPillars,
+        };
+      });
+
+    } catch (error) {
+      const errorInfo = handleAPIError(error);
+      console.error('Failed to load epics:', errorInfo);
+    }
+  });
 
   // Load roadmap on mount
   useEffect(() => {
@@ -242,6 +334,7 @@ export const RoadmapProvider = ({ children }) => {
   const getComponentVersions = async (componentName) => {
     try {
       const response = await roadmapAPI.getComponentVersions(componentName);
+      // const
       return { success: true, data: response.versions };
     } catch (error) {
       const errorInfo = handleAPIError(error);
