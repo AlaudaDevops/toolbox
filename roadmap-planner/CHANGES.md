@@ -39,3 +39,8 @@ Lets do a number of changes in this code base, we will start with the bellow UI 
   - [X] UI is doing multiple calls to load all the data which did not improve startup time. Please make sure only one call to the basic api is done when starting the app, all subsequent calls should be done after the app is loaded.
   - [X] Epics and milestone APIs should support filtering instead of making it a subresource API for pillars and milestones. This way we can load milestones from multiple pillars at once, we can also load epics from multiple milestones at once.
   - [X] After UI calls the UI is not displaying milestones or epics. This should be checked and fixed
+- [X] Implement smart partial updates and eliminate redundant requests:
+  - [X] Smart refresh system: Only refresh affected pillars/milestones after CRUD operations
+  - [X] Request deduplication: Prevent multiple identical API calls
+  - [X] Optimistic updates: Update UI immediately for better user experience
+  - [X] Batch operations: Efficient handling of multiple related updates
