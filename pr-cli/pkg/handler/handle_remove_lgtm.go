@@ -24,67 +24,138 @@ import (
 )
 
 // HandleRemoveLGTM processes the removal of LGTM by dismissing approval if threshold was met
-func (h *PRHandler) HandleRemoveLGTM() error {
+func (h *PRHandler) HandleRemoveLGTM(_ []string) error {
 	h.Logger.Info("Processing remove LGTM")
 
-	// Check if the current comment sender has permission
+	// Check permissions first
+	userPermission, hasPermission, err := h.validateRemoveLGTMPermissions()
+	if err != nil {
+		return err
+	}
+	if !hasPermission {
+		return nil // Permission denied message already posted
+	}
+
+	// Get current LGTM state and process removal
+	removalResult, err := h.processLGTMRemoval(userPermission)
+	if err != nil {
+		return err
+	}
+
+	// Generate and post final status
+	return h.postRemoveLGTMStatus(removalResult)
+}
+
+// RemovalResult holds the result of LGTM removal processing
+type RemovalResult struct {
+	CurrentUserHasVote bool
+	BeforeVotes        int
+	AfterVotes         int
+	UserPermission     string
+}
+
+// validateRemoveLGTMPermissions checks if the user has permission to remove LGTM
+func (h *PRHandler) validateRemoveLGTMPermissions() (string, bool, error) {
 	hasPermission, userPermission, err := h.client.CheckUserPermissions(h.config.CommentSender, h.config.LGTMPermissions)
 	if err != nil {
-		return fmt.Errorf("failed to check user permissions: %w", err)
+		return "", false, fmt.Errorf("failed to check user permissions: %w", err)
 	}
 
 	if !hasPermission {
-		// User doesn't have permission
 		message := fmt.Sprintf(messages.RemoveLGTMPermissionDeniedTemplate,
 			h.config.CommentSender, userPermission, strings.Join(h.config.LGTMPermissions, ", "))
-
-		return h.client.PostComment(message)
+		err := h.client.PostComment(message)
+		if err != nil {
+			return "", false, err
+		}
+		return userPermission, false, nil
 	}
 
-	// We need to check the LGTM status BEFORE processing the current /remove-lgtm command
-	// Use the updated method that can ignore the current user's latest /remove-lgtm comment
+	return userPermission, true, nil
+}
+
+// processLGTMRemoval handles the core logic of LGTM removal
+func (h *PRHandler) processLGTMRemoval(userPermission string) (*RemovalResult, error) {
+	// Get LGTM status before processing current /remove-lgtm command
 	beforeRemoveVotes, beforeRemoveUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug, h.config.CommentSender)
 	if err != nil {
-		return fmt.Errorf("failed to get votes before current remove LGTM: %w", err)
+		return nil, fmt.Errorf("failed to get votes before current remove LGTM: %w", err)
 	}
 
-	// Check if current user has a vote before this /remove-lgtm command
-	currentUserHasVote := false
-	if _, exists := beforeRemoveUsers[h.config.CommentSender]; exists {
-		currentUserHasVote = true
-	}
+	// Check if current user has a vote and calculate vote counts
+	result := h.calculateRemovalResult(beforeRemoveVotes, beforeRemoveUsers, userPermission)
 
-	// Calculate what the vote count would be after removing current user's vote
-	afterRemoveVotes := beforeRemoveVotes
+	// Handle approval dismissal if needed
+	h.handleApprovalDismissal(result)
+
+	return result, nil
+}
+
+// calculateRemovalResult determines the impact of removing the current user's vote
+func (h *PRHandler) calculateRemovalResult(beforeVotes int, beforeUsers map[string]string, userPermission string) *RemovalResult {
+	// Check if current user has a vote
+	_, currentUserHasVote := beforeUsers[h.config.CommentSender]
+
+	// Calculate vote count after removal
+	afterVotes := beforeVotes
 	if currentUserHasVote {
-		afterRemoveVotes = beforeRemoveVotes - 1
+		afterVotes = beforeVotes - 1
 	}
-	h.Logger.Debugf("Before remove LGTM: %d votes, after remove LGTM: %d votes (current user has vote: %t)",
-		beforeRemoveVotes, afterRemoveVotes, currentUserHasVote)
 
-	// If current user has a vote and removing it would drop below threshold, dismiss approval
-	if currentUserHasVote && beforeRemoveVotes >= h.config.LGTMThreshold && afterRemoveVotes < h.config.LGTMThreshold {
-		dismissMessage := fmt.Sprintf(messages.RemoveLGTMDismissTemplate, h.config.CommentSender)
-		if err = h.client.DismissApprove(dismissMessage); err != nil {
-			// Check if the error is because no approval was found to dismiss
-			if !strings.Contains(err.Error(), "no approval review found") {
-				h.Logger.Errorf("Failed to dismiss approval: %v", err)
-			} else {
-				h.Logger.Debugf("No approval review found to dismiss for user %s with permission: %s", h.config.CommentSender, userPermission)
-			}
+	h.Logger.Debugf("Before remove LGTM: %d votes, after remove LGTM: %d votes (current user has vote: %t)",
+		beforeVotes, afterVotes, currentUserHasVote)
+
+	return &RemovalResult{
+		CurrentUserHasVote: currentUserHasVote,
+		BeforeVotes:        beforeVotes,
+		AfterVotes:         afterVotes,
+		UserPermission:     userPermission,
+	}
+}
+
+// handleApprovalDismissal dismisses approval if removing vote would drop below threshold
+func (h *PRHandler) handleApprovalDismissal(result *RemovalResult) {
+	shouldDismiss := result.CurrentUserHasVote &&
+		result.BeforeVotes >= h.config.LGTMThreshold &&
+		result.AfterVotes < h.config.LGTMThreshold
+
+	if shouldDismiss {
+		h.dismissApproval(result.UserPermission)
+	} else {
+		h.logRemovalReason(result)
+	}
+}
+
+// dismissApproval attempts to dismiss the PR approval
+func (h *PRHandler) dismissApproval(userPermission string) {
+	dismissMessage := fmt.Sprintf(messages.RemoveLGTMDismissTemplate, h.config.CommentSender)
+	if err := h.client.DismissApprove(dismissMessage); err != nil {
+		if !strings.Contains(err.Error(), "no approval review found") {
+			h.Logger.Errorf("Failed to dismiss approval: %v", err)
 		} else {
-			h.Logger.Infof("✅ User %s successfully dismissed approval (removing vote would drop below threshold) with permission: %s", h.config.CommentSender, userPermission)
+			h.Logger.Debugf("No approval review found to dismiss for user %s with permission: %s",
+				h.config.CommentSender, userPermission)
 		}
 	} else {
-		if !currentUserHasVote {
-			h.Logger.Infof("User %s requested remove LGTM but has no existing vote with permission: %s", h.config.CommentSender, userPermission)
-		} else {
-			h.Logger.Infof("User %s requested remove LGTM but removing vote would not drop below threshold (before: %d, after: %d, threshold: %d) with permission: %s",
-				h.config.CommentSender, beforeRemoveVotes, afterRemoveVotes, h.config.LGTMThreshold, userPermission)
-		}
+		h.Logger.Infof("✅ User %s successfully dismissed approval (removing vote would drop below threshold) with permission: %s",
+			h.config.CommentSender, userPermission)
 	}
+}
 
-	// Get final LGTM status (after processing all comments including /remove-lgtm)
+// logRemovalReason logs why the approval was not dismissed
+func (h *PRHandler) logRemovalReason(result *RemovalResult) {
+	if !result.CurrentUserHasVote {
+		h.Logger.Infof("User %s requested remove LGTM but has no existing vote with permission: %s",
+			h.config.CommentSender, result.UserPermission)
+	} else {
+		h.Logger.Infof("User %s requested remove LGTM but removing vote would not drop below threshold (before: %d, after: %d, threshold: %d) with permission: %s",
+			h.config.CommentSender, result.BeforeVotes, result.AfterVotes, h.config.LGTMThreshold, result.UserPermission)
+	}
+}
+
+// postRemoveLGTMStatus generates and posts the final status message
+func (h *PRHandler) postRemoveLGTMStatus(_ *RemovalResult) error {
+	// Get final LGTM status after processing all comments
 	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return fmt.Errorf("failed to get final LGTM votes: %w", err)

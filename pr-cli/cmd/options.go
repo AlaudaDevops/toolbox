@@ -111,7 +111,7 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Handle built-in commands separately
-	if p.isBuiltInCommand(command) {
+	if handler.IsBuiltInCommand(command) {
 		return p.executeBuiltInCommand(prHandler, command, cmdArgs)
 	}
 
@@ -188,7 +188,7 @@ func (p *PROption) parseStringFields() error {
 
 var (
 	// Match pattern: /command [args...] or /__built-in-command [args...]
-	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-pick|cherrypick|assign|merge|ready|unassign|label|unlabel|check)\s*(.*)$`)
+	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-pick|cherrypick|assign|merge|ready|unassign|label|unlabel|check|retest|batch)\s*(.*)$`)
 	// Match pattern for built-in commands: /__command [args...]
 	builtInCommandRegexp = regexp.MustCompile(`^/(__[a-z-_]+)\s*(.*)$`)
 )
@@ -246,12 +246,7 @@ var commandsSkipPRStatusCheck = map[string]bool{
 
 // shouldSkipPRStatusCheck returns true if the command can work with closed PRs
 func (p *PROption) shouldSkipPRStatusCheck(command string) bool {
-	return commandsSkipPRStatusCheck[command] || p.isBuiltInCommand(command)
-}
-
-// isBuiltInCommand returns true if the command is a built-in command (starts with __)
-func (p *PROption) isBuiltInCommand(command string) bool {
-	return strings.HasPrefix(command, "__")
+	return commandsSkipPRStatusCheck[command] || handler.IsBuiltInCommand(command)
 }
 
 // validateCommentSender verifies that the comment-sender actually posted the trigger-comment
@@ -311,14 +306,8 @@ func (p *PROption) executeBuiltInCommand(prHandler *handler.PRHandler, command s
 	p.Logger.Infof("Executing built-in command: %s", command)
 
 	// Built-in commands skip comment sender validation
-	// Execute built-in command
-	var err error
-	switch command {
-	case "__post-merge-cherry-pick":
-		err = prHandler.HandlePostMergeCherryPick()
-	default:
-		err = fmt.Errorf("unknown built-in command: %s", command)
-	}
+	// Execute built-in command using unified method
+	err := prHandler.ExecuteCommand(command, cmdArgs)
 
 	// Handle error for built-in commands (may not want to post comments for internal commands)
 	if err != nil {
@@ -350,34 +339,8 @@ func (p *PROption) executeRegularCommand(prHandler *handler.PRHandler, command s
 		}
 	}
 
-	// Execute regular command
-	var err error
-	switch command {
-	case "help":
-		err = prHandler.HandleHelp()
-	case "assign":
-		err = prHandler.HandleAssign(cmdArgs)
-	case "unassign":
-		err = prHandler.HandleUnassign(cmdArgs)
-	case "lgtm":
-		err = prHandler.HandleLGTM()
-	case "remove-lgtm":
-		err = prHandler.HandleRemoveLGTM()
-	case "merge", "ready":
-		err = prHandler.HandleMerge(cmdArgs)
-	case "rebase":
-		err = prHandler.HandleRebase()
-	case "check":
-		err = prHandler.HandleCheck()
-	case "cherry-pick", "cherrypick":
-		err = prHandler.HandleCherrypick(cmdArgs)
-	case "label":
-		err = prHandler.HandleLabel(cmdArgs)
-	case "unlabel":
-		err = prHandler.HandleUnlabel(cmdArgs)
-	default:
-		err = fmt.Errorf("unknown command: %s", command)
-	}
+	// Execute regular command using unified method
+	err := prHandler.ExecuteCommand(command, cmdArgs)
 
 	// If command execution failed, try to post error as comment
 	if err != nil {

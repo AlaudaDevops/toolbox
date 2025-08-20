@@ -43,13 +43,15 @@ Available commands for managing this Pull Request:
 | **unassign** | `+"`/unassign user1 user2 ...`"+` | Remove assigned reviewers | `+"`/unassign @alice @bob`"+` |
 | **lgtm** | `+"`/lgtm`"+` | Approve the PR (requires permissions) | `+"`/lgtm`"+` |
 | **remove-lgtm** | `+"`/remove-lgtm` or `/lgtm cancel`"+` | Dismiss your approval (requires permissions) | `+"`/remove-lgtm`"+` |
-| **check** | `+"`/check`"+` | Check current LGTM status and check runs status | `+"`/check`"+` |
+| **check** | `+"`/check [/cmd1 args... /cmd2 args...]`"+` | Check current LGTM status and check runs status, or execute multiple commands | `+"`/check` or `/check /assign user1 /merge squash`"+` |
+| **batch** | `+"`/batch /cmd1 args... /cmd2 args...`"+` | Execute multiple commands in batch mode | `+"`/batch /assign user1 /merge squash`"+` |
 | **merge** | `+"`/merge [method]`"+` | Merge the PR after checking permissions, checks, and LGTM status | `+"`/merge squash`"+` |
 | **ready** | `+"`/ready [method]`"+` | Alias for merge command | `+"`/ready`"+` |
 | **rebase** | `+"`/rebase`"+` | Rebase the PR branch against base | `+"`/rebase`"+` |
 | **cherrypick** | `+"`/cherrypick <branch>`"+` | Create a cherrypick PR to a different branch | `+"`/cherrypick release-3.9`"+` |
 | **label** | `+"`/label label1 label2 ...`"+` | Add labels to the PR | `+"`/label bug enhancement`"+` |
 | **unlabel** | `+"`/unlabel label1 label2 ...`"+` | Remove labels from the PR | `+"`/unlabel bug`"+` |
+| **retest** | `+"`/retest`"+` | Trigger retest of failed checks | `+"`/retest`"+` |
 | **help** | `+"`/help`"+` | Display this help message | `+"`/help`"+` |
 
 ### 👍 LGTM Commands
@@ -58,7 +60,7 @@ Available commands for managing this Pull Request:
 | `+"`/lgtm`"+` | Approve the PR and check if approval threshold is met |
 | `+"`/remove-lgtm`"+` | Dismiss your own approval review |
 | `+"`/lgtm cancel`"+` | Alternative syntax for dismissing approval |
-| `+"`/check`"+` | Check current LGTM status without voting |
+| `+"`/check`"+` | Check current LGTM status without voting, or execute multiple commands |
 
 ### ️ Label Management
 | Command | Description |
@@ -79,6 +81,40 @@ Available commands for managing this Pull Request:
 | `+"`/cherrypick <branch>`"+` | Create a cherrypick PR to target branch | **Merged:** Creates immediately |
 | `+"`/cherry-pick <branch>`"+` | Alternative syntax for cherrypick | **Open:** Schedules for after merge |
 |  | | **Closed:** Creates from last commit |
+
+### 🔍 Check Command
+The `+"`/check`"+` command can show PR status or execute multiple commands:
+
+| Usage | Description | Example |
+|-------|-------------|---------|
+| `+"`/check`"+` | Show PR status only | `+"`/check`"+` |
+| `+"`/check /cmd1 /cmd2 ...`"+` | Execute multiple commands (same as `+"`/batch`"+`) | `+"`/check /assign user1 /merge squash`"+` |
+
+> 💡 **Note:** For detailed information about multi-command execution, see the **Batch Command Execution** section below.
+
+### 🔄 Batch Command Execution
+The `+"`/batch`"+` command is a dedicated tool for executing multiple commands in batch mode:
+
+| Usage | Description | Example |
+|-------|-------------|---------|
+| `+"`/batch /cmd1 /cmd2 ...`"+` | Execute multiple commands sequentially | `+"`/batch /assign user1 /merge squash`"+` |
+
+**Supported Commands:**
+- Regular commands: `+"`assign, unassign, merge, ready, rebase, label, unlabel, cherrypick, retest`"+`
+
+**Restrictions:**
+- Recursive batch calls are not allowed (`+"`/batch`"+` cannot be used within batch)
+- LGTM commands (`+"`/lgtm, /remove-lgtm`"+`) are NOT supported in batch execution
+
+**Example Usage:**
+- `+"`/batch /assign user1 /merge rebase`"+` - Assign reviewer and merge with rebase
+- `+"`/batch /assign user1 /label bug /retest`"+` - Assign reviewer, add label, trigger retest
+- `+"`/batch /label ready /merge squash`"+` - Add label and merge with squash
+
+**Notes:**
+- Commands execute sequentially with results summarized
+- All sub-commands use the same permissions as direct execution
+- Execution continues even if some commands fail
 
 ### ⚙️ Configuration
 - **LGTM Threshold:** %d approval(s) required
@@ -409,4 +445,52 @@ type CheckStatus struct {
 	Status     string
 	Conclusion string
 	URL        string
+}
+
+// LGTMStatusOptions contains options for generating LGTM status message
+type LGTMStatusOptions struct {
+	ValidVotes       int
+	LGTMUsers        map[string]string
+	LGTMThreshold    int
+	LGTMPermissions  []string
+	RobotAccounts    []string
+	IncludeThreshold bool
+	ChecksPassed     bool
+	FailedChecks     []CheckStatus
+}
+
+// BuildLGTMStatusMessage generates a formatted LGTM status message with check runs status
+func BuildLGTMStatusMessage(opts LGTMStatusOptions) string {
+	// Build robot users map for filtering
+	robotUsers := make(map[string]bool)
+	for _, robot := range opts.RobotAccounts {
+		for user := range opts.LGTMUsers {
+			if user == robot {
+				robotUsers[user] = true
+				break
+			}
+		}
+	}
+
+	// Build users table for status message
+	usersTable := BuildLGTMUsersTable(opts.LGTMUsers, opts.LGTMPermissions, robotUsers)
+
+	// Build base LGTM status message
+	var message string
+	if opts.ValidVotes >= opts.LGTMThreshold {
+		message = fmt.Sprintf(LGTMStatusReadyTemplate, opts.ValidVotes, opts.LGTMThreshold, usersTable)
+	} else {
+		// Not enough LGTM votes
+		message = fmt.Sprintf(LGTMStatusPendingTemplate, opts.ValidVotes, opts.LGTMThreshold,
+			opts.LGTMThreshold-opts.ValidVotes, usersTable, strings.Join(opts.LGTMPermissions, ", "))
+
+		if opts.IncludeThreshold {
+			message += LGTMStatusTipTemplate
+		}
+	}
+
+	// Add check runs status information
+	message += BuildCheckRunsStatusSection(opts.ChecksPassed, opts.FailedChecks)
+
+	return message
 }

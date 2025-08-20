@@ -16,24 +16,15 @@ limitations under the License.
 
 package handler
 
-import (
-	"fmt"
+// CommentedError represents an error where a comment has already been posted to the PR
+type CommentedError struct {
+	Err error
+}
 
-	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
-)
+func (e *CommentedError) Error() string {
+	return e.Err.Error()
+}
 
-// HandleRebase rebases the PR branch
-func (h *PRHandler) HandleRebase(_ []string) error {
-	h.Logger.Info("Rebasing PR")
-
-	if err := h.client.RebasePR(); err != nil {
-		message := fmt.Sprintf(messages.RebaseFailedTemplate, err)
-		if postErr := h.client.PostComment(message); postErr != nil {
-			h.Logger.Errorf("Failed to post rebase error comment: %v", postErr)
-			return fmt.Errorf("rebase failed: %w", err)
-		}
-		return &CommentedError{Err: err}
-	}
-
-	return h.client.PostComment(messages.RebaseSuccessTemplate)
+func (e *CommentedError) Unwrap() error {
+	return e.Err
 }

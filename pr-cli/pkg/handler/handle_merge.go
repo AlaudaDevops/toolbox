@@ -21,80 +21,130 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
 
-// CommentedError represents an error where a comment has already been posted to the PR
-type CommentedError struct {
-	Err error
-}
-
-func (e *CommentedError) Error() string {
-	return e.Err.Error()
-}
-
-func (e *CommentedError) Unwrap() error {
-	return e.Err
-}
-
 // HandleMerge merges the PR if conditions are met
 func (h *PRHandler) HandleMerge(args []string) error {
-	// Check user permissions - allow if user has write permission OR is the PR creator
+	// Validate user permissions
+	userPerm, err := h.validateMergePermissions()
+	if err != nil {
+		return err
+	}
+
+	// Validate check runs status
+	if err := h.validateCheckRunsStatus(); err != nil {
+		return err
+	}
+
+	// Validate and process LGTM votes
+	validVotes, lgtmUsers, err := h.validateAndProcessLGTMVotes(userPerm)
+	if err != nil {
+		return err
+	}
+
+	// Determine merge method from arguments
+	method := h.determineMergeMethod(args)
+
+	// Execute the merge
+	if err := h.executeMerge(method); err != nil {
+		return err
+	}
+
+	// Post success message
+	return h.postMergeSuccessMessage(method, validVotes, lgtmUsers)
+}
+
+// validateMergePermissions checks if user has permission to merge
+func (h *PRHandler) validateMergePermissions() (string, error) {
 	hasPermission, userPerm, err := h.client.CheckUserPermissions(h.config.CommentSender, h.config.LGTMPermissions)
 	if err != nil {
-		return fmt.Errorf("failed to check user permissions: %w", err)
+		return "", fmt.Errorf("failed to check user permissions: %w", err)
 	}
 
-	// Allow merge if user has write permission OR is the PR creator
 	isPRCreator := h.config.CommentSender == h.prSender
 	if !hasPermission && !isPRCreator {
-		message := fmt.Sprintf(messages.MergeInsufficientPermissionsTemplate,
-			h.config.CommentSender, userPerm, strings.Join(h.config.LGTMPermissions, ", "), h.prSender, strings.Join(h.config.LGTMPermissions, ", "))
-
-		if err = h.client.PostComment(message); err != nil {
-			h.Logger.Errorf("Failed to post permission error comment: %v", err)
-			return fmt.Errorf("insufficient permissions")
-		}
-		return &CommentedError{Err: fmt.Errorf("insufficient permissions")}
+		return userPerm, h.postInsufficientPermissionsMessage(userPerm)
 	}
 
-	// Check if all checks are passing
+	return userPerm, nil
+}
+
+// postInsufficientPermissionsMessage posts error message for insufficient permissions
+func (h *PRHandler) postInsufficientPermissionsMessage(userPerm string) error {
+	message := fmt.Sprintf(messages.MergeInsufficientPermissionsTemplate,
+		h.config.CommentSender, userPerm, strings.Join(h.config.LGTMPermissions, ", "),
+		h.prSender, strings.Join(h.config.LGTMPermissions, ", "))
+
+	if err := h.client.PostComment(message); err != nil {
+		h.Logger.Errorf("Failed to post permission error comment: %v", err)
+		return fmt.Errorf("insufficient permissions")
+	}
+	return &CommentedError{Err: fmt.Errorf("insufficient permissions")}
+}
+
+// validateCheckRunsStatus validates that all check runs are passing
+func (h *PRHandler) validateCheckRunsStatus() error {
 	allPassed, failedChecks, err := h.client.CheckRunsStatus()
 	if err != nil {
 		return fmt.Errorf("failed to check run status: %w", err)
 	}
 
 	if !allPassed {
-		// Convert failedChecks to our message type
-		var checkStatuses []messages.CheckStatus
-		for _, check := range failedChecks {
-			checkStatuses = append(checkStatuses, messages.CheckStatus{
-				Name:       check.Name,
-				Status:     check.Status,
-				Conclusion: check.Conclusion,
-				URL:        check.URL,
-			})
-		}
-
-		statusTable := messages.BuildCheckStatusTable(checkStatuses)
-		message := fmt.Sprintf(messages.MergeChecksNotPassingTemplate, statusTable)
-
-		if err = h.client.PostComment(message); err != nil {
-			h.Logger.Errorf("Failed to post check status comment: %v", err)
-			return fmt.Errorf("checks not passing")
-		}
-		return &CommentedError{Err: fmt.Errorf("checks not passing")}
+		return h.postCheckRunsNotPassingMessage(failedChecks)
 	}
 
-	// Check LGTM votes
+	return nil
+}
+
+// postCheckRunsNotPassingMessage posts error message when checks are not passing
+func (h *PRHandler) postCheckRunsNotPassingMessage(failedChecks []git.CheckRun) error {
+	checkStatuses := h.convertToMessageCheckStatuses(failedChecks)
+	statusTable := messages.BuildCheckStatusTable(checkStatuses)
+	message := fmt.Sprintf(messages.MergeChecksNotPassingTemplate, statusTable)
+
+	if err := h.client.PostComment(message); err != nil {
+		h.Logger.Errorf("Failed to post check status comment: %v", err)
+		return fmt.Errorf("checks not passing")
+	}
+	return &CommentedError{Err: fmt.Errorf("checks not passing")}
+}
+
+// convertToMessageCheckStatuses converts git.CheckRun to messages.CheckStatus
+func (h *PRHandler) convertToMessageCheckStatuses(failedChecks []git.CheckRun) []messages.CheckStatus {
+	var checkStatuses []messages.CheckStatus
+	for _, check := range failedChecks {
+		checkStatuses = append(checkStatuses, messages.CheckStatus{
+			Name:       check.Name,
+			Status:     check.Status,
+			Conclusion: check.Conclusion,
+			URL:        check.URL,
+		})
+	}
+	return checkStatuses
+}
+
+// validateAndProcessLGTMVotes validates LGTM votes and processes admin/write user logic
+func (h *PRHandler) validateAndProcessLGTMVotes(userPerm string) (int, map[string]string, error) {
 	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
-		return fmt.Errorf("failed to get LGTM votes: %w", err)
+		return 0, nil, fmt.Errorf("failed to get LGTM votes: %w", err)
 	}
 
-	// Handle admin/write user direct merge logic - use config instead of hardcoded values
+	// Handle admin/write user direct merge logic
+	validVotes = h.processAdminUserMergeLogic(validVotes, lgtmUsers, userPerm)
+
+	if validVotes < h.config.LGTMThreshold {
+		return 0, nil, h.postNotEnoughLGTMMessage(validVotes)
+	}
+
+	return validVotes, lgtmUsers, nil
+}
+
+// processAdminUserMergeLogic handles the logic for admin/write users to merge directly
+func (h *PRHandler) processAdminUserMergeLogic(validVotes int, lgtmUsers map[string]string, userPerm string) int {
 	if h.prSender != h.config.CommentSender && h.hasLGTMPermission(userPerm) {
-		// Check if merger already voted
 		_, alreadyVoted := lgtmUsers[h.config.CommentSender]
 		if h.config.LGTMThreshold == 1 || (validVotes >= h.config.LGTMThreshold-1 && !alreadyVoted) {
 			if !alreadyVoted {
@@ -103,59 +153,78 @@ func (h *PRHandler) HandleMerge(args []string) error {
 			}
 		}
 	}
+	return validVotes
+}
 
-	if validVotes < h.config.LGTMThreshold {
-		message := fmt.Sprintf(messages.MergeNotEnoughLGTMTemplate,
-			validVotes, h.config.LGTMThreshold, h.config.LGTMThreshold-validVotes)
+// postNotEnoughLGTMMessage posts error message when there are not enough LGTM votes
+func (h *PRHandler) postNotEnoughLGTMMessage(validVotes int) error {
+	message := fmt.Sprintf(messages.MergeNotEnoughLGTMTemplate,
+		validVotes, h.config.LGTMThreshold, h.config.LGTMThreshold-validVotes)
 
-		if err := h.client.PostComment(message); err != nil {
-			h.Logger.Errorf("Failed to post LGTM status comment: %v", err)
-			return fmt.Errorf("not enough LGTM votes")
-		}
-		return &CommentedError{Err: fmt.Errorf("not enough LGTM votes")}
+	if err := h.client.PostComment(message); err != nil {
+		h.Logger.Errorf("Failed to post LGTM status comment: %v", err)
+		return fmt.Errorf("not enough LGTM votes")
 	}
+	return &CommentedError{Err: fmt.Errorf("not enough LGTM votes")}
+}
 
-	// Determine merge method
+// determineMergeMethod determines merge method from arguments or uses default
+func (h *PRHandler) determineMergeMethod(args []string) string {
 	method := h.config.MergeMethod
 	if len(args) > 0 {
 		if args[0] == "merge" || args[0] == "squash" || args[0] == "rebase" {
 			method = args[0]
 		}
 	}
+	return method
+}
 
+// executeMerge performs the actual merge operation
+func (h *PRHandler) executeMerge(method string) error {
 	h.Logger.Infof("Merging PR with method: %s", method)
 
-	// Perform the merge
 	if err := h.client.MergePR(method); err != nil {
-		message := fmt.Sprintf(messages.MergeFailedTemplate, h.config.PRNum, err)
-
-		if postErr := h.client.PostComment(message); postErr != nil {
-			h.Logger.Errorf("Failed to post merge error comment: %v", postErr)
-			return fmt.Errorf("merge failed: %w", err)
-		}
-		return &CommentedError{Err: err}
+		return h.postMergeFailedMessage(err)
 	}
 
-	// Build robot users map for filtering
+	return nil
+}
+
+// postMergeFailedMessage posts error message when merge fails
+func (h *PRHandler) postMergeFailedMessage(mergeErr error) error {
+	message := fmt.Sprintf(messages.MergeFailedTemplate, h.config.PRNum, mergeErr)
+
+	if postErr := h.client.PostComment(message); postErr != nil {
+		h.Logger.Errorf("Failed to post merge error comment: %v", postErr)
+		return fmt.Errorf("merge failed: %w", mergeErr)
+	}
+	return &CommentedError{Err: mergeErr}
+}
+
+// postMergeSuccessMessage posts success message and writes Tekton result
+func (h *PRHandler) postMergeSuccessMessage(method string, validVotes int, lgtmUsers map[string]string) error {
+	robotUsers := h.buildRobotUsersMap(lgtmUsers)
+	usersTable := messages.BuildUsersTable(lgtmUsers, robotUsers)
+	successMessage := fmt.Sprintf(messages.MergeSuccessTemplate,
+		method, h.config.CommentSender, validVotes, h.config.LGTMThreshold, usersTable)
+
+	if err := h.client.PostComment(successMessage); err != nil {
+		return err
+	}
+
+	h.writeTektonResult("merge-successful", "true")
+	return nil
+}
+
+// buildRobotUsersMap builds a map of robot users for filtering
+func (h *PRHandler) buildRobotUsersMap(lgtmUsers map[string]string) map[string]bool {
 	robotUsers := make(map[string]bool)
 	for user := range lgtmUsers {
 		if h.isRobotUser(user) {
 			robotUsers[user] = true
 		}
 	}
-
-	// Build success message with users table
-	usersTable := messages.BuildUsersTable(lgtmUsers, robotUsers)
-	successMessage := fmt.Sprintf(messages.MergeSuccessTemplate, method, h.config.CommentSender, validVotes, h.config.LGTMThreshold, usersTable)
-
-	if err := h.client.PostComment(successMessage); err != nil {
-		return err
-	}
-
-	// Write Tekton result to indicate merge was successful
-	h.writeTektonResult("merge-successful", "true")
-
-	return nil
+	return robotUsers
 }
 
 var (

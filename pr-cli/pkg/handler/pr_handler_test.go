@@ -1,3 +1,20 @@
+/*
+Copyright 2025 The AlaudaDevops Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package handler
 
 import (
@@ -42,7 +59,7 @@ func TestPRHandler_HandleHelp(t *testing.T) {
 	}
 
 	// Test the HandleHelp method
-	err := handler.HandleHelp()
+	err := handler.HandleHelp(nil)
 	if err != nil {
 		t.Errorf("HandleHelp() error = %v, wantErr false", err)
 	}
@@ -254,7 +271,7 @@ func TestPRHandler_HandleLGTM(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleLGTM()
+	err := handler.HandleLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleLGTM() error = %v, wantErr false", err)
 	}
@@ -290,7 +307,7 @@ func TestPRHandler_HandleLGTM_NoPermission(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleLGTM()
+	err := handler.HandleLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleLGTM() error = %v, wantErr false", err)
 	}
@@ -359,7 +376,7 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleRemoveLGTM()
+	err := handler.HandleRemoveLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
 	}
@@ -395,7 +412,7 @@ func TestPRHandler_HandleRemoveLGTM_NoPermission(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleRemoveLGTM()
+	err := handler.HandleRemoveLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
 	}
@@ -454,7 +471,7 @@ func TestPRHandler_HandleRemoveLGTM_NoUserVote(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleRemoveLGTM()
+	err := handler.HandleRemoveLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
 	}
@@ -519,7 +536,7 @@ func TestPRHandler_HandleRemoveLGTM_NoApproval(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleRemoveLGTM()
+	err := handler.HandleRemoveLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
 	}
@@ -586,7 +603,7 @@ func TestPRHandler_HandleRemoveLGTM_RemoveWontDropBelowThreshold(t *testing.T) {
 		config: cfg,
 	}
 
-	err := handler.HandleRemoveLGTM()
+	err := handler.HandleRemoveLGTM(nil)
 	if err != nil {
 		t.Errorf("HandleRemoveLGTM() error = %v, wantErr false", err)
 	}

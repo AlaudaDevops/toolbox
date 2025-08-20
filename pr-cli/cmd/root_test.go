@@ -3,6 +3,8 @@ package cmd
 import (
 	"reflect"
 	"testing"
+
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
 )
 
 func TestParseCommand(t *testing.T) {
@@ -289,12 +291,10 @@ func TestIsBuiltInCommand(t *testing.T) {
 		},
 	}
 
-	prOption := NewPROption()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := prOption.isBuiltInCommand(tt.command); got != tt.want {
-				t.Errorf("isBuiltInCommand() = %v, want %v", got, tt.want)
+			if got := handler.IsBuiltInCommand(tt.command); got != tt.want {
+				t.Errorf("IsBuiltInCommand() = %v, want %v", got, tt.want)
 			}
 		})
 	}

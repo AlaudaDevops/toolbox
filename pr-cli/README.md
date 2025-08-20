@@ -31,6 +31,16 @@ make build
 go install github.com/AlaudaDevops/toolbox/pr-cli@latest
 ```
 
+## Documentation
+
+📖 **Choose the right documentation for your needs:**
+
+| Documentation | Purpose | Audience |
+|---------------|---------|----------|
+| **This README** | Project overview, installation, and quick start | New users getting started |
+| **[📋 CLI Reference](docs/usage.md)** | Complete command-line usage guide | Users needing detailed CLI documentation |
+| **[🔧 Pipeline Integration](pipeline/README.md)** | Tekton Pipeline setup and configuration | DevOps teams setting up automation |
+
 ## Quick Start
 
 ### Basic Usage
@@ -59,6 +69,8 @@ export PR_REPO_NAME=repo
 
 ## Supported Commands
 
+Quick reference for all available PR comment commands:
+
 | Command | Description | Parameters | Example |
 |---------|-------------|------------|---------|
 | `/assign` | Assign reviewers to PR | `user1 user2 ...` | `/assign alice bob` |
@@ -69,12 +81,16 @@ export PR_REPO_NAME=repo
 | `/merge` | Merge the PR | `[method]` | `/merge` or `/merge squash` |
 | `/ready` | Merge the PR (alias for `/merge`) | `[method]` | `/ready` or `/ready squash` |
 | `/rebase` | Rebase the PR | - | `/rebase` |
-| `/check` | Check PR status | - | `/check` |
+| `/check` | Check PR status or execute multiple commands | `[/cmd1 args... /cmd2 args...]` | `/check` or `/check /assign user1 /merge rebase` |
+| `/batch` | Execute multiple commands in batch mode | `/cmd1 args... [/cmd2 args...]` | `/batch /assign user1 /merge squash` |
 | `/label` | Add labels to PR | `label1 label2 ...` | `/label bug enhancement` |
 | `/unlabel` | Remove labels from PR | `label1 label2 ...` | `/unlabel bug` |
 | `/cherry-pick` | Cherry-pick to branches | `branch1 branch2 ...` | `/cherry-pick release/v1.0` |
 | `/cherrypick` | Cherry-pick to branches (alias) | `branch1 branch2 ...` | `/cherrypick release/v1.0` |
+| `/retest` | Trigger retest of failed checks | - | `/retest` |
 | `/help` | Show available commands | - | `/help` |
+
+> 📘 **Need More Details?** For complete command syntax, configuration options, and troubleshooting, see the **[CLI Reference](docs/usage.md)**. For Pipeline integration, see **[Pipeline Integration](pipeline/README.md)**.
 
 ### Built-in Commands
 

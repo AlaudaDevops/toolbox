@@ -2,15 +2,23 @@
 
 This document describes how to integrate PR CLI with Tekton Pipelines for automated Pull Request management through comment commands.
 
+📖 **Other Documentation:**
+- **[Main README](../README.md)** - Project overview and quick start
+- **[CLI Reference](../docs/usage.md)** - Complete command-line usage guide
+
 ## Overview
 
 The Pipeline automatically triggers when users post specific comment commands on PRs, executing corresponding PR management operations using the PR CLI tool.
 
-**Trigger Pattern**: `^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \t].*)?$`
+**Trigger Pattern**: `^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check|retest|batch)([ \t].*)?$`
 
-> 📘 **Command Reference**: For detailed command descriptions and examples, see [../README.md](../README.md#supported-commands)
+> 📘 **Pipeline Integration**: This document provides detailed command categorization and pipeline-specific configuration. For basic command usage, see [../README.md](../README.md#supported-commands)
 
-## Quick Command Reference
+## Command Categories
+
+### Direct Trigger Commands
+
+These commands can be directly triggered by PR comments and will automatically start the pipeline:
 
 | Command | Purpose | Parameters | Example |
 |---------|---------|------------|---------|
@@ -22,17 +30,46 @@ The Pipeline automatically triggers when users post specific comment commands on
 | `/merge` | Merge the PR | `[method]` | `/merge` or `/merge squash` |
 | `/ready` | Merge the PR (alias for `/merge`) | `[method]` | `/ready` or `/ready squash` |
 | `/rebase` | Rebase the PR | - | `/rebase` |
-| `/check` | Check PR status | - | `/check` |
+| `/check` | Check PR status or execute multiple commands | `[/cmd1 args... /cmd2 args...]` | `/check` or `/check /assign user1 /merge rebase` |
+| `/batch` | Execute multiple commands in batch mode | `/cmd1 args... [/cmd2 args...]` | `/batch /assign user1 /merge squash` |
 | `/label` | Add labels to PR | `label1 label2 ...` | `/label bug enhancement` |
 | `/unlabel` | Remove labels from PR | `label1 label2 ...` | `/unlabel bug` |
 | `/cherry-pick` | Cherry-pick to branches | `branch1 branch2 ...` | `/cherry-pick release/v1.0` |
 | `/cherrypick` | Cherry-pick to branches (alias) | `branch1 branch2 ...` | `/cherrypick release/v1.0` |
+| `/retest` | Trigger retest of failed checks | - | `/retest` |
 | `/help` | Show available commands | - | `/help` |
 
-**Special Notes:**
-- **Cherry-pick**: Uses Git CLI method by default for reliable operations
-- **LGTM**: Requires `admin`, `write`, or `read` permissions by default (configurable)
-- **Merge**: Checks LGTM threshold and status before merging
+### Commands Requiring Indirect Trigger
+
+> 💡 **Note:** Some commands supported by pr-cli may not be directly triggerable via PR comments due to pipeline configuration. These commands can be executed indirectly through `/check` or `/batch` until their trigger patterns are added to the pipeline configuration. This allows for gradual rollout and testing of new features.
+
+## Multi-Command Execution
+
+Both `/check` and `/batch` commands support executing multiple commands in a single operation:
+
+### Check Command
+**Primary Purpose:** Check PR status, with optional multi-command execution
+```bash
+/check                                    # Show PR status only
+/check /assign user1 /merge rebase       # Execute commands (same as /batch)
+```
+
+### Batch Command
+**Primary Purpose:** Execute multiple commands in batch mode
+```bash
+/batch /assign user1 /merge squash       # Assign reviewer then merge with squash
+/batch /assign user1 /label bug /retest  # Assign reviewer, add label, trigger retest
+```
+
+**Restrictions (Both Commands):**
+- Built-in commands (starting with `__`) are blocked for security
+- LGTM commands (`/lgtm`, `/remove-lgtm`) are NOT supported in multi-command execution
+- Recursive batch calls (`/batch` within `/batch`) are not allowed
+
+**Key Features:**
+- Commands run sequentially with results summarized in one comment
+- All commands use the same permissions as direct execution
+- Execution continues even if some commands fail
 
 ## Pipeline Configuration Parameters
 
@@ -54,6 +91,7 @@ The Pipeline supports the following configurable parameters:
 | Parameter | Default Value | Description |
 |-----------|---------------|-------------|
 | `git_auth_secret_key` | `git-provider-token` | The key in git_auth_secret that contains the token |
+| `image` | `registry.alauda.cn:60070/devops/toolbox/pr-cli:latest` | Container image for pr-cli tool |
 | `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM, allow read permission for internal repositories |
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
 | `lgtm_review_event` | `APPROVE` | LGTM review event type |
@@ -108,7 +146,7 @@ metadata:
   name: pr-manage
   annotations:
     pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/AlaudaDevops/toolbox/main/pr-cli/pipeline/pr-manage.yaml"
-    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check)([ \\t].*)?$"
+    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check|retest|batch)([ \\t].*)?$"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   pipelineRef:
@@ -133,6 +171,10 @@ spec:
     # The key in git_auth_secret that contains the token (default: git-provider-token)
     # - name: git_auth_secret_key
     #   value: "git-provider-token"
+    #
+    # Container image for pr-cli tool (default: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest)
+    # - name: image
+    #   value: "registry.alauda.cn:60070/devops/toolbox/pr-cli:latest"
     #
     # The /lgtm threshold needed of approvers for a PR to be approved (default: 1)
     # - name: lgtm_threshold
