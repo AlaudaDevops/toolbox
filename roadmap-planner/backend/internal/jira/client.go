@@ -302,6 +302,7 @@ func (c *Client) CreateEpic(ctx context.Context, req models.CreateEpicRequest) (
 			Type:     jira.IssueType{Name: "Epic"},
 			Summary:  req.Name,
 			Assignee: &jira.User{Name: req.Assignee.Name},
+			Unknowns: tcontainer.MarshalMap{"customfield_10004": req.Name},
 		},
 	}
 
@@ -328,6 +329,7 @@ func (c *Client) CreateEpic(ctx context.Context, req models.CreateEpicRequest) (
 	if err != nil {
 		return nil, fmt.Errorf("failed to create epic: %s", c.handleError(resp, err))
 	}
+	c.logger.Sugar().Infow("Created epic issue", "epic", createdIssue, "req", req)
 
 	// Link the epic to the milestone using "blocks" relationship
 	if err := c.LinkEpicToMilestone(ctx, createdIssue.ID, req.MilestoneID); err != nil {
@@ -337,7 +339,15 @@ func (c *Client) CreateEpic(ctx context.Context, req models.CreateEpicRequest) (
 			zap.Error(err))
 	}
 
-	epic := models.ConvertJiraIssueToEpic(createdIssue, req.MilestoneID)
+	// epic := models.ConvertJiraIssueToEpic(createdIssue, req.MilestoneID)
+	epic := &models.Epic{
+		ID:          createdIssue.ID,
+		Key:         createdIssue.Key,
+		Name:        req.Name,
+		Versions:     []string{req.Version},
+		Components:   []string{req.Component},
+		MilestoneIDs: []string{req.MilestoneID},
+	}
 
 	return epic, nil
 }

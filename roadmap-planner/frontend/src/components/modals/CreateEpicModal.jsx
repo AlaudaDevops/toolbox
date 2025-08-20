@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useRoadmap } from '../../hooks/useRoadmap';
 import { X } from 'lucide-react';
 import AssigneeSelect from '../AssigneeSelect';
+import FilterableSelect from '../FilterableSelect';
+import '../FilterableSelect.css';
 import './Modal.css';
 
 const CreateEpicModal = ({ milestone, onClose }) => {
-  const { createEpic, getComponentVersions } = useRoadmap();
+  const { roadmapData, createEpic } = useRoadmap();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [versions, setVersions] = useState([]);
-  const [loadingVersions, setLoadingVersions] = useState(false);
 
   const {
     register,
@@ -18,30 +18,11 @@ const CreateEpicModal = ({ milestone, onClose }) => {
     trigger,
     formState: { errors },
     setError,
-    watch,
   } = useForm();
 
-  const watchedComponent = watch('component');
-
-  // Load versions when component changes
-  useEffect(() => {
-    if (watchedComponent && watchedComponent.trim()) {
-      loadVersions(watchedComponent.trim());
-    } else {
-      setVersions([]);
-    }
-  }, [watchedComponent]);
-
-  const loadVersions = async (component) => {
-    setLoadingVersions(true);
-    const result = await getComponentVersions(component);
-    if (result.success) {
-      setVersions(result.data || []);
-    } else {
-      setVersions([]);
-    }
-    setLoadingVersions(false);
-  };
+  // Get available components and versions from roadmap data
+  const availableComponents = roadmapData?.components || [];
+  const availableVersions = roadmapData?.versions || [];
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
@@ -121,12 +102,35 @@ const CreateEpicModal = ({ milestone, onClose }) => {
             <label htmlFor="component" className="form-label">
               Component
             </label>
-            <input
-              id="component"
-              type="text"
-              className={`form-input ${errors.component ? 'error' : ''}`}
-              placeholder="e.g., connectors-operator"
-              {...register('component')}
+            <Controller
+              name="component"
+              control={control}
+              render={({ field }) => (
+                <FilterableSelect
+                  id="component"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  options={availableComponents}
+                  placeholder="Search and select a component..."
+                  className={errors.component ? 'error' : ''}
+                  error={!!errors.component}
+                  disabled={isSubmitting}
+                  getOptionLabel={(component) => component.name}
+                  getOptionValue={(component) => component.name}
+                  filterFunction={(component, searchTerm) => {
+                    const search = searchTerm.toLowerCase();
+                    return (
+                      component.data.name.toLowerCase().includes(search) ||
+                      (component.data.description && component.data.description.toLowerCase().includes(search))
+                    );
+                  }}
+                  emptyMessage="No components found"
+                  isClearable={true}
+                  isSearchable={true}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
+              )}
             />
             {errors.component && (
               <span className="form-error">{errors.component.message}</span>
@@ -137,33 +141,33 @@ const CreateEpicModal = ({ milestone, onClose }) => {
             <label htmlFor="version" className="form-label">
               Version
             </label>
-            {loadingVersions ? (
-              <div className="loading-versions">
-                <div className="loading-spinner-sm"></div>
-                Loading versions...
-              </div>
-            ) : versions.length > 0 ? (
-              <select
-                id="version"
-                className={`form-select ${errors.version ? 'error' : ''}`}
-                {...register('version')}
-              >
-                <option value="">Select a version</option>
-                {versions.map((version) => (
-                  <option key={version} value={version}>
-                    {version}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                id="version"
-                type="text"
-                className={`form-input ${errors.version ? 'error' : ''}`}
-                placeholder="Enter version"
-                {...register('version')}
-              />
-            )}
+            <Controller
+              name="version"
+              control={control}
+              render={({ field }) => (
+                <FilterableSelect
+                  id="version"
+                  value={field.value || ''}
+                  onChange={field.onChange}
+                  options={availableVersions}
+                  placeholder="Search and select a version..."
+                  className={errors.version ? 'error' : ''}
+                  error={!!errors.version}
+                  disabled={isSubmitting}
+                  getOptionLabel={(version) => version.name}
+                  getOptionValue={(version) => version.name}
+                  filterFunction={(version, searchTerm) => {
+                    const search = searchTerm.toLowerCase();
+                    return version.data.name.toLowerCase().includes(search);
+                  }}
+                  emptyMessage="No versions found"
+                  isClearable={true}
+                  isSearchable={true}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
+                />
+              )}
+            />
             {errors.version && (
               <span className="form-error">{errors.version.message}</span>
             )}

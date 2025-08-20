@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import React from 'react';
+import Select from 'react-select';
+import './FilterableSelect.css';
 
 const FilterableSelect = ({
   id,
@@ -14,190 +15,156 @@ const FilterableSelect = ({
   getOptionValue = (option) => option.value || option.id || option,
   filterFunction = null, // Custom filter function
   emptyMessage = "No options found",
+  isClearable = true,
+  isSearchable = true,
+  menuPortalTarget = null,
+  menuPosition = "absolute",
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const dropdownRef = useRef(null);
-  const inputRef = useRef(null);
-  const listRef = useRef(null);
-
-  // Filter options based on search term
-  const filteredOptions = searchTerm
-    ? options.filter(option => {
-        if (filterFunction) {
-          return filterFunction(option, searchTerm);
-        }
-        const label = getOptionLabel(option).toLowerCase();
-        const search = searchTerm.toLowerCase();
-        return label.includes(search);
-      })
-    : options;
+  // Transform options to react-select format
+  const selectOptions = options.map(option => ({
+    value: getOptionValue(option),
+    label: getOptionLabel(option),
+    data: option, // Keep original option data
+  }));
 
   // Find selected option
-  const selectedOption = options.find(option => getOptionValue(option) === value);
-  const selectedLabel = selectedOption ? getOptionLabel(selectedOption) : '';
+  const selectedOption = selectOptions.find(option => option.value === value) || null;
 
-  // Handle outside clicks
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setIsOpen(false);
-        setSearchTerm('');
-        setHighlightedIndex(-1);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Handle keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (!isOpen) return;
-
-      switch (event.key) {
-        case 'ArrowDown':
-          event.preventDefault();
-          setHighlightedIndex(prev =>
-            prev < filteredOptions.length - 1 ? prev + 1 : 0
-          );
-          break;
-        case 'ArrowUp':
-          event.preventDefault();
-          setHighlightedIndex(prev =>
-            prev > 0 ? prev - 1 : filteredOptions.length - 1
-          );
-          break;
-        case 'Enter':
-          event.preventDefault();
-          if (highlightedIndex >= 0 && filteredOptions[highlightedIndex]) {
-            handleSelectOption(filteredOptions[highlightedIndex]);
-          }
-          break;
-        case 'Escape':
-          setIsOpen(false);
-          setSearchTerm('');
-          setHighlightedIndex(-1);
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, highlightedIndex, filteredOptions]);
-
-  // Scroll highlighted option into view
-  useEffect(() => {
-    if (highlightedIndex >= 0 && listRef.current) {
-      const highlightedElement = listRef.current.children[highlightedIndex];
-      if (highlightedElement) {
-        highlightedElement.scrollIntoView({
-          block: 'nearest',
-          behavior: 'smooth',
-        });
-      }
-    }
-  }, [highlightedIndex]);
-
-  const handleSelectOption = (option) => {
-    const optionValue = getOptionValue(option);
-    onChange(optionValue);
-    setIsOpen(false);
-    setSearchTerm('');
-    setHighlightedIndex(-1);
+  // Custom styles matching your existing design
+  const customStyles = {
+    control: (provided, state) => ({
+      ...provided,
+      borderColor: error ? '#ef4444' : state.isFocused ? '#3b82f6' : '#d1d5db',
+      boxShadow: error
+        ? '0 0 0 3px rgba(239, 68, 68, 0.1)'
+        : state.isFocused
+          ? '0 0 0 3px rgba(59, 130, 246, 0.1)'
+          : 'none',
+      '&:hover': {
+        borderColor: error ? '#ef4444' : '#9ca3af',
+      },
+      minHeight: '38px',
+      fontSize: '14px',
+      borderRadius: '6px',
+      backgroundColor: disabled ? '#f9fafb' : 'white',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: '#9ca3af',
+    }),
+    input: (provided) => ({
+      ...provided,
+      fontSize: '14px',
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      fontSize: '14px',
+      color: '#374151',
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected
+        ? '#3b82f6'
+        : state.isFocused
+          ? '#f3f4f6'
+          : 'white',
+      color: state.isSelected ? 'white' : '#374151',
+      fontSize: '14px',
+      padding: '8px 12px',
+      cursor: 'pointer',
+      '&:hover': {
+        backgroundColor: state.isSelected ? '#3b82f6' : '#f3f4f6',
+      },
+    }),
+    menu: (provided) => ({
+      ...provided,
+      borderRadius: '6px',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+      border: '1px solid #d1d5db',
+      marginTop: '4px',
+      zIndex: 1000,
+    }),
+    menuList: (provided) => ({
+      ...provided,
+      maxHeight: '200px',
+      padding: 0,
+    }),
+    menuPortal: (provided) => ({
+      ...provided,
+      zIndex: 1000,
+    }),
+    loadingMessage: (provided) => ({
+      ...provided,
+      fontSize: '14px',
+      color: '#6b7280',
+      fontStyle: 'italic',
+    }),
+    noOptionsMessage: (provided) => ({
+      ...provided,
+      fontSize: '14px',
+      color: '#6b7280',
+      fontStyle: 'italic',
+      padding: '12px',
+    }),
+    clearIndicator: (provided) => ({
+      ...provided,
+      color: '#6b7280',
+      cursor: 'pointer',
+      '&:hover': {
+        color: '#374151',
+      },
+    }),
+    dropdownIndicator: (provided, state) => ({
+      ...provided,
+      color: '#6b7280',
+      cursor: 'pointer',
+      transform: state.selectProps.menuIsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      transition: 'transform 0.2s',
+      '&:hover': {
+        color: '#374151',
+      },
+    }),
+    indicatorSeparator: (provided) => ({
+      ...provided,
+      backgroundColor: '#e5e7eb',
+    }),
   };
 
-  const handleInputClick = () => {
-    if (!disabled) {
-      setIsOpen(!isOpen);
-      if (!isOpen) {
-        setTimeout(() => inputRef.current?.focus(), 0);
+  // Custom filter function if provided
+  const filterOption = filterFunction
+    ? (option, inputValue) => {
+        return filterFunction(option.data, inputValue);
       }
-    }
-  };
+    : undefined;
 
-  const handleClear = (e) => {
-    e.stopPropagation();
-    onChange('');
-    setSearchTerm('');
-    setIsOpen(false);
-  };
-
-  const handleInputChange = (e) => {
-    setSearchTerm(e.target.value);
-    setHighlightedIndex(-1);
-    if (!isOpen) {
-      setIsOpen(true);
-    }
+  // Handle selection change
+  const handleChange = (selectedOption) => {
+    const newValue = selectedOption ? selectedOption.value : '';
+    onChange(newValue);
   };
 
   return (
-    <div className={`filterable-select ${className}`} ref={dropdownRef}>
-      <div
-        className={`filterable-select-control ${error ? 'error' : ''} ${disabled ? 'disabled' : ''} ${isOpen ? 'open' : ''}`}
-        onClick={handleInputClick}
-      >
-        <input
-          ref={inputRef}
-          id={id}
-          type="text"
-          value={isOpen ? searchTerm : selectedLabel}
-          onChange={handleInputChange}
-          placeholder={selectedLabel || placeholder}
-          className="filterable-select-input"
-          disabled={disabled}
-          autoComplete="off"
-          readOnly={!isOpen}
-        />
-
-        <div className="filterable-select-indicators">
-          {value && !disabled && (
-            <button
-              type="button"
-              className="filterable-select-clear"
-              onClick={handleClear}
-              tabIndex={-1}
-            >
-              <X size={14} />
-            </button>
-          )}
-          <div className="filterable-select-separator" />
-          <div className={`filterable-select-arrow ${isOpen ? 'open' : ''}`}>
-            <ChevronDown size={16} />
-          </div>
-        </div>
-      </div>
-
-      {isOpen && (
-        <div className="filterable-select-menu">
-          <div className="filterable-select-list" ref={listRef}>
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map((option, index) => {
-                const optionValue = getOptionValue(option);
-                const optionLabel = getOptionLabel(option);
-                return (
-                  <div
-                    key={optionValue}
-                    className={`filterable-select-option ${
-                      index === highlightedIndex ? 'highlighted' : ''
-                    } ${optionValue === value ? 'selected' : ''}`}
-                    onClick={() => handleSelectOption(option)}
-                    onMouseEnter={() => setHighlightedIndex(index)}
-                  >
-                    {optionLabel}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="filterable-select-empty">
-                {emptyMessage}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+    <div className={`filterable-select ${className}`}>
+      <Select
+        inputId={id}
+        value={selectedOption}
+        onChange={handleChange}
+        options={selectOptions}
+        isDisabled={disabled}
+        isSearchable={isSearchable}
+        isClearable={isClearable}
+        placeholder={placeholder}
+        noOptionsMessage={({ inputValue }) =>
+          inputValue ? `No options found matching "${inputValue}"` : emptyMessage
+        }
+        styles={customStyles}
+        menuPortalTarget={menuPortalTarget}
+        menuPosition={menuPosition}
+        filterOption={filterOption}
+        className={`react-select-container ${error ? 'error' : ''}`}
+        classNamePrefix="react-select"
+      />
     </div>
   );
 };

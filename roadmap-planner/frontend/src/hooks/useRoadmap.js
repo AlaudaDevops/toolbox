@@ -52,8 +52,8 @@ export const RoadmapProvider = ({ children }) => {
           milestones: [] // Will be loaded with full data
         })),
         quarters: basicData.quarters,
-        components: basicData.components,
-        versions: basicData.versions,
+        components: basicData.project?.components,
+        versions: basicData.project?.versions,
       }));
 
       return basicData;

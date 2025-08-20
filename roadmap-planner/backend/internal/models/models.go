@@ -298,7 +298,7 @@ func GenerateQuarters() []string {
 
 // extractPriorityFromIssue extracts the priority from a Jira issue
 func extractPriorityFromIssue(issue *jira.Issue) string {
-	if issue.Fields.Priority != nil {
+	if issue.Fields != nil && issue.Fields.Priority != nil {
 		return issue.Fields.Priority.Name
 	}
 	return ""
@@ -326,7 +326,7 @@ func extractVersionsFromIssue(issue *jira.Issue) (fixVersion []string) {
 
 // extractStatusFromIssue extracts the status from a Jira issue
 func extractStatusFromIssue(issue *jira.Issue) string {
-	if issue.Fields.Status != nil {
+	if issue.Fields != nil &&  issue.Fields.Status != nil {
 		return issue.Fields.Status.Name
 	}
 	return ""

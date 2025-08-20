@@ -41,9 +41,6 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
     setIsSubmitting(false);
   };
 
-  // Find the selected milestone for display
-  // const selectedMilestone = availableMilestones.find(m => m.id === epic.milestone_id);
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -120,14 +117,20 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
                   }
                   getOptionValue={(milestone) => milestone.id}
                   filterFunction={(milestone, searchTerm) => {
+                    console.log("mileston and search term", milestone, searchTerm);
                     const search = searchTerm.toLowerCase();
                     return (
-                      milestone.name.toLowerCase().includes(search) ||
-                      milestone.quarter.toLowerCase().includes(search) ||
-                      milestone.key.toLowerCase().includes(search)
+                      milestone.data.name.toLowerCase().includes(search) ||
+                      milestone.data.quarter.toLowerCase().includes(search) ||
+                      milestone.data.key.toLowerCase().includes(search)
                     );
+                    return true;
                   }}
                   emptyMessage="No milestones found"
+                  isClearable={false}
+                  isSearchable={true}
+                  menuPortalTarget={document.body}
+                  menuPosition="fixed"
                 />
               )}
             />
