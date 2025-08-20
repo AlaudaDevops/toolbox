@@ -83,29 +83,14 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	// Debug and logging flags
 	flags.BoolVar(&p.Config.Verbose, "verbose", false, "Enable verbose logging (debug level logs)")
 	flags.BoolVar(&p.Config.Debug, "debug", false, "Enable debug mode (skip comment sender validation and allow PR creators to approve their own PR)")
+	flags.StringVar(&p.Config.ResultsDir, "results-dir", p.Config.ResultsDir, "Directory to write results files (default: /tekton/results)")
 }
 
 // Run executes the PR CLI logic
 func (p *PROption) Run(cmd *cobra.Command, args []string) error {
-	// Read all values from viper (which includes environment variables)
-	p.readAllFromViper()
-
-	// Parse string fields into config
-	if err := p.parseStringFields(); err != nil {
-		return fmt.Errorf("failed to parse CLI fields: %w", err)
-	}
-
-	// Set log level based on verbose flag
-	if p.Config.Verbose {
-		p.Logger.SetLevel(logrus.DebugLevel)
-		p.Logger.Debug("Verbose logging enabled")
-	} else {
-		p.Logger.SetLevel(logrus.InfoLevel)
-	}
-
-	// Validate configuration
-	if err := p.Config.Validate(); err != nil {
-		return fmt.Errorf("configuration validation failed: %w", err)
+	// Initialize and validate configuration
+	if err := p.initialize(); err != nil {
+		return err
 	}
 
 	// Parse the trigger comment to determine the command
@@ -125,56 +110,13 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize PR handler: %w", err)
 	}
 
-	// Check if PR is open and get PR information to retrieve the author
-	// Skip status check for commands that can work with closed PRs
-	if !p.shouldSkipPRStatusCheck(command) {
-		if err := prHandler.CheckPRStatus("open"); err != nil {
-			return fmt.Errorf("PR status check failed: %w", err)
-		}
+	// Handle built-in commands separately
+	if p.isBuiltInCommand(command) {
+		return p.executeBuiltInCommand(prHandler, command, cmdArgs)
 	}
 
-	// Validate comment sender in non-debug mode
-	if !p.Config.Debug {
-		if err := p.validateCommentSender(prHandler); err != nil {
-			return fmt.Errorf("comment sender validation failed: %w", err)
-		}
-	}
-
-	// Execute command and handle errors gracefully
-	switch command {
-	case "help":
-		err = prHandler.HandleHelp()
-	case "assign":
-		err = prHandler.HandleAssign(cmdArgs)
-	case "unassign":
-		err = prHandler.HandleUnassign(cmdArgs)
-	case "lgtm":
-		err = prHandler.HandleLGTM()
-	case "remove-lgtm":
-		err = prHandler.HandleRemoveLGTM()
-	case "merge", "ready":
-		err = prHandler.HandleMerge(cmdArgs)
-	case "rebase":
-		err = prHandler.HandleRebase()
-	case "check":
-		err = prHandler.HandleCheck()
-	case "cherry-pick", "cherrypick":
-		err = prHandler.HandleCherrypick(cmdArgs)
-	case "label":
-		err = prHandler.HandleLabel(cmdArgs)
-	case "unlabel":
-		err = prHandler.HandleUnlabel(cmdArgs)
-	default:
-		err = fmt.Errorf("unknown command: %s", command)
-	}
-
-	// If command execution failed, try to post error as comment
-	if err != nil {
-		p.Logger.Errorf("Command %s failed: %v", command, err)
-		return p.handleCommandError(prHandler, command, err)
-	}
-
-	return nil
+	// Handle regular commands
+	return p.executeRegularCommand(prHandler, command, cmdArgs)
 }
 
 // readAllFromViper reads all configuration values from viper
@@ -194,6 +136,7 @@ func (p *PROption) readAllFromViper() {
 	p.Config.LGTMReviewEvent = strings.TrimSpace(p.Config.LGTMReviewEvent)
 	p.Config.MergeMethod = strings.TrimSpace(p.Config.MergeMethod)
 	p.Config.SelfCheckName = strings.TrimSpace(p.Config.SelfCheckName)
+	p.Config.ResultsDir = strings.TrimSpace(p.Config.ResultsDir)
 
 	// Handle special string fields that need to be read separately
 	// since they're not directly mapped to Config struct fields
@@ -244,8 +187,10 @@ func (p *PROption) parseStringFields() error {
 }
 
 var (
-	// Match pattern: /command [args...]
-	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-pick|cherrypick|assign|merge|ready|unassign|label|unlabel|check)\s*(.*)`)
+	// Match pattern: /command [args...] or /__built-in-command [args...]
+	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-pick|cherrypick|assign|merge|ready|unassign|label|unlabel|check)\s*(.*)$`)
+	// Match pattern for built-in commands: /__command [args...]
+	builtInCommandRegexp = regexp.MustCompile(`^/(__[a-z-_]+)\s*(.*)$`)
 )
 
 // parseCommand parses the trigger comment to extract command and arguments
@@ -255,6 +200,20 @@ func (p *PROption) parseCommand(comment string) (string, []string, error) {
 		return "", nil, fmt.Errorf("comment must start with /")
 	}
 
+	// Try to match built-in commands first (/__command)
+	if builtInMatches := builtInCommandRegexp.FindStringSubmatch(comment); len(builtInMatches) >= 2 {
+		command := builtInMatches[1] // Built-in command with __ prefix already captured
+		argsStr := strings.TrimSpace(builtInMatches[2])
+
+		var args []string
+		if argsStr != "" {
+			args = strings.Fields(argsStr)
+		}
+
+		return command, args, nil
+	}
+
+	// Try to match regular commands (/command)
 	matches := commentRegexp.FindStringSubmatch(comment)
 	if len(matches) < 2 {
 		return "", nil, fmt.Errorf("invalid command format")
@@ -287,7 +246,12 @@ var commandsSkipPRStatusCheck = map[string]bool{
 
 // shouldSkipPRStatusCheck returns true if the command can work with closed PRs
 func (p *PROption) shouldSkipPRStatusCheck(command string) bool {
-	return commandsSkipPRStatusCheck[command]
+	return commandsSkipPRStatusCheck[command] || p.isBuiltInCommand(command)
+}
+
+// isBuiltInCommand returns true if the command is a built-in command (starts with __)
+func (p *PROption) isBuiltInCommand(command string) bool {
+	return strings.HasPrefix(command, "__")
 }
 
 // validateCommentSender verifies that the comment-sender actually posted the trigger-comment
@@ -313,6 +277,114 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 	}
 
 	p.Logger.Infof("Comment sender validation passed: %s posted a comment containing the trigger", p.Config.CommentSender)
+	return nil
+}
+
+// initialize initializes and validates the PROption configuration
+func (p *PROption) initialize() error {
+	// Read all values from viper (which includes environment variables)
+	p.readAllFromViper()
+
+	// Parse string fields into config
+	if err := p.parseStringFields(); err != nil {
+		return fmt.Errorf("failed to parse CLI fields: %w", err)
+	}
+
+	// Set log level based on verbose flag
+	if p.Config.Verbose {
+		p.Logger.SetLevel(logrus.DebugLevel)
+		p.Logger.Debug("Verbose logging enabled")
+	} else {
+		p.Logger.SetLevel(logrus.InfoLevel)
+	}
+
+	// Validate configuration
+	if err := p.Config.Validate(); err != nil {
+		return fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	return nil
+}
+
+// executeBuiltInCommand handles execution of built-in commands
+func (p *PROption) executeBuiltInCommand(prHandler *handler.PRHandler, command string, cmdArgs []string) error {
+	p.Logger.Infof("Executing built-in command: %s", command)
+
+	// Built-in commands skip comment sender validation
+	// Execute built-in command
+	var err error
+	switch command {
+	case "__post-merge-cherry-pick":
+		err = prHandler.HandlePostMergeCherryPick()
+	default:
+		err = fmt.Errorf("unknown built-in command: %s", command)
+	}
+
+	// Handle error for built-in commands (may not want to post comments for internal commands)
+	if err != nil {
+		p.Logger.Errorf("Built-in command %s failed: %v", command, err)
+		// For built-in commands, we typically don't post error comments to PR
+		// as they are internal system operations
+		return fmt.Errorf("built-in command failed: %w", err)
+	}
+
+	return nil
+}
+
+// executeRegularCommand handles execution of regular user commands
+func (p *PROption) executeRegularCommand(prHandler *handler.PRHandler, command string, cmdArgs []string) error {
+	p.Logger.Infof("Executing regular command: %s", command)
+
+	// Check if PR is open and get PR information to retrieve the author
+	// Skip status check for commands that can work with closed PRs
+	if !p.shouldSkipPRStatusCheck(command) {
+		if err := prHandler.CheckPRStatus("open"); err != nil {
+			return fmt.Errorf("PR status check failed: %w", err)
+		}
+	}
+
+	// Validate comment sender in non-debug mode
+	if !p.Config.Debug {
+		if err := p.validateCommentSender(prHandler); err != nil {
+			return fmt.Errorf("comment sender validation failed: %w", err)
+		}
+	}
+
+	// Execute regular command
+	var err error
+	switch command {
+	case "help":
+		err = prHandler.HandleHelp()
+	case "assign":
+		err = prHandler.HandleAssign(cmdArgs)
+	case "unassign":
+		err = prHandler.HandleUnassign(cmdArgs)
+	case "lgtm":
+		err = prHandler.HandleLGTM()
+	case "remove-lgtm":
+		err = prHandler.HandleRemoveLGTM()
+	case "merge", "ready":
+		err = prHandler.HandleMerge(cmdArgs)
+	case "rebase":
+		err = prHandler.HandleRebase()
+	case "check":
+		err = prHandler.HandleCheck()
+	case "cherry-pick", "cherrypick":
+		err = prHandler.HandleCherrypick(cmdArgs)
+	case "label":
+		err = prHandler.HandleLabel(cmdArgs)
+	case "unlabel":
+		err = prHandler.HandleUnlabel(cmdArgs)
+	default:
+		err = fmt.Errorf("unknown command: %s", command)
+	}
+
+	// If command execution failed, try to post error as comment
+	if err != nil {
+		p.Logger.Errorf("Command %s failed: %v", command, err)
+		return p.handleCommandError(prHandler, command, err)
+	}
+
 	return nil
 }
 

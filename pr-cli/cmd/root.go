@@ -52,7 +52,12 @@ Example usage:
   pr-cli --merge-method squash --trigger-comment "/merge" --platform github --repo-owner owner --repo-name repo --pr-num 123 --comment-sender user --token $TOKEN
 
   # Use ready command (alias for merge)
-  pr-cli --trigger-comment "/ready" --platform github --repo-owner owner --repo-name repo --pr-num 123 --comment-sender user --token $TOKEN`,
+  pr-cli --trigger-comment "/ready" --platform github --repo-owner owner --repo-name repo --pr-num 123 --comment-sender user --token $TOKEN
+
+Tekton Results:
+  When used in Tekton pipelines, pr-cli writes result files to the configured results directory.
+  Available results:
+  - merge-successful: Written with value "true" when a merge operation completes successfully`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Handle --version flag

@@ -41,6 +41,7 @@ type Config struct {
 	TriggerComment string `json:"trigger_comment,omitempty" yaml:"trigger_comment,omitempty" mapstructure:"trigger-comment"`
 	Debug          bool   `json:"debug,omitempty" yaml:"debug,omitempty" mapstructure:"debug"`
 	Verbose        bool   `json:"verbose,omitempty" yaml:"verbose,omitempty" mapstructure:"verbose"`
+	ResultsDir     string `json:"results_dir,omitempty" yaml:"results_dir,omitempty" mapstructure:"results-dir"`
 
 	// LGTM configuration
 	LGTMThreshold   int      `json:"lgtm_threshold" yaml:"lgtm_threshold" mapstructure:"lgtm-threshold"`
@@ -72,6 +73,7 @@ func NewDefaultConfig() *Config {
 		SelfCheckName:          "pr-cli",
 		LogLevel:               "info",
 		UseGitCLIForCherryPick: true, // Default to Git CLI method for backward compatibility
+		ResultsDir:             "/tekton/results",
 	}
 }
 

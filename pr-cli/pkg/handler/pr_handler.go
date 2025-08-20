@@ -18,6 +18,8 @@ package handler
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -154,4 +156,21 @@ func (h *PRHandler) GetComments() ([]git.Comment, error) {
 // PostComment posts a comment to the pull request
 func (h *PRHandler) PostComment(message string) error {
 	return h.client.PostComment(message)
+}
+
+// writeTektonResult writes a result value for Tekton pipeline
+func (h *PRHandler) writeTektonResult(name, value string) {
+	// Check if the results directory exists
+	if _, err := os.Stat(h.config.ResultsDir); os.IsNotExist(err) {
+		h.Logger.Debugf("Results directory %s does not exist, skipping result writing", h.config.ResultsDir)
+		return
+	}
+
+	resultPath := filepath.Join(h.config.ResultsDir, name)
+	if err := os.WriteFile(resultPath, []byte(value), 0644); err != nil {
+		h.Logger.Errorf("Failed to write result %s to %s: %v", name, resultPath, err)
+		return
+	}
+
+	h.Logger.Infof("Wrote result %s=%s to %s", name, value, resultPath)
 }

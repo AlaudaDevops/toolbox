@@ -388,6 +388,15 @@ func (cp *CherryPicker) performCherryPick(commitSHA string) error {
 					cp.runGitCommand("cherry-pick", "--abort")
 					err = cp.runGitCommand("cherry-pick", "--strategy=recursive", "--strategy-option=ours", commitSHA)
 					if err != nil {
+						// Check if this is an empty commit error
+						if cp.isEmptyCommitError(err) {
+							cp.logger.Warnf("Cherry-pick resulted in empty commit for %s, skipping with --allow-empty", commitSHA)
+							// Try to skip the empty commit
+							if skipErr := cp.runGitCommand("cherry-pick", "--skip"); skipErr != nil {
+								cp.logger.Warnf("Failed to skip empty commit, continuing anyway: %v", skipErr)
+							}
+							return nil
+						}
 						return fmt.Errorf("failed to cherry-pick commit %s with automatic conflict resolution: %w", commitSHA, err)
 					}
 				}
@@ -397,6 +406,14 @@ func (cp *CherryPicker) performCherryPick(commitSHA string) error {
 		}
 	}
 	return nil
+}
+
+// isEmptyCommitError checks if the error is related to empty commits
+func (cp *CherryPicker) isEmptyCommitError(err error) bool {
+	errorMsg := strings.ToLower(err.Error())
+	return strings.Contains(errorMsg, "empty") ||
+		strings.Contains(errorMsg, "nothing to commit") ||
+		strings.Contains(errorMsg, "the previous cherry-pick is now empty")
 }
 
 // pushBranch pushes the cherry-pick branch to the remote

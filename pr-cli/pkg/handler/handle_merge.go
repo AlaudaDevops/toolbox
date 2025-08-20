@@ -136,12 +136,6 @@ func (h *PRHandler) HandleMerge(args []string) error {
 		return &CommentedError{Err: err}
 	}
 
-	// After successful merge, handle any pending cherry-pick operations
-	if err := h.handlePostMergeCherryPicks(); err != nil {
-		h.Logger.Errorf("Failed to handle post-merge cherry-picks: %v", err)
-		// Don't fail the merge operation for cherry-pick errors
-	}
-
 	// Build robot users map for filtering
 	robotUsers := make(map[string]bool)
 	for user := range lgtmUsers {
@@ -154,16 +148,37 @@ func (h *PRHandler) HandleMerge(args []string) error {
 	usersTable := messages.BuildUsersTable(lgtmUsers, robotUsers)
 	successMessage := fmt.Sprintf(messages.MergeSuccessTemplate, method, h.config.CommentSender, validVotes, h.config.LGTMThreshold, usersTable)
 
-	return h.client.PostComment(successMessage)
+	if err := h.client.PostComment(successMessage); err != nil {
+		return err
+	}
+
+	// Write Tekton result to indicate merge was successful
+	h.writeTektonResult("merge-successful", "true")
+
+	return nil
 }
 
 var (
 	cherryPickPattern = regexp.MustCompile(`^/cherry-pick\s+(\S+)`)
 )
 
-// handlePostMergeCherryPicks processes any cherry-pick commands found in PR comments after merge
-func (h *PRHandler) handlePostMergeCherryPicks() error {
+// HandlePostMergeCherryPick processes any cherry-pick commands found in PR comments after merge
+// This is a public method that can be called independently for post-merge operations
+func (h *PRHandler) HandlePostMergeCherryPick() error {
 	h.Logger.Info("Checking for cherry-pick commands after merge")
+
+	// First check if PR is closed (merged or closed)
+	prInfo, err := h.client.GetPR()
+	if err != nil {
+		return fmt.Errorf("failed to get PR info: %w", err)
+	}
+
+	if prInfo.State == "open" {
+		h.Logger.Info("PR is still open, skipping post-merge cherry-pick operations")
+		return nil
+	}
+
+	h.Logger.Infof("PR is %s, proceeding with cherry-pick operations", prInfo.State)
 
 	// Get all comments from the PR
 	comments, err := h.client.GetComments()

@@ -38,6 +38,9 @@ spec:
     - name: pr-merge-management
       displayName: PR Merge & Management Operations
       taskSpec:
+        results:
+          - name: merge-successful
+            description: Indicates if a merge operation was successful
         steps:
           - name: cli
             image: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest
@@ -47,10 +50,9 @@ spec:
               requests:
                 cpu: "200m"
                 memory: "192Mi"
-              # Because we may use git to cherrypick, we set the limits a bit larger to avoid OOM issues.
               limits:
-                cpu: "1"
-                memory: "1Gi"
+                cpu: "500m"
+                memory: "512Mi"
             env:
               - name: PR_PLATFORM
                 value: $(params.platform)
@@ -85,3 +87,50 @@ spec:
                 value: $(params.verbose)
               - name: PR_ROBOT_ACCOUNTS
                 value: $(params.robot_accounts)
+  finally:
+    # Execute cherry-pick operations in finally block because after PR merge,
+    # the pipeline will be cancelled (set to CancelledRunFinally), so these
+    # operations must be placed in finally to ensure they run
+    - name: post-merge-cherry-pick
+      displayName: Post-Merge Cherry-Pick Operations
+      when:
+        - input: $(tasks.pr-merge-management.results.merge-successful)
+          operator: in
+          values: ["true"]
+      taskSpec:
+        steps:
+          - name: cherry-pick-handler
+            image: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest
+            imagePullPolicy: Always
+            command: ["/usr/local/bin/pr-cli"]
+            computeResources:
+              requests:
+                cpu: "200m"
+                memory: "192Mi"
+              limits:
+                cpu: "1"
+                memory: "1Gi"
+            env:
+              - name: PR_PLATFORM
+                value: $(params.platform)
+              - name: PR_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.git_auth_secret)
+                    key: $(params.git_auth_secret_key)
+              - name: PR_REPO_OWNER
+                value: $(params.repo_owner)
+              - name: PR_REPO_NAME
+                value: $(params.repo_name)
+              - name: PR_PR_NUM
+                value: $(params.pull_request_number)
+              - name: PR_COMMENT_SENDER
+                value: $(params.comment_sender)
+              - name: PR_TRIGGER_COMMENT
+                value: "/__post-merge-cherry-pick"
+              - name: PR_DEBUG
+                value: $(params.debug)
+              - name: PR_VERBOSE
+                value: $(params.verbose)
+              - name: PR_POST_MERGE_CHERRY_PICK
+                value: "true"

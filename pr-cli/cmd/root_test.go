@@ -62,6 +62,34 @@ func TestParseCommand(t *testing.T) {
 			wantArgs:    nil,
 			wantErr:     true,
 		},
+		{
+			name:        "built-in command - post-merge-cherry-pick",
+			comment:     "/__post-merge-cherry-pick",
+			wantCommand: "__post-merge-cherry-pick",
+			wantArgs:    nil,
+			wantErr:     false,
+		},
+		{
+			name:        "built-in command with args",
+			comment:     "/__post-merge-cherry-pick arg1 arg2",
+			wantCommand: "__post-merge-cherry-pick",
+			wantArgs:    []string{"arg1", "arg2"},
+			wantErr:     false,
+		},
+		{
+			name:        "built-in command with underscores",
+			comment:     "/__some-other_command",
+			wantCommand: "__some-other_command",
+			wantArgs:    nil,
+			wantErr:     false,
+		},
+		{
+			name:        "regular command should not match built-in pattern",
+			comment:     "/help",
+			wantCommand: "help",
+			wantArgs:    nil,
+			wantErr:     false,
+		},
 	}
 
 	// Create a PROption instance for testing
@@ -154,6 +182,119 @@ func TestParseStringFields(t *testing.T) {
 				if !reflect.DeepEqual(prOption.Config.LGTMPermissions, tt.wantLGTMPermissions) {
 					t.Errorf("parseStringFields() LGTMPermissions = %v, want %v", prOption.Config.LGTMPermissions, tt.wantLGTMPermissions)
 				}
+			}
+		})
+	}
+}
+
+func TestShouldSkipPRStatusCheck(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		want    bool
+	}{
+		{
+			name:    "cherry-pick command should skip",
+			command: "cherry-pick",
+			want:    true,
+		},
+		{
+			name:    "cherrypick command should skip",
+			command: "cherrypick",
+			want:    true,
+		},
+		{
+			name:    "built-in post-merge-cherry-pick should skip",
+			command: "__post-merge-cherry-pick",
+			want:    true,
+		},
+		{
+			name:    "any built-in command should skip",
+			command: "__some-other-builtin",
+			want:    true,
+		},
+		{
+			name:    "regular command should not skip",
+			command: "help",
+			want:    false,
+		},
+		{
+			name:    "merge command should not skip",
+			command: "merge",
+			want:    false,
+		},
+		{
+			name:    "lgtm command should not skip",
+			command: "lgtm",
+			want:    false,
+		},
+		{
+			name:    "unknown command should not skip",
+			command: "unknown",
+			want:    false,
+		},
+	}
+
+	prOption := NewPROption()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := prOption.shouldSkipPRStatusCheck(tt.command); got != tt.want {
+				t.Errorf("shouldSkipPRStatusCheck() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsBuiltInCommand(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		want    bool
+	}{
+		{
+			name:    "built-in command",
+			command: "__post-merge-cherry-pick",
+			want:    true,
+		},
+		{
+			name:    "another built-in command",
+			command: "__some-other-command",
+			want:    true,
+		},
+		{
+			name:    "regular command",
+			command: "help",
+			want:    false,
+		},
+		{
+			name:    "regular command with prefix",
+			command: "cherry-pick",
+			want:    false,
+		},
+		{
+			name:    "single underscore prefix",
+			command: "_command",
+			want:    false,
+		},
+		{
+			name:    "empty command",
+			command: "",
+			want:    false,
+		},
+		{
+			name:    "only double underscore",
+			command: "__",
+			want:    true,
+		},
+	}
+
+	prOption := NewPROption()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := prOption.isBuiltInCommand(tt.command); got != tt.want {
+				t.Errorf("isBuiltInCommand() = %v, want %v", got, tt.want)
 			}
 		})
 	}

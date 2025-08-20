@@ -76,6 +76,31 @@ export PR_REPO_NAME=repo
 | `/cherrypick` | Cherry-pick to branches (alias) | `branch1 branch2 ...` | `/cherrypick release/v1.0` |
 | `/help` | Show available commands | - | `/help` |
 
+### Built-in Commands
+
+Built-in commands use the `/__` prefix (double underscore) and are designed for internal system usage rather than direct user interaction. These commands bypass normal validation checks and are typically triggered by pipeline automation or system processes.
+
+| Command | Description | Use Case | Example |
+|---------|-------------|----------|---------|
+| `/__post-merge-cherry-pick` | Execute post-merge cherry-pick operations | Pipeline finally tasks after PR merge | `/__post-merge-cherry-pick` |
+
+#### Built-in Command Rules:
+- **Prefix**: All built-in commands must start with `/__` (slash + double underscore)
+- **Purpose**: Internal system automation, not user-triggered actions
+- **Validation**: Skip comment sender validation (no permission checks)
+- **Status Checks**: Automatically bypass PR status checks when appropriate
+
+#### Usage Example:
+```bash
+# Pipeline/automation usage
+pr-cli --platform github \
+       --repo-owner owner \
+       --repo-name repo \
+       --pr-num 123 \
+       --comment-sender system \
+       --trigger-comment "/__post-merge-cherry-pick"
+```
+
 ### Merge Methods
 - `merge` - Create merge commit
 - `squash` - Squash merge (default)
@@ -99,9 +124,14 @@ export PR_REPO_NAME=repo
 - `--debug`: Enable debug mode (skip validation, allow PR creator self-approval)
 - `--verbose`: Enable verbose logging (debug level logs)
 - `--lgtm-permissions`: Comma-separated list of permissions required for LGTM (default: admin,write)
-- `--lgtm-review-event`: Review event type for LGTM (default: APPRO
+- `--lgtm-review-event`: Review event type for LGTM (default: APPROVE)
 - `--self-check-name`: Name for self-check (default: pr-cli)
 - `--robot-accounts`: Comma-separated list of bot accounts for managing bot approval reviews
+- `--base-url`: API base URL (optional, defaults per platform)
+- `--use-git-cli-for-cherrypick`: Use Git CLI for cherry-pick operations (default: true)
+- `--results-dir`: Directory to write results files (default: /tekton/results)
+- `--version`, `-v`: Show version information
+- `--output`, `-o`: Output format for version (text|json)
 
 ### LGTM Configuration
 
@@ -112,6 +142,14 @@ pr-cli --lgtm-threshold 2 --trigger-comment "/lgtm" ...
 # Custom merge method
 pr-cli --merge-method squash --trigger-comment "/merge" ...
 ```
+
+## Tekton Results
+
+When used in Tekton pipelines, pr-cli writes result files to the configured results directory (specified by `--results-dir`). The following table shows all available results:
+
+| Result Name | Value | Condition | Description |
+|-------------|-------|-----------|-------------|
+| `merge-successful` | `"true"` | When merge operation completes successfully | Indicates that a PR has been successfully merged |
 
 ## Development
 

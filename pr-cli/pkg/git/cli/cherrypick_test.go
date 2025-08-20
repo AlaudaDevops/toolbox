@@ -17,6 +17,7 @@ limitations under the License.
 package cli
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -263,6 +264,53 @@ func TestSanitizeErrorMessage(t *testing.T) {
 			result := sanitizeErrorMessage(tt.input)
 			if result != tt.expected {
 				t.Errorf("sanitizeErrorMessage() = %q, want %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsEmptyCommitError(t *testing.T) {
+	logger := logrus.New()
+	cherryPicker := NewCherryPicker(logger, "https://test.com", "token", "owner", "repo", 1)
+
+	tests := []struct {
+		name     string
+		errMsg   string
+		expected bool
+	}{
+		{
+			name:     "Empty commit error",
+			errMsg:   "The previous cherry-pick is now empty, possibly due to conflict resolution.",
+			expected: true,
+		},
+		{
+			name:     "Nothing to commit error",
+			errMsg:   "nothing to commit, working tree clean",
+			expected: true,
+		},
+		{
+			name:     "Generic empty error",
+			errMsg:   "commit is empty after applying changes",
+			expected: true,
+		},
+		{
+			name:     "Regular cherry-pick error",
+			errMsg:   "error: could not apply abc123d... commit message",
+			expected: false,
+		},
+		{
+			name:     "Conflict error",
+			errMsg:   "CONFLICT (content): Merge conflict in file.txt",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := fmt.Errorf("%s", tt.errMsg)
+			result := cherryPicker.isEmptyCommitError(err)
+			if result != tt.expected {
+				t.Errorf("isEmptyCommitError() = %v, want %v for error: %s", result, tt.expected, tt.errMsg)
 			}
 		})
 	}
