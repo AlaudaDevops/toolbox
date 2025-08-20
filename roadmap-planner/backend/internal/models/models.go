@@ -61,6 +61,7 @@ type Epic struct {
 	MilestoneIDs []string `json:"milestone_ids"`
 	Status      string `json:"status"`
 	Priority    string `json:"priority"`
+	Assignee    *User  `json:"assignee,omitempty"`
 }
 
 // User represents a Jira user
@@ -220,6 +221,7 @@ func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
 		MilestoneIDs: extractMilestoneIdsFromIssue(issue),
 		Status:      extractStatusFromIssue(issue),
 		Priority:    extractPriorityFromIssue(issue),
+		Assignee:    convertJiraUserToUser(issue.Fields.Assignee),
 	}
 
 	return epic
@@ -573,4 +575,18 @@ func HasItem(index map[string]struct{}, item []string) bool {
 		}
 	}
 	return false
+}
+
+// convertJiraUserToUser converts a Jira user to our User model
+func convertJiraUserToUser(jiraUser *jira.User) *User {
+	if jiraUser == nil {
+		return nil
+	}
+
+	return &User{
+		AccountID:    jiraUser.AccountID,
+		Name:         jiraUser.Name,
+		DisplayName:  jiraUser.DisplayName,
+		EmailAddress: jiraUser.EmailAddress,
+	}
 }

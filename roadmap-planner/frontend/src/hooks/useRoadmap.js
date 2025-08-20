@@ -54,6 +54,7 @@ export const RoadmapProvider = ({ children }) => {
         quarters: basicData.quarters,
         components: basicData.project?.components,
         versions: basicData.project?.versions,
+        project: basicData.project,
       }));
 
       return basicData;

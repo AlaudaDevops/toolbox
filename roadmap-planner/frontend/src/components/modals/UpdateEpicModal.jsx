@@ -1,60 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useRoadmap } from '../../hooks/useRoadmap';
 import { X } from 'lucide-react';
 import AssigneeSelect from '../AssigneeSelect';
+import FilterableSelect from '../FilterableSelect';
+import '../FilterableSelect.css';
 import './Modal.css';
 
 const UpdateEpicModal = ({ epic, onClose }) => {
-  const { updateEpic, getComponentVersions } = useRoadmap();
+  const { roadmapData, updateEpic } = useRoadmap();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [versions, setVersions] = useState([]);
-  const [loadingVersions, setLoadingVersions] = useState(false);
 
   const {
     register,
     handleSubmit,
     control,
-    watch,
     formState: { errors },
     setError,
   } = useForm({
     defaultValues: {
       name: epic.name,
-      component: epic.component || '',
-      version: epic.version || '',
+      component: epic.components? epic.components[0] : '',
+      version: epic.versions? epic.versions[0] : '',
       priority: epic.priority || '',
-      assignee: null, // Will be set by AssigneeSelect
+      assignee: epic.assignee || null, // Will be handled separately for AssigneeSelect
     },
   });
 
-  const watchedComponent = watch('component');
-
-  // Load versions when component changes
-  useEffect(() => {
-    const loadVersions = async () => {
-      if (watchedComponent) {
-        setLoadingVersions(true);
-        try {
-          const result = await getComponentVersions(watchedComponent);
-          if (result.success) {
-            setVersions(result.data.versions || []);
-          } else {
-            setVersions([]);
-          }
-        } catch (error) {
-          console.error('Failed to load versions:', error);
-          setVersions([]);
-        } finally {
-          setLoadingVersions(false);
-        }
-      } else {
-        setVersions([]);
-      }
-    };
-
-    loadVersions();
-  }, [watchedComponent, getComponentVersions]);
+  // Get available components and versions from roadmap data
+  const availableComponents = roadmapData?.project?.components || [];
+  const availableVersions = roadmapData?.project?.versions || [];
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
@@ -126,12 +101,23 @@ const UpdateEpicModal = ({ epic, onClose }) => {
             <label htmlFor="component" className="form-label">
               Component
             </label>
-            <input
-              id="component"
-              type="text"
-              className={`form-input ${errors.component ? 'error' : ''}`}
-              placeholder="Enter component name"
-              {...register('component')}
+            <Controller
+              name="component"
+              control={control}
+              render={({ field }) => (
+                <FilterableSelect
+                  id="component"
+                  options={availableComponents}
+                  placeholder="Select Component"
+                  getOptionValue={(option) => option.name}
+                  getOptionLabel={(option) => option.name}
+                  value={field.value || ''}
+                  onChange={(selectedOption) => {
+                    console.log("component selectedOption:", selectedOption);
+                    field.onChange(selectedOption?.value || '');
+                  }}
+                />
+              )}
             />
             {errors.component && (
               <span className="form-error">{errors.component.message}</span>
@@ -142,25 +128,24 @@ const UpdateEpicModal = ({ epic, onClose }) => {
             <label htmlFor="version" className="form-label">
               Version
             </label>
-            <select
-              id="version"
-              className={`form-select ${errors.version ? 'error' : ''}`}
-              disabled={loadingVersions || versions.length === 0}
-              {...register('version')}
-            >
-              <option value="">Select a version</option>
-              {versions.map((version) => (
-                <option key={version} value={version}>
-                  {version}
-                </option>
-              ))}
-            </select>
-            {loadingVersions && (
-              <span className="form-help">Loading versions...</span>
-            )}
-            {!loadingVersions && watchedComponent && versions.length === 0 && (
-              <span className="form-help">No versions found for this component</span>
-            )}
+            <Controller
+              name="version"
+              control={control}
+              render={({ field }) => (
+                <FilterableSelect
+                  id="version"
+                  options={availableVersions}
+                  placeholder="Select Version"
+                  getOptionValue={(option) => option.name}
+                  getOptionLabel={(option) => option.name}
+                  value={field.value || ''}
+                  onChange={(selectedOption) => {
+                    console.log("version selectedOption:", selectedOption);
+                    field.onChange(selectedOption?.value || '');
+                  }}
+                />
+              )}
+            />
             {errors.version && (
               <span className="form-error">{errors.version.message}</span>
             )}

@@ -439,41 +439,52 @@ func (c *Client) UpdateEpic(ctx context.Context, epicID string, req models.Updat
 		return fmt.Errorf("failed to get epic %s: %s", epicID, c.handleError(resp, err))
 	}
 
+
+	updateFields := map[string]interface{}{}
+
+	if req.Name != "" {
+		updateFields["summary"] = req.Name
+		updateFields["customfield_10004"] = req.Name
+	}
+
 	// Update the basic fields
 	epic.Fields.Summary = req.Name
 
 	// Update component if specified
 	if req.Component != "" {
-		epic.Fields.Components = []*jira.Component{
-			{Name: req.Component},
+		// epic.Fields.Components = []*jira.Component{
+		// 	{Name: req.Component},
+		// }
+		updateFields["components"] = []map[string]string{
+			{"name": req.Component},
 		}
 	} else {
-		epic.Fields.Components = nil
+		updateFields["components"] = nil
 	}
 
 	// Update version if specified
 	if req.Version != "" {
-		epic.Fields.FixVersions = []*jira.FixVersion{
-			{Name: req.Version},
+		updateFields["fixVersions"] = []map[string]string{
+			{"name": req.Version},
 		}
 	} else {
-		epic.Fields.FixVersions = nil
+		updateFields["fixVersions"] = nil
 	}
 
 	// Update priority if specified
 	if req.Priority != "" {
-		epic.Fields.Priority = &jira.Priority{Name: req.Priority}
+		updateFields["priority"] = &jira.Priority{Name: req.Priority}
 	}
 
 	// Update assignee if specified
 	if req.Assignee != nil {
-		epic.Fields.Assignee = &jira.User{
+		updateFields["assignee"] = &jira.User{
 			Name: req.Assignee.Name,
 		}
 	}
 
 	// Update the issue
-	_, resp, err = c.inner.Issue.UpdateWithContext(ctx, epic)
+	resp, err = c.inner.Issue.UpdateIssueWithContext(ctx, epicID, map[string]interface{}{"fields": updateFields})
 	if err != nil {
 		return fmt.Errorf("failed to update epic %s: %s", epicID, c.handleError(resp, err))
 	}
@@ -769,7 +780,7 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
 
 	searchOptions := &jira.SearchOptions{
-		Fields: []string{"summary", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		Fields: []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
 		MaxResults: 2000,
 	}
 

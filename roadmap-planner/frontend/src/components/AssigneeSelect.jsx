@@ -27,7 +27,7 @@ const AssigneeSelect = ({
       const result = await getAssignableUsers(issueKey, query);
       if (result.success) {
         const userOptions = (result.data || []).map(user => ({
-          value: user.account_id,
+          value: user.name,
           label: `${user.display_name} (${user.email_address})`,
           user: user
         }));
@@ -50,7 +50,6 @@ const AssigneeSelect = ({
 
   // Handle search input with debouncing
   const handleInputChange = (inputValue, { action }) => {
-    console.log("input changed to: ", inputValue, " action: ", action);
     if (action === 'input-change') {
       setSearchQuery(inputValue);
 
@@ -76,7 +75,7 @@ const AssigneeSelect = ({
   }, []);
 
   // Find selected option
-  const selectedOption = value ? users.find(user => user.value === value.account_id) : null;
+  const selectedOption = value ? users.find(user => user.value === value.name) : null;
 
   // Custom styles for react-select
   const customStyles = {
@@ -134,7 +133,6 @@ const AssigneeSelect = ({
   // Handle selection change
   const handleChange = (option) => {
     const newValue = option ? option.user : null;
-    console.log("changed to: ", newValue, " option: ", option);
     onChange(newValue);
   };
 

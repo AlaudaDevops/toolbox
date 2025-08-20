@@ -21,6 +21,9 @@ const FilterableSelect = ({
   menuPosition = "absolute",
 }) => {
   // Transform options to react-select format
+
+//   console.log(id, "Options: ", options);
+//   console.log(id, "Value: ", value);
   const selectOptions = options.map(option => ({
     value: getOptionValue(option),
     label: getOptionLabel(option),
@@ -140,8 +143,8 @@ const FilterableSelect = ({
 
   // Handle selection change
   const handleChange = (selectedOption) => {
-    const newValue = selectedOption ? selectedOption.value : '';
-    onChange(newValue);
+    console.log(id, "change?", selectedOption, "onChange?", onChange);
+    onChange(selectedOption);
   };
 
   return (
