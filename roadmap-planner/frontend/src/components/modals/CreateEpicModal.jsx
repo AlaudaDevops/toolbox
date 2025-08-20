@@ -67,11 +67,10 @@ const CreateEpicModal = ({ milestone, onClose }) => {
   };
 
   const priorityOptions = [
-    { value: 'Highest', label: 'Highest' },
-    { value: 'High', label: 'High' },
-    { value: 'Medium', label: 'Medium' },
-    { value: 'Low', label: 'Low' },
-    { value: 'Lowest', label: 'Lowest' },
+    { value: 'L0 - Critical', label: 'L0 - Critical' },
+    { value: 'L1 - High', label: 'L1 - High', default: true},
+    { value: 'L2 - Medium', label: 'L2 - Medium' },
+    { value: 'L3 - Low', label: 'L3 - Low' },
   ];
 
   return (
@@ -178,7 +177,7 @@ const CreateEpicModal = ({ milestone, onClose }) => {
               id="priority"
               className={`form-select ${errors.priority ? 'error' : ''}`}
               {...register('priority')}
-              defaultValue="Medium"
+              defaultValue="L1 - High"
             >
               {priorityOptions.map((option) => (
                 <option key={option.value} value={option.value}>

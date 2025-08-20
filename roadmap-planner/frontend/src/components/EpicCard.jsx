@@ -1,36 +1,54 @@
 import React from 'react';
-import { AlertCircle, CheckCircle, Clock, ExternalLink, ArrowRightLeft, Edit } from 'lucide-react';
+import { AlertCircle, PlayCircle, CheckCircle, Clock, ExternalLink, ArrowRightLeft, Edit, Tag } from 'lucide-react';
 import { getJiraIssueUrl } from '../utils/jiraUtils';
 import './EpicCard.css';
 
 const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone }) => {
   const getStatusIcon = (status) => {
     switch (status?.toLowerCase()) {
+      case '已完成':
+      case '已取消':
       case 'done':
       case 'closed':
       case 'resolved':
-        return <CheckCircle size={14} />;
+        return <CheckCircle title={status} size={14} />;
+      case '调研中':
+      case '调研完成':
+      case '设计完成':
+      case '开发完成':
+      case '测试完成':
+      case '验收完成':
       case 'in progress':
       case 'in-progress':
-        return <Clock size={14} />;
+        return <PlayCircle title={status} size={14} />;
+      case '待处理':
       case 'to do':
       case 'todo':
       case 'open':
-        return <AlertCircle size={14} />;
+        return <Clock title={status} size={14} />;
       default:
-        return <AlertCircle size={14} />;
+        return <AlertCircle title={status} size={14} />;
     }
   };
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
+      case '已完成':
+      case '已取消':
       case 'done':
       case 'closed':
       case 'resolved':
         return 'status-done';
+      case '调研中':
+      case '调研完成':
+      case '设计完成':
+      case '开发完成':
+      case '测试完成':
+      case '验收完成':
       case 'in progress':
       case 'in-progress':
         return 'status-progress';
+      case '待处理':
       case 'to do':
       case 'todo':
       case 'open':
@@ -83,7 +101,7 @@ const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone
   };
 
   return (
-    <div className={`epic-card-content ${isDragging ? 'dragging' : ''}`} onClick={handleCardClick}>
+    <div className={`epic-card-content ${isDragging ? 'dragging' : ''}`} >
       {/* First Row: Name and Priority */}
       <div className="epic-row-1">
         <div className="epic-name-container">
@@ -99,14 +117,27 @@ const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone
 
       {/* Second Row: ID, Status, and Actions */}
       <div className="epic-row-2">
-        <span className="epic-key">{epic.key}</span>
+        <div className="epic-row-2-left">
+        <span className={`epic-key epic-status ${getStatusColor(epic.status)}`}>{epic.key}</span>
+        {epic.status && (
+            <div className={`epic-status ${getStatusColor(epic.status)}`}>
+              {/* <span>{epic.status}</span> */}
+            </div>
+          )}
+        <Tag size={13}/>
+        {epic.versions && (
+          <span className="epic-versions">{epic.versions.join(', ')}</span>
+        ) || (
+          <span className="epic-versions">-</span>
+        )}
+        </div>
         <div className="epic-row-2-right">
-          {epic.status && (
+          {/* {epic.status && (
             <div className={`epic-status ${getStatusColor(epic.status)}`}>
               {getStatusIcon(epic.status)}
               <span>{epic.status}</span>
             </div>
-          )}
+          )} */}
           {onUpdateEpic && (
             <button
               onClick={handleEditClick}

@@ -176,11 +176,10 @@ const UpdateEpicModal = ({ epic, onClose }) => {
               {...register('priority')}
             >
               <option value="">Select priority</option>
-              <option value="Highest">Highest</option>
-              <option value="High">High</option>
-              <option value="Medium">Medium</option>
-              <option value="Low">Low</option>
-              <option value="Lowest">Lowest</option>
+              <option value="L0 - Critical">L0 - Critical</option>
+              <option value="L1 - High">L1 - High</option>
+              <option value="L2 - Medium">L2 - Medium</option>
+              <option value="L3 - Low">L3 - Low</option>
             </select>
             {errors.priority && (
               <span className="form-error">{errors.priority.message}</span>

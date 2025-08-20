@@ -108,7 +108,7 @@
   font-weight: 500;
 }
 
-.epic-row-2-right {
+.epic-row-2-right, .epic-row-2-left {
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -201,15 +201,39 @@
 }
 
 .epic-status.status-progress {
-  color: #d97706;
+  color: #3968df;
 }
 
 .epic-status.status-todo {
-  color: #6366f1;
+  color: #64748b;
 }
 
 .epic-status.status-default {
-  color: #64748b;
+  color: #d97706;
+}
+
+.epic-key.status-done {
+  background-color: #059669;
+  color: #FFF;
+}
+
+.epic-key.status-progress {
+  background-color: #3968df;
+  color: #FFF;
+}
+
+.epic-key.status-todo, .epic-key.status-default {
+  background-color: #42526e;
+  color: #FFF;
+}
+
+.epic-versions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6rem;
+  font-weight: 500;
+  flex-shrink: 0;
 }
 
 /* Drag States */

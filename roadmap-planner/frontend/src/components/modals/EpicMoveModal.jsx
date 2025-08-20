@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useRoadmap } from '../../hooks/useRoadmap';
 import { X, ArrowRight } from 'lucide-react';
+import FilterableSelect from '../FilterableSelect';
+import '../FilterableSelect.css';
 import './Modal.css';
 
 const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose }) => {
@@ -9,7 +11,7 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
-    register,
+    control,
     handleSubmit,
     formState: { errors },
     setError,
@@ -97,20 +99,38 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
             <label htmlFor="milestone_id" className="form-label">
               New Milestone *
             </label>
-            <select
-              id="milestone_id"
-              className={`form-select ${errors.milestone_id ? 'error' : ''}`}
-              {...register('milestone_id', {
+            <Controller
+              name="milestone_id"
+              control={control}
+              rules={{
                 required: 'Please select a milestone',
-              })}
-            >
-              <option value="">Select a milestone</option>
-              {availableMilestones.map((milestone) => (
-                <option key={milestone.id} value={milestone.id}>
-                  {milestone.name} ({milestone.quarter}) - {milestone.key}
-                </option>
-              ))}
-            </select>
+              }}
+              render={({ field }) => (
+                <FilterableSelect
+                  id="milestone_id"
+                  value={field.value}
+                  onChange={field.onChange}
+                  options={availableMilestones}
+                  placeholder="Search and select a milestone..."
+                  className={errors.milestone_id ? 'error' : ''}
+                  error={!!errors.milestone_id}
+                  disabled={isSubmitting}
+                  getOptionLabel={(milestone) =>
+                    `${milestone.name} (${milestone.quarter}) - ${milestone.key}`
+                  }
+                  getOptionValue={(milestone) => milestone.id}
+                  filterFunction={(milestone, searchTerm) => {
+                    const search = searchTerm.toLowerCase();
+                    return (
+                      milestone.name.toLowerCase().includes(search) ||
+                      milestone.quarter.toLowerCase().includes(search) ||
+                      milestone.key.toLowerCase().includes(search)
+                    );
+                  }}
+                  emptyMessage="No milestones found"
+                />
+              )}
+            />
             {errors.milestone_id && (
               <span className="form-error">{errors.milestone_id.message}</span>
             )}

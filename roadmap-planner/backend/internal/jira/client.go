@@ -394,28 +394,9 @@ func (c *Client) UpdateMilestone(ctx context.Context, milestoneID string, req mo
 		return fmt.Errorf("invalid quarter format: %w", err)
 	}
 
-	// Get the milestone issue first to check if it exists
-	// milestone, resp, err := c.inner.Issue.GetWithContext(ctx, milestoneID, nil)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get milestone %s: %s", milestoneID, c.handleError(resp, err))
-	// }
-
-	// issue := jira.Issue{
-	// 	ID: milestoneID,
-	// 	Fields: &jira.IssueFields{},
-	// }
-
-	// Prepare the update fields
 	updateFields := map[string]interface{}{}
 
 	// Update the quarter custom field
-	// if issue.Fields.Unknowns == nil {
-	// 	issue.Fields.Unknowns = make(map[string]interface{})
-	// }
-	// updateFields["customfield_12242"] = map[string]interface{}{
-	// 	"value": req.Quarter,
-	// }
-
 	if req.Name != "" {
 		updateFields["summary"] = req.Name
 	}
@@ -425,19 +406,8 @@ func (c *Client) UpdateMilestone(ctx context.Context, milestoneID string, req mo
 			"value": req.Quarter,
 		}
 	}
-
-	// // Update the milestone fields directly
-	// milestone.Fields.Summary = req.Name
-	// issue.Fields.Unknowns["customfield_12242"] = map[string]interface{}{
-	// 	"value": req.Quarter,
-	// }
-
-
-
+	// Update request
 	resp, err := c.inner.Issue.UpdateIssueWithContext(ctx, milestoneID, map[string]interface{}{"fields": updateFields})
-
-	// Update the issue
-	// _, resp, err = c.inner.Issue.UpdateWithContext(ctx, milestone)
 	if err != nil {
 		return fmt.Errorf("failed to update milestone %s: %s", milestoneID, c.handleError(resp, err))
 	}
