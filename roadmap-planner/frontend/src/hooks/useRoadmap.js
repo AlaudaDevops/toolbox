@@ -43,37 +43,69 @@ export const RoadmapProvider = ({ children }) => {
     }
   }, []);
 
-  // Load roadmap data (simplified approach)
-  const loadRoadmap = useCallback(async () => {
+
+
+  const loadEpics = useCallback(async (milestoneIds) => {
     try {
-      setIsLoading(true);
-      setError(null);
+      console.log('Fetching epic data for milestones:', milestoneIds); // Debug log
+      const epics = await roadmapAPI.getEpics({ milestoneIds });
+      console.log('Epics loaded:', epics); // Debug log
+      setRoadmapData(prevData => {
+        if (!prevData) return prevData;
 
-      // Try to load basic data first for fast UI feedback
-      await loadBasicData();
+        // Create a map of epics grouped by milestone_id for efficient lookup
+        const epicsByMilestone = {};
+        epics.epics.forEach(epic => {
+          const milestoneId = epic.milestone_ids;
+          milestoneId.forEach(id => {
+            if (!epicsByMilestone[id]) {
+              epicsByMilestone[id] = [];
+            }
+            epicsByMilestone[id].push(epic);
+          });
+          // if (!epicsByMilestone[milestoneId]) {
+          //   epicsByMilestone[milestoneId] = [];
+          // }
+          // epicsByMilestone[milestoneId].push(epic);
+        });
 
-      // Then load complete data using the original API
-      // const data = await roadmapAPI.getRoadmap();
-      // console.log('Complete roadmap data loaded:', data); // Debug log
+        // Merge the new epics into the existing data
+        const updatedPillars = prevData.pillars.map(pillar => ({
+          ...pillar,
+          milestones: pillar.milestones.map(milestone => {
+            const milestoneEpics = epicsByMilestone[milestone.id] || [];
 
-      // Sort the roadmap data
-      // const sortedData = sortRoadmapData(data);
-      // console.log('Roadmap data sorted:', sortedData); // Debug log
+            // Merge existing epics with new ones, avoiding duplicates
+            const existingEpicIds = new Set(milestone.epics.map(e => e.id));
+            const newEpics = milestoneEpics.filter(e => !existingEpicIds.has(e.id));
 
-      // setRoadmapData(sortedData);
+            return {
+              ...milestone,
+              epics: [...milestone.epics, ...newEpics],
+            };
+          }),
+        }));
+
+        console.log("Updated pillars are", updatedPillars);
+
+        return {
+          ...prevData,
+          pillars: updatedPillars,
+        };
+      });
+
+      return epics;
+
     } catch (error) {
       const errorInfo = handleAPIError(error);
-      console.error('Failed to load roadmap:', errorInfo); // Debug log
-      setError(errorInfo.message);
-      toast.error(`Failed to load roadmap: ${errorInfo.message}`);
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to load epics:', errorInfo);
     }
-  }, [loadBasicData]);
-
+    return null;
+  }, []);
 
   const loadMilestones = useCallback(async (pillarIds, quarters) => {
     try {
+      console.log('Fetching milestone data for data:', pillarIds, quarters); // Debug log
       const milestones = await roadmapAPI.getMilestones({ pillarIds, quarters });
       console.log('Milestones loaded:', milestones); // Debug log
 
@@ -83,7 +115,7 @@ export const RoadmapProvider = ({ children }) => {
 
         // Create a map of milestones grouped by pillar_id for efficient lookup
         const milestonesByPillar = {};
-        milestones.forEach(milestone => {
+        milestones.milestones.forEach(milestone => {
           const pillarId = milestone.pillar_id;
           if (!milestonesByPillar[pillarId]) {
             milestonesByPillar[pillarId] = [];
@@ -110,58 +142,76 @@ export const RoadmapProvider = ({ children }) => {
           pillars: updatedPillars,
         };
       });
-
+      return milestones;
     } catch (error) {
       const errorInfo = handleAPIError(error);
       console.error('Failed to load milestones:', errorInfo);
     }
+    return null;
   }, []);
 
-  const loadEpics = useCallback(async (milestoneIds) => {
+  // Load roadmap data with progressive loading
+  const loadRoadmap = useCallback(async () => {
     try {
-      const epics = await roadmapAPI.getEpics({ milestoneIds });
-      console.log('Epics loaded:', epics); // Debug log
-      setRoadmapData(prevData => {
-        if (!prevData) return prevData;
+      setIsLoading(true);
+      setError(null);
 
-        // Create a map of epics grouped by milestone_id for efficient lookup
-        const epicsByMilestone = {};
-        epics.forEach(epic => {
-          const milestoneId = epic.milestone_id;
-          if (!epicsByMilestone[milestoneId]) {
-            epicsByMilestone[milestoneId] = [];
-          }
-          epicsByMilestone[milestoneId].push(epic);
-        });
+      // Step 1: Load basic data first for fast UI feedback
+      const basicData = await loadBasicData();
+      if (!basicData) {
+        throw new Error('Failed to load basic data');
+      }
+      setIsLoading(false);
 
-        // Merge the new epics into the existing data
-        const updatedPillars = prevData.pillars.map(pillar => ({
-          ...pillar,
-          milestones: pillar.milestones.map(milestone => {
-            const milestoneEpics = epicsByMilestone[milestone.id] || [];
+      // Step 2: Load milestones for all pillars
+      const pillarIds = basicData.pillars.map(pillar => pillar.id);
+      const quarters = basicData.quarters;
 
-            // Merge existing epics with new ones, avoiding duplicates
-            const existingEpicIds = new Set(milestone.epics.map(e => e.id));
-            const newEpics = milestoneEpics.filter(e => !existingEpicIds.has(e.id));
+      console.log('Loading milestones for pillars:', pillarIds, 'quarters:', quarters);
+      const milestones = await loadMilestones(pillarIds, quarters);
 
-            return {
-              ...milestone,
-              epics: [...milestone.epics, ...newEpics],
-            };
-          }),
-        }));
+      console.log("Got milestones?", milestones)
 
-        return {
-          ...prevData,
-          pillars: updatedPillars,
-        };
-      });
+      const milestoneIds = milestones.milestones.map(milestone => milestone.id);
+      const epics = await loadEpics(milestoneIds);
+
+      console.log("Got epics?", epics)
+
+      // Step 3: Get milestone IDs from current state to load epics
+      // We need to access the updated state after milestones are loaded
+      // setRoadmapData(prevData => {
+      //   if (prevData && prevData.pillars) {
+      //     // Collect all milestone IDs from the loaded milestones
+      //     const milestoneIds = [];
+      //     prevData.pillars.forEach(pillar => {
+      //       pillar.milestones.forEach(milestone => {
+      //         milestoneIds.push(milestone.id);
+      //       });
+      //     });
+
+      //     if (milestoneIds.length > 0) {
+      //       console.log('Loading epics for milestones:', milestoneIds);
+      //       // Load epics asynchronously without blocking the UI
+      //       loadEpics(milestoneIds).catch(error => {
+      //         console.error('Failed to load epics:', error);
+      //       });
+      //     }
+      //   }
+      //   return prevData;
+      // });
 
     } catch (error) {
       const errorInfo = handleAPIError(error);
-      console.error('Failed to load epics:', errorInfo);
+      console.error('Failed to load roadmap:', errorInfo);
+      setError(errorInfo.message);
+      toast.error(`Failed to load roadmap: ${errorInfo.message}`);
+    } finally {
+      setIsLoading(false);
     }
-  });
+  }, [loadBasicData, loadMilestones, loadEpics]);
+
+
+
 
   // Load roadmap on mount
   useEffect(() => {
@@ -208,7 +258,7 @@ export const RoadmapProvider = ({ children }) => {
       const response = await roadmapAPI.updateMilestone(milestoneId, milestoneData);
 
       // Reload roadmap data to get the updated state
-      await loadRoadmap();
+      // await loadRoadmap();
 
       toast.success('Milestone updated successfully!');
       return { success: true, data: response };
@@ -262,7 +312,7 @@ export const RoadmapProvider = ({ children }) => {
       const response = await roadmapAPI.updateEpic(epicId, epicData);
 
       // Reload roadmap data to get the updated state
-      await loadRoadmap();
+      // await loadRoadmap();
 
       toast.success('Epic updated successfully!');
       return { success: true, data: response };
@@ -325,7 +375,7 @@ export const RoadmapProvider = ({ children }) => {
       const errorInfo = handleAPIError(error);
       toast.error(`Failed to move epic: ${errorInfo.message}`);
       // Reload roadmap to ensure consistency
-      loadRoadmap();
+      // loadRoadmap();
       return { success: false, error: errorInfo.message };
     }
   };
@@ -359,6 +409,8 @@ export const RoadmapProvider = ({ children }) => {
     error,
     loadRoadmap,
     loadBasicData,
+    loadMilestones,
+    loadEpics,
     createMilestone,
     updateMilestone,
     createEpic,

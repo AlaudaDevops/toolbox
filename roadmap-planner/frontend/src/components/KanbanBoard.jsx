@@ -186,23 +186,6 @@ const KanbanBoard = () => {
 
   return (
     <div className="kanban-container">
-      {/* Main Header */}
-      {/* <header className="app-header">
-        <div className="app-header-left">
-          <h1 className="app-title">Product Roadmap</h1>
-          <span className="app-subtitle">Welcome, {user}</span>
-        </div>
-
-        <div className="app-header-right">
-          <button onClick={loadRoadmap} className="btn btn-ghost btn-sm" title="Refresh data">
-            <RefreshCw size={16} />
-          </button>
-          <button onClick={logout} className="btn btn-ghost btn-sm" title="Logout">
-            <LogOut size={16} />
-          </button>
-        </div>
-      </header> */}
-
       {/* Compact Controls Bar */}
       <div className="controls-bar">
         <div className="quarter-selection-compact">
