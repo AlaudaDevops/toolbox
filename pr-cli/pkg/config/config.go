@@ -20,6 +20,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 )
 
 // Config holds the configuration for PR CLI operations
@@ -113,4 +114,14 @@ func (c *Config) Validate() error {
 		return ErrMissingTriggerComment
 	}
 	return nil
+}
+
+// IsRobotUser checks if the user is a robot user that should be excluded from LGTM status
+func (c *Config) IsRobotUser(user string) bool {
+	return slices.Contains(c.RobotAccounts, user)
+}
+
+// HasLGTMPermission checks if the given permission is in the LGTM permissions list
+func (c *Config) HasLGTMPermission(userPerm string) bool {
+	return slices.Contains(c.LGTMPermissions, userPerm)
 }

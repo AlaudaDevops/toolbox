@@ -24,7 +24,7 @@ import (
 )
 
 // HandleLGTM processes LGTM votes and approves PR if threshold is met
-func (h *PRHandler) HandleLGTM() error {
+func (h *PRHandler) HandleLGTM(_ []string) error {
 	h.Logger.Info("Processing LGTM")
 
 	// Check if the comment sender is the PR author (not in debug mode)

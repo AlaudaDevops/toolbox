@@ -21,7 +21,7 @@ import (
 )
 
 // HandleHelp displays available commands in GitHub Markdown table format
-func (h *PRHandler) HandleHelp() error {
+func (h *PRHandler) HandleHelp(_ []string) error {
 	helpMessage := messages.HelpMessage(h.config.LGTMThreshold, h.config.LGTMPermissions, h.config.MergeMethod)
 	return h.client.PostComment(helpMessage)
 }

@@ -1,10 +1,14 @@
-# Usage Guide
+# CLI Reference Guide
 
-This guide provides detailed information on using the PR CLI tool for managing pull requests.
+This is the complete command-line reference for PR CLI. For a quick overview, see the [main README](../README.md). For Pipeline integration, see [Pipeline documentation](../pipeline/README.md).
 
-## Command Reference
+> 📖 **Quick Navigation:**
+> - [Global Flags](#global-flags) - Command-line parameters and environment variables
+> - [Command Reference](#command-reference) - Detailed syntax for each command  
+> - [Configuration Examples](#configuration-examples) - Platform-specific setups
+> - [Troubleshooting](#troubleshooting) - Common issues and solutions
 
-### Global Flags
+## Global Flags
 
 | Flag | Environment Variable | Description | Required |
 |------|---------------------|-------------|----------|
@@ -23,6 +27,12 @@ This guide provides detailed information on using the PR CLI tool for managing p
 | `--lgtm-review-event` | `PR_LGTM_REVIEW_EVENT` | Review event type for LGTM (default: APPROVE) | No |
 | `--merge-method` | `PR_MERGE_METHOD` | Merge method (default: squash) | No |
 | `--self-check-name` | `PR_SELF_CHECK_NAME` | Name of the tool's own check run to exclude (default: pr-cli) | No |
+
+## Command Reference
+
+This section provides detailed syntax and behavior for each command. For a quick command overview, see the [main README](../README.md#supported-commands).
+
+> 💡 **Pro Tip**: Most commands can be combined using the `/check` command. See the [`/check` section](#check) for details.
 
 ### Comment Commands
 
@@ -143,23 +153,81 @@ pr-cli --trigger-comment "/rebase"
 
 #### `/check`
 
-Check the current status of the pull request.
+Check the current status of the pull request or execute sub-commands.
 
 **Syntax:**
 ```
-/check
+/check [sub-commands...]
 ```
 
-**Example:**
+**Examples:**
 ```bash
+# Check current status only
 pr-cli --trigger-comment "/check"
+
+# Execute single sub-command
+pr-cli --trigger-comment "/check /assign user1"
+
+# Execute multiple sub-commands
+pr-cli --trigger-comment "/check /assign user1 user2 /label bug"
 ```
 
-**Output includes:**
+**Basic Output (no sub-commands):**
 - Current LGTM count and threshold
 - Status check results
 - Merge eligibility
 - Assigned reviewers
+
+**Multi-command Support:**
+The `/check` command can also execute multiple commands in sequence (same functionality as `/batch`).
+
+> 💡 **Note:** For detailed information about multi-command execution, restrictions, and supported commands, see the `/batch` command section below.
+
+#### `/batch`
+
+Execute multiple commands in batch mode in a single operation.
+
+**Syntax:**
+```
+/batch /cmd1 args... /cmd2 args... /cmd3 args...
+```
+
+**Examples:**
+```bash
+# Assign reviewers and merge with squash
+pr-cli --trigger-comment "/batch /assign user1 user2 /merge squash"
+
+# Add labels and assign reviewer
+pr-cli --trigger-comment "/batch /label bug enhancement /assign reviewer1"
+
+# Complex workflow: assign, label, and merge
+pr-cli --trigger-comment "/batch /assign user1 /label ready /merge rebase"
+```
+
+**Supported Commands:**
+The `/batch` command can execute most PR management commands in sequence:
+- `/assign` - Assign reviewers
+- `/unassign` - Remove reviewers
+- `/merge` - Merge the PR
+- `/ready` - Merge the PR (alias)
+- `/rebase` - Rebase the PR
+- `/label` - Add labels
+- `/unlabel` - Remove labels
+- `/cherrypick` - Cherry-pick to branches
+- `/retest` - Retry tests
+
+**Restrictions:**
+- Built-in commands (starting with `__`) are blocked for security
+- LGTM commands (`/lgtm`, `/remove-lgtm`) are NOT supported in batch execution
+- Recursive batch calls (`/batch` within `/batch`) are not allowed
+
+**Key Features:**
+- Commands execute sequentially with results summarized in one comment
+- All commands use the same permissions as direct execution
+- Execution continues even if some commands fail
+- Failed commands are clearly marked in the summary
+
+> 💡 **Note:** Some commands supported by pr-cli may require indirect execution through `/check` or `/batch` if they haven't been added to pipeline trigger configurations yet.
 
 #### `/label`
 

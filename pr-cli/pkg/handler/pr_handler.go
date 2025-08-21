@@ -18,10 +18,6 @@ package handler
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"slices"
-	"strings"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
@@ -88,64 +84,48 @@ func (h *PRHandler) CheckPRStatus(expectedState string) error {
 
 // isRobotUser checks if the user is a robot user that should be excluded from LGTM status
 func (h *PRHandler) isRobotUser(user string) bool {
-	return slices.Contains(h.config.RobotAccounts, user)
+	return h.config.IsRobotUser(user)
 }
 
 // hasLGTMPermission checks if the given permission is in the LGTM permissions list
 func (h *PRHandler) hasLGTMPermission(userPerm string) bool {
-	return slices.Contains(h.config.LGTMPermissions, userPerm)
+	return h.config.HasLGTMPermission(userPerm)
 }
 
 // generateLGTMStatusMessage generates a formatted LGTM status message with check runs status
 func (h *PRHandler) generateLGTMStatusMessage(validVotes int, lgtmUsers map[string]string, includeThreshold bool) string {
-	// Build robot users map for filtering
-	robotUsers := make(map[string]bool)
-	for user := range lgtmUsers {
-		if h.isRobotUser(user) {
-			robotUsers[user] = true
-		}
-	}
-
-	// Build users table for status message
-	usersTable := messages.BuildLGTMUsersTable(lgtmUsers, h.config.LGTMPermissions, robotUsers)
-
 	// Check check runs status
 	allPassed, failedChecks, err := h.client.CheckRunsStatus()
 	if err != nil {
 		h.Logger.Errorf("Failed to check run status: %v", err)
 		// Continue without check runs status if there's an error
+		allPassed = true
+		failedChecks = nil
 	}
 
-	// Build base LGTM status message
-	var message string
-	if validVotes >= h.config.LGTMThreshold {
-		message = fmt.Sprintf(messages.LGTMStatusReadyTemplate, validVotes, h.config.LGTMThreshold, usersTable)
-	} else {
-		// Not enough LGTM votes
-		message = fmt.Sprintf(messages.LGTMStatusPendingTemplate, validVotes, h.config.LGTMThreshold, h.config.LGTMThreshold-validVotes, usersTable, strings.Join(h.config.LGTMPermissions, ", "))
-
-		if includeThreshold {
-			message += messages.LGTMStatusTipTemplate
-		}
+	// Convert failedChecks to message type
+	var checkStatuses []messages.CheckStatus
+	for _, check := range failedChecks {
+		checkStatuses = append(checkStatuses, messages.CheckStatus{
+			Name:       check.Name,
+			Status:     check.Status,
+			Conclusion: check.Conclusion,
+			URL:        check.URL,
+		})
 	}
 
-	// Add check runs status information
-	if err == nil {
-		// Convert failedChecks to our message type
-		var checkStatuses []messages.CheckStatus
-		for _, check := range failedChecks {
-			checkStatuses = append(checkStatuses, messages.CheckStatus{
-				Name:       check.Name,
-				Status:     check.Status,
-				Conclusion: check.Conclusion,
-				URL:        check.URL,
-			})
-		}
-
-		message += messages.BuildCheckRunsStatusSection(allPassed, checkStatuses)
+	opts := messages.LGTMStatusOptions{
+		ValidVotes:       validVotes,
+		LGTMUsers:        lgtmUsers,
+		LGTMThreshold:    h.config.LGTMThreshold,
+		LGTMPermissions:  h.config.LGTMPermissions,
+		RobotAccounts:    h.config.RobotAccounts,
+		IncludeThreshold: includeThreshold,
+		ChecksPassed:     allPassed,
+		FailedChecks:     checkStatuses,
 	}
 
-	return message
+	return messages.BuildLGTMStatusMessage(opts)
 }
 
 // GetComments retrieves all comments from the pull request
@@ -156,21 +136,4 @@ func (h *PRHandler) GetComments() ([]git.Comment, error) {
 // PostComment posts a comment to the pull request
 func (h *PRHandler) PostComment(message string) error {
 	return h.client.PostComment(message)
-}
-
-// writeTektonResult writes a result value for Tekton pipeline
-func (h *PRHandler) writeTektonResult(name, value string) {
-	// Check if the results directory exists
-	if _, err := os.Stat(h.config.ResultsDir); os.IsNotExist(err) {
-		h.Logger.Debugf("Results directory %s does not exist, skipping result writing", h.config.ResultsDir)
-		return
-	}
-
-	resultPath := filepath.Join(h.config.ResultsDir, name)
-	if err := os.WriteFile(resultPath, []byte(value), 0644); err != nil {
-		h.Logger.Errorf("Failed to write result %s to %s: %v", name, resultPath, err)
-		return
-	}
-
-	h.Logger.Infof("Wrote result %s=%s to %s", name, value, resultPath)
 }

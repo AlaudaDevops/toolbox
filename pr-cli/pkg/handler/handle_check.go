@@ -21,8 +21,21 @@ import (
 	"fmt"
 )
 
-// HandleCheck displays current LGTM status and check runs status without adding new votes
-func (h *PRHandler) HandleCheck() error {
+// HandleCheck displays current LGTM status or executes sub-commands
+func (h *PRHandler) HandleCheck(args []string) error {
+	// Parse sub-commands with arguments
+	subCommands := h.parseSubCommands(args)
+	if len(subCommands) == 0 {
+		// No valid sub-commands found, execute original check
+		return h.handleOriginalCheck()
+	}
+
+	// Execute sub-commands with check-specific header
+	return h.handleSubCommands(subCommands, "**Check Command Results:**")
+}
+
+// handleOriginalCheck executes the original check logic
+func (h *PRHandler) handleOriginalCheck() error {
 	h.Logger.Info("Checking LGTM status and check runs status")
 
 	// Get all LGTM votes to check current status

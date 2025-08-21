@@ -329,126 +329,203 @@ func (c *Client) RemoveReviewers(reviewers []string) error {
 
 // GetLGTMVotes retrieves and validates LGTM votes from comments and reviews
 func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
-	var ignoreUser string
-	if len(ignoreUserRemove) > 0 {
-		ignoreUser = ignoreUserRemove[0]
-	}
+	ignoreUser := c.getIgnoreUser(ignoreUserRemove)
 	lgtmUsers := make(map[string]string)
-	userLatestReviews := make(map[string]*git.Review) // Track latest review for each user
 
-	// Get reviews for approvals
+	// 1. Process review votes
+	userLatestReviews, err := c.processReviewVotes(lgtmUsers)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// 2. Process comment votes
+	if err := c.processCommentVotes(lgtmUsers, userLatestReviews, debugMode, ignoreUser); err != nil {
+		return 0, nil, err
+	}
+
+	c.logCollectedUsers(lgtmUsers, ignoreUser)
+
+	// 3. Validate permissions and count valid votes
+	return c.validatePermissionsAndCount(lgtmUsers, requiredPerms)
+}
+
+// getIgnoreUser extracts the ignore user from optional parameters
+func (c *Client) getIgnoreUser(ignoreUserRemove []string) string {
+	if len(ignoreUserRemove) > 0 {
+		return ignoreUserRemove[0]
+	}
+	return ""
+}
+
+// processReviewVotes processes review approvals and returns the latest reviews map
+func (c *Client) processReviewVotes(lgtmUsers map[string]string) (map[string]*git.Review, error) {
 	reviews, err := c.GetReviews()
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get reviews: %w", err)
+		return nil, fmt.Errorf("failed to get reviews: %w", err)
 	}
 
-	// Find the latest review for each user
+	userLatestReviews := c.findLatestReviews(reviews)
+	c.addApprovedReviews(lgtmUsers, userLatestReviews)
+
+	return userLatestReviews, nil
+}
+
+// findLatestReviews finds the latest review for each user
+func (c *Client) findLatestReviews(reviews []git.Review) map[string]*git.Review {
+	userLatestReviews := make(map[string]*git.Review)
+
 	for i := range reviews {
-		review := &reviews[i] // Get address of slice element directly
+		review := &reviews[i]
 		user := review.User.Login
+
 		if user == c.prSender { // Skip self-approvals
 			continue
 		}
 
-		// If this is the first review from this user, or if it's newer than existing one
 		if existingReview, exists := userLatestReviews[user]; !exists || review.SubmittedAt > existingReview.SubmittedAt {
-			userLatestReviews[user] = review // Assign pointer directly
+			userLatestReviews[user] = review
 		}
 	}
 
-	// Process latest reviews to determine current approval status
+	return userLatestReviews
+}
+
+// addApprovedReviews adds users who have approved via reviews
+func (c *Client) addApprovedReviews(lgtmUsers map[string]string, userLatestReviews map[string]*git.Review) {
 	for user, latestReview := range userLatestReviews {
 		if latestReview.State == "APPROVED" {
 			lgtmUsers[user] = ""
 			c.logger.Debugf("Found APPROVED from user: %s (latest review)", user)
 		}
-		// Note: We don't add users with CHANGES_REQUESTED or COMMENTED states
 	}
+}
 
-	// Get comments for /lgtm commands
+// processCommentVotes processes LGTM commands from comments
+func (c *Client) processCommentVotes(lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool, ignoreUser string) error {
 	comments, err := c.GetComments()
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to get comments: %w", err)
+		return fmt.Errorf("failed to get comments: %w", err)
 	}
 
-	// Find the latest comment from the ignored user to skip if it's /remove-lgtm
-	var ignoreCommentIndex = -1
-	if ignoreUser != "" {
-		for i := len(comments) - 1; i >= 0; i-- {
-			if comments[i].User.Login == ignoreUser {
-				// Check if this comment is /remove-lgtm
-				body := strings.TrimSpace(comments[i].Body)
-				if removeLgtmRegexp.MatchString(body) {
-					ignoreCommentIndex = i
-					c.logger.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
-				}
-				break
-			}
-		}
-	}
+	ignoreCommentIndex := c.findIgnoreCommentIndex(comments, ignoreUser)
 
-	// Process LGTM commands from comments
 	for i, comment := range comments {
-		user := comment.User.Login
-		body := strings.TrimSpace(comment.Body)
-
-		// Skip the ignored comment
 		if i == ignoreCommentIndex {
-			c.logger.Debugf("Skipping ignored comment at index %d from user: %s", i, user)
+			c.logger.Debugf("Skipping ignored comment at index %d from user: %s", i, comment.User.Login)
 			continue
 		}
 
-		switch {
-		case removeLgtmRegexp.MatchString(body):
-			// Only remove if user hasn't approved via latest review
-			if latestReview, exists := userLatestReviews[user]; !exists || latestReview.State != "APPROVED" {
-				delete(lgtmUsers, user)
-				c.logger.Debugf("Found `/remove-lgtm` from user: %s", user)
-			} else {
-				c.logger.Debugf("Ignoring `/remove-lgtm` from user: %s (has latest APPROVED review)", user)
+		c.processLGTMComment(comment, lgtmUsers, userLatestReviews, debugMode)
+	}
+
+	return nil
+}
+
+// findIgnoreCommentIndex finds the index of the comment to ignore
+func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser string) int {
+	if ignoreUser == "" {
+		return -1
+	}
+
+	for i := len(comments) - 1; i >= 0; i-- {
+		if comments[i].User.Login == ignoreUser {
+			body := strings.TrimSpace(comments[i].Body)
+			if removeLgtmRegexp.MatchString(body) {
+				c.logger.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
+				return i
 			}
-		case lgtmCancelRegexp.MatchString(body):
-			// Only remove if user hasn't approved via latest review
-			if latestReview, exists := userLatestReviews[user]; !exists || latestReview.State != "APPROVED" {
-				delete(lgtmUsers, user)
-				c.logger.Debugf("Found `/lgtm cancel` from user: %s", user)
-			} else {
-				c.logger.Debugf("Ignoring `/lgtm cancel` from user: %s (has latest APPROVED review)", user)
-			}
-		case lgtmRegexp.MatchString(body):
-			// This regex should be placed at the end because `/lgtm cancel` needs to be matched first
-			if user == c.prSender {
-				if !debugMode {
-					c.logger.Debugf("Skipping LGTM from PR author %s (not allowed)", user)
-					continue
-				}
-				c.logger.Debugf("Debug mode: allowing PR author %s to give LGTM to their own PR", user)
-			}
-			// Only add if user hasn't already approved via latest review
-			if latestReview, exists := userLatestReviews[user]; !exists || latestReview.State != "APPROVED" {
-				lgtmUsers[user] = ""
-				c.logger.Debugf("Found /lgtm from user: %s", user)
-			} else {
-				c.logger.Debugf("Ignoring /lgtm from user: %s (already has latest APPROVED review)", user)
-			}
-		default:
-			continue
+			break
 		}
 	}
 
+	return -1
+}
+
+// processLGTMComment processes a single LGTM-related comment
+func (c *Client) processLGTMComment(comment git.Comment, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
+	user := comment.User.Login
+	body := strings.TrimSpace(comment.Body)
+
+	switch {
+	case removeLgtmRegexp.MatchString(body):
+		c.handleRemoveLGTM(user, lgtmUsers, userLatestReviews)
+	case lgtmCancelRegexp.MatchString(body):
+		c.handleLGTMCancel(user, lgtmUsers, userLatestReviews)
+	case lgtmRegexp.MatchString(body):
+		c.handleLGTM(user, lgtmUsers, userLatestReviews, debugMode)
+	}
+}
+
+// handleRemoveLGTM processes /remove-lgtm commands
+func (c *Client) handleRemoveLGTM(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review) {
+	if c.canRemoveLGTM(user, userLatestReviews) {
+		delete(lgtmUsers, user)
+		c.logger.Debugf("Found `/remove-lgtm` from user: %s", user)
+	} else {
+		c.logger.Debugf("Ignoring `/remove-lgtm` from user: %s (has latest APPROVED review)", user)
+	}
+}
+
+// handleLGTMCancel processes /lgtm cancel commands
+func (c *Client) handleLGTMCancel(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review) {
+	if c.canRemoveLGTM(user, userLatestReviews) {
+		delete(lgtmUsers, user)
+		c.logger.Debugf("Found `/lgtm cancel` from user: %s", user)
+	} else {
+		c.logger.Debugf("Ignoring `/lgtm cancel` from user: %s (has latest APPROVED review)", user)
+	}
+}
+
+// handleLGTM processes /lgtm commands
+func (c *Client) handleLGTM(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
+	if user == c.prSender && !debugMode {
+		c.logger.Debugf("Skipping LGTM from PR author %s (not allowed)", user)
+		return
+	}
+
+	if user == c.prSender && debugMode {
+		c.logger.Debugf("Debug mode: allowing PR author %s to give LGTM to their own PR", user)
+	}
+
+	if c.canAddLGTM(user, userLatestReviews) {
+		lgtmUsers[user] = ""
+		c.logger.Debugf("Found /lgtm from user: %s", user)
+	} else {
+		c.logger.Debugf("Ignoring /lgtm from user: %s (already has latest APPROVED review)", user)
+	}
+}
+
+// canRemoveLGTM checks if LGTM can be removed for a user
+func (c *Client) canRemoveLGTM(user string, userLatestReviews map[string]*git.Review) bool {
+	latestReview, exists := userLatestReviews[user]
+	return !exists || latestReview.State != "APPROVED"
+}
+
+// canAddLGTM checks if LGTM can be added for a user
+func (c *Client) canAddLGTM(user string, userLatestReviews map[string]*git.Review) bool {
+	latestReview, exists := userLatestReviews[user]
+	return !exists || latestReview.State != "APPROVED"
+}
+
+// logCollectedUsers logs the collected LGTM users
+func (c *Client) logCollectedUsers(lgtmUsers map[string]string, ignoreUser string) {
 	if ignoreUser != "" {
 		c.logger.Debugf("Collected LGTM users (ignoring %s): %v", ignoreUser, lgtmUsers)
 	} else {
 		c.logger.Debugf("Collected LGTM users: %v", lgtmUsers)
 	}
+}
 
-	// Validate permissions for each user
+// validatePermissionsAndCount validates permissions for each user and counts valid votes
+func (c *Client) validatePermissionsAndCount(lgtmUsers map[string]string, requiredPerms []string) (int, map[string]string, error) {
 	validVotes := 0
+
 	for user := range lgtmUsers {
 		hasPermission, perm, err := c.CheckUserPermissions(user, requiredPerms)
 		if err != nil {
 			return 0, nil, fmt.Errorf("failed to check permissions for %s: %w", user, err)
 		}
+
 		lgtmUsers[user] = perm
 		if hasPermission {
 			validVotes++
@@ -623,6 +700,20 @@ func (c *Client) CheckRunsStatus() (bool, []git.CheckRun, error) {
 		return false, nil, fmt.Errorf("failed to get PR: %w", err)
 	}
 
+	// Fetch all check runs with pagination
+	allCheckRuns, err := c.fetchAllCheckRuns(pr.Head.SHA)
+	if err != nil {
+		return false, nil, err
+	}
+
+	// Analyze check runs and find failed ones
+	failedChecks := c.analyzeCheckRuns(allCheckRuns)
+
+	return len(failedChecks) == 0, failedChecks, nil
+}
+
+// fetchAllCheckRuns retrieves all check runs for a given SHA with pagination
+func (c *Client) fetchAllCheckRuns(sha string) ([]*github.CheckRun, error) {
 	var allCheckRuns []*github.CheckRun
 
 	opts := &github.ListCheckRunsOptions{
@@ -630,9 +721,9 @@ func (c *Client) CheckRunsStatus() (bool, []git.CheckRun, error) {
 	}
 
 	for {
-		checkRuns, resp, err := c.client.Checks.ListCheckRunsForRef(c.ctx, c.owner, c.repo, pr.Head.SHA, opts)
+		checkRuns, resp, err := c.client.Checks.ListCheckRunsForRef(c.ctx, c.owner, c.repo, sha, opts)
 		if err != nil {
-			return false, nil, fmt.Errorf("failed to get check runs: %w", err)
+			return nil, fmt.Errorf("failed to get check runs: %w", err)
 		}
 
 		allCheckRuns = append(allCheckRuns, checkRuns.CheckRuns...)
@@ -643,32 +734,73 @@ func (c *Client) CheckRunsStatus() (bool, []git.CheckRun, error) {
 		opts.Page = resp.NextPage
 	}
 
+	return allCheckRuns, nil
+}
+
+// analyzeCheckRuns analyzes check runs and returns failed ones
+func (c *Client) analyzeCheckRuns(allCheckRuns []*github.CheckRun) []git.CheckRun {
 	c.logger.Debugf("Check run: selfCheckName: %q", c.selfCheckName)
 
 	var failedChecks []git.CheckRun
 	for _, check := range allCheckRuns {
-		c.logger.Debugf("Check run: %q, Status: %q, Conclusion: %q, URL: %q",
-			check.GetName(), check.GetStatus(), check.GetConclusion(), check.GetHTMLURL())
-		if check.GetStatus() == "completed" &&
-			check.GetConclusion() != "success" &&
-			check.GetConclusion() != "skipped" {
-			failedChecks = append(failedChecks, git.CheckRun{
-				Name:       check.GetName(),
-				Status:     check.GetStatus(),
-				Conclusion: check.GetConclusion(),
-				URL:        check.GetHTMLURL(),
-			})
-		} else if check.GetStatus() != "completed" &&
-			(c.selfCheckName == "" || !strings.HasSuffix(strings.TrimSpace(check.GetName()), "/ "+c.selfCheckName)) {
-			failedChecks = append(failedChecks, git.CheckRun{
-				Name:   check.GetName(),
-				Status: check.GetStatus(),
-				URL:    check.GetHTMLURL(),
-			})
+		c.logCheckRunDetails(check)
+
+		if c.isFailedCheck(check) {
+			failedChecks = append(failedChecks, c.convertToGitCheckRun(check))
 		}
 	}
 
-	return len(failedChecks) == 0, failedChecks, nil
+	return failedChecks
+}
+
+// logCheckRunDetails logs details of a check run
+func (c *Client) logCheckRunDetails(check *github.CheckRun) {
+	c.logger.Debugf("Check run: %q, Status: %q, Conclusion: %q, URL: %q",
+		check.GetName(), check.GetStatus(), check.GetConclusion(), check.GetHTMLURL())
+}
+
+// isFailedCheck determines if a check run should be considered failed
+func (c *Client) isFailedCheck(check *github.CheckRun) bool {
+	// Case 1: Completed check with failure/error conclusion
+	if check.GetStatus() == "completed" {
+		conclusion := check.GetConclusion()
+		return conclusion != "success" && conclusion != "skipped"
+	}
+
+	// Case 2: Incomplete check (but exclude self-check)
+	if check.GetStatus() != "completed" {
+		return c.shouldIncludeIncompleteCheck(check)
+	}
+
+	return false
+}
+
+// shouldIncludeIncompleteCheck determines if an incomplete check should be considered failed
+func (c *Client) shouldIncludeIncompleteCheck(check *github.CheckRun) bool {
+	if c.selfCheckName == "" {
+		return true
+	}
+
+	checkName := strings.TrimSpace(check.GetName())
+	selfCheckSuffix := "/ " + c.selfCheckName
+
+	return !strings.HasSuffix(checkName, selfCheckSuffix)
+}
+
+// convertToGitCheckRun converts a GitHub CheckRun to git.CheckRun
+func (c *Client) convertToGitCheckRun(check *github.CheckRun) git.CheckRun {
+	result := git.CheckRun{
+		Name:   check.GetName(),
+		Status: check.GetStatus(),
+		URL:    check.GetHTMLURL(),
+	}
+
+	// Only set conclusion for completed checks
+	if check.GetStatus() == "completed" {
+		result.Conclusion = check.GetConclusion()
+	}
+
+	return result
 }
 
 // AddLabels adds labels to the pull request
@@ -844,62 +976,129 @@ func (c *Client) CreatePR(title, body, head, base string) (*git.PullRequest, err
 func (c *Client) CherryPickCommit(commitSHA, targetBranch string) error {
 	c.logger.Debugf("Cherry-picking commit %s to branch %s", commitSHA, targetBranch)
 
-	// Get the commit to cherry-pick
-	commit, _, err := c.client.Git.GetCommit(c.ctx, c.owner, c.repo, commitSHA)
+	// 1. Get and validate the commit to cherry-pick
+	commit, parentSHA, err := c.prepareCommitForCherryPick(commitSHA)
 	if err != nil {
-		return fmt.Errorf("failed to get commit %s: %w", commitSHA, err)
+		return err
 	}
 
-	// Handle different commit types
-	var parentSHA string
+	// 2. Get target branch reference and trees
+	targetRef, trees, err := c.prepareCherryPickTrees(targetBranch, parentSHA, commit)
+	if err != nil {
+		return err
+	}
+
+	// 3. Apply changes and create new tree
+	newTree, err := c.createCherryPickTree(targetRef, trees)
+	if err != nil {
+		return err
+	}
+
+	// 4. Create and apply the cherry-pick commit
+	return c.createAndApplyCherryPickCommit(commit, newTree, targetRef)
+}
+
+// cherryPickTrees holds the three trees needed for cherry-pick operation
+type cherryPickTrees struct {
+	target *github.Tree
+	parent *github.Tree
+	commit *github.Tree
+}
+
+// prepareCommitForCherryPick gets and validates the commit, returning the commit and parent SHA
+func (c *Client) prepareCommitForCherryPick(commitSHA string) (*github.Commit, string, error) {
+	commit, _, err := c.client.Git.GetCommit(c.ctx, c.owner, c.repo, commitSHA)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get commit %s: %w", commitSHA, err)
+	}
+
+	parentSHA, err := c.determineParentSHA(commit, commitSHA)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return commit, parentSHA, nil
+}
+
+// determineParentSHA determines the appropriate parent SHA for cherry-pick
+func (c *Client) determineParentSHA(commit *github.Commit, commitSHA string) (string, error) {
 	if len(commit.Parents) == 0 {
-		return fmt.Errorf("cannot cherry-pick initial commit %s (no parents)", commitSHA)
-	} else if len(commit.Parents) == 1 {
-		// Regular commit - use the single parent
-		parentSHA = commit.Parents[0].GetSHA()
-	} else {
-		// Merge commit - use the first parent (the branch that was merged into)
-		// This will cherry-pick all changes introduced by the merge
-		parentSHA = commit.Parents[0].GetSHA()
+		return "", fmt.Errorf("cannot cherry-pick initial commit %s (no parents)", commitSHA)
+	}
+
+	// Use the first parent (works for both regular and merge commits)
+	parentSHA := commit.Parents[0].GetSHA()
+
+	if len(commit.Parents) > 1 {
 		c.logger.Infof("Cherry-picking merge commit %s (using first parent %s)", commitSHA, parentSHA)
 	}
 
-	// Get the target branch reference
+	return parentSHA, nil
+}
+
+// prepareCherryPickTrees gets the target branch reference and all required trees
+func (c *Client) prepareCherryPickTrees(targetBranch, parentSHA string, commit *github.Commit) (*github.Reference, *cherryPickTrees, error) {
+	// Get target branch reference
 	targetRef, _, err := c.client.Git.GetRef(c.ctx, c.owner, c.repo, "heads/"+targetBranch)
 	if err != nil {
-		return fmt.Errorf("failed to get target branch %s: %w", targetBranch, err)
+		return nil, nil, fmt.Errorf("failed to get target branch %s: %w", targetBranch, err)
 	}
 
-	// Get the tree of the target branch (where we'll apply the changes)
-	targetTree, _, err := c.client.Git.GetTree(c.ctx, c.owner, c.repo, targetRef.Object.GetSHA(), false)
+	// Get all required trees
+	trees, err := c.fetchCherryPickTrees(targetRef.Object.GetSHA(), parentSHA, commit.Tree.GetSHA())
 	if err != nil {
-		return fmt.Errorf("failed to get target tree: %w", err)
+		return nil, nil, err
 	}
 
-	// Get the parent commit tree
+	return targetRef, trees, nil
+}
+
+// fetchCherryPickTrees fetches the three trees needed for cherry-pick
+func (c *Client) fetchCherryPickTrees(targetSHA, parentSHA, commitTreeSHA string) (*cherryPickTrees, error) {
+	// Get target tree
+	targetTree, _, err := c.client.Git.GetTree(c.ctx, c.owner, c.repo, targetSHA, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get target tree: %w", err)
+	}
+
+	// Get parent tree
 	parentTree, _, err := c.client.Git.GetTree(c.ctx, c.owner, c.repo, parentSHA, false)
 	if err != nil {
-		return fmt.Errorf("failed to get parent tree: %w", err)
+		return nil, fmt.Errorf("failed to get parent tree: %w", err)
 	}
 
-	// Get the commit tree (the state after the changes)
-	commitTree, _, err := c.client.Git.GetTree(c.ctx, c.owner, c.repo, commit.Tree.GetSHA(), false)
+	// Get commit tree
+	commitTree, _, err := c.client.Git.GetTree(c.ctx, c.owner, c.repo, commitTreeSHA, false)
 	if err != nil {
-		return fmt.Errorf("failed to get commit tree: %w", err)
+		return nil, fmt.Errorf("failed to get commit tree: %w", err)
 	}
 
-	// Build a new tree by applying the changes from the commit to the target tree
-	newTreeEntries, err := c.applyCommitChanges(targetTree, parentTree, commitTree)
+	return &cherryPickTrees{
+		target: targetTree,
+		parent: parentTree,
+		commit: commitTree,
+	}, nil
+}
+
+// createCherryPickTree applies changes and creates the new tree
+func (c *Client) createCherryPickTree(targetRef *github.Reference, trees *cherryPickTrees) (*github.Tree, error) {
+	// Apply changes from commit to target tree
+	newTreeEntries, err := c.applyCommitChanges(trees.target, trees.parent, trees.commit)
 	if err != nil {
-		return fmt.Errorf("failed to apply commit changes: %w", err)
+		return nil, fmt.Errorf("failed to apply commit changes: %w", err)
 	}
 
 	// Create the new tree
 	newTree, _, err := c.client.Git.CreateTree(c.ctx, c.owner, c.repo, targetRef.Object.GetSHA(), newTreeEntries)
 	if err != nil {
-		return fmt.Errorf("failed to create new tree: %w", err)
+		return nil, fmt.Errorf("failed to create new tree: %w", err)
 	}
 
+	return newTree, nil
+}
+
+// createAndApplyCherryPickCommit creates the cherry-pick commit and updates the target branch
+func (c *Client) createAndApplyCherryPickCommit(commit *github.Commit, newTree *github.Tree, targetRef *github.Reference) error {
 	// Create the cherry-pick commit
 	newCommit := &github.Commit{
 		Message: commit.Message,
