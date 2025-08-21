@@ -33,7 +33,7 @@ spec:
       value: "{{ registry_host }}/devops/roadmap-planner"
 
     - name: build-extra-args
-      value: []
+      value:
         - "--build-arg BUILDER_IMAGE={{ docker_mirror_host }}/library/golang:1.24-alpine"
         - "--build-arg RUNTIME_IMAGE={{ registry_host }}/ops/alpine:3.20"
         - "--build-arg NODE_IMAGE={{ docker_mirror_host }}/library/node:24-alpine"
