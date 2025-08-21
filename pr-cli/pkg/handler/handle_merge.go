@@ -34,7 +34,7 @@ func (h *PRHandler) HandleMerge(args []string) error {
 	}
 
 	// Validate check runs status
-	if err := h.validateCheckRunsStatus(); err != nil {
+	if err = h.validateCheckRunsStatus(); err != nil {
 		return err
 	}
 
@@ -132,28 +132,11 @@ func (h *PRHandler) validateAndProcessLGTMVotes(userPerm string) (int, map[strin
 		return 0, nil, fmt.Errorf("failed to get LGTM votes: %w", err)
 	}
 
-	// Handle admin/write user direct merge logic
-	validVotes = h.processAdminUserMergeLogic(validVotes, lgtmUsers, userPerm)
-
 	if validVotes < h.config.LGTMThreshold {
 		return 0, nil, h.postNotEnoughLGTMMessage(validVotes)
 	}
 
 	return validVotes, lgtmUsers, nil
-}
-
-// processAdminUserMergeLogic handles the logic for admin/write users to merge directly
-func (h *PRHandler) processAdminUserMergeLogic(validVotes int, lgtmUsers map[string]string, userPerm string) int {
-	if h.prSender != h.config.CommentSender && h.hasLGTMPermission(userPerm) {
-		_, alreadyVoted := lgtmUsers[h.config.CommentSender]
-		if h.config.LGTMThreshold == 1 || (validVotes >= h.config.LGTMThreshold-1 && !alreadyVoted) {
-			if !alreadyVoted {
-				lgtmUsers[h.config.CommentSender] = userPerm
-				validVotes++
-			}
-		}
-	}
-	return validVotes
 }
 
 // postNotEnoughLGTMMessage posts error message when there are not enough LGTM votes
