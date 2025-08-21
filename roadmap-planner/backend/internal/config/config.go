@@ -92,12 +92,12 @@ func Load() (*Config, error) {
 	viper.AutomaticEnv()
 
 	// Bind environment variables
-	viper.BindEnv("jira.base_url", "JIRA_BASE_URL")
-	viper.BindEnv("jira.username", "JIRA_USERNAME")
-	viper.BindEnv("jira.password", "JIRA_PASSWORD")
-	viper.BindEnv("server.static_files_path", "STATIC_FILES_PATH")
-	viper.BindEnv("server.port", "SERVER_PORT")
-	viper.BindEnv("debug", "DEBUG")
+	_ = viper.BindEnv("jira.base_url", "JIRA_BASE_URL")
+	_ = viper.BindEnv("jira.username", "JIRA_USERNAME")
+	_ = viper.BindEnv("jira.password", "JIRA_PASSWORD")
+	_ = viper.BindEnv("server.static_files_path", "STATIC_FILES_PATH")
+	_ = viper.BindEnv("server.port", "SERVER_PORT")
+	_ = viper.BindEnv("debug", "DEBUG")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

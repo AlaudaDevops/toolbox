@@ -26,21 +26,6 @@ import (
 // IssueOption represents a function that can modify a Jira issue
 type IssueOption func(issue *jira.Issue)
 
-// newIssue creates a new Jira issue with the given options
-func newIssue(options ...IssueOption) *jira.Issue {
-	issue := &jira.Issue{
-		Fields: &jira.IssueFields{
-			Unknowns: make(tcontainer.MarshalMap),
-		},
-	}
-
-	for _, option := range options {
-		option(issue)
-	}
-
-	return issue
-}
-
 // WithProject sets the project for a Jira issue
 func WithProject(project string) IssueOption {
 	return func(issue *jira.Issue) {

@@ -129,7 +129,7 @@ jira:
   baseURL: "https://your-jira-instance.atlassian.net"
   username: "your-username"
   password: "your-api-token"
-  project: "DEVOPS"
+  project: "PROJECT-KEY"
 
 server:
   port: 8080

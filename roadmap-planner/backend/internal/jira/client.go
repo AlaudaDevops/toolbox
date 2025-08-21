@@ -423,7 +423,11 @@ func (c *Client) UpdateMilestone(ctx context.Context, milestoneID string, req mo
 	if err != nil {
 		return fmt.Errorf("failed to update milestone %s: %s", milestoneID, c.handleError(resp, err))
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			c.logger.Warn("Failed to close response body", zap.Error(closeErr))
+		}
+	}()
 
 	c.logger.Info("Updated milestone",
 		zap.String("milestone_id", milestoneID),
@@ -689,6 +693,8 @@ func (c *Client) GetMilestonesWithFilter(ctx context.Context, pillarIDs []string
 	// Add quarter filter if provided (this would need custom field filtering)
 	if len(quarters) > 0 {
 		// For now, we'll filter quarters in post-processing since JQL custom field filtering is complex
+		// TODO: Implement custom field filtering for quarters
+		c.logger.Debug("Quarter filtering will be done in post-processing", zap.Strings("quarters", quarters))
 	}
 
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
@@ -755,6 +761,8 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	if len(pillarIDs) > 0 {
 		// This is more complex - we'd need to get milestones first, then filter epics
 		// For now, we'll handle this in post-processing
+		// TODO: Implement pillar filtering for epics by getting milestones first
+		c.logger.Debug("Pillar filtering will be done in post-processing", zap.Strings("pillar_ids", pillarIDs))
 	}
 
 	// Add component filter if provided
