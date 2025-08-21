@@ -14,7 +14,7 @@ const AssigneeSelect = ({
   const { getAssignableUsers } = useRoadmap();
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Debounce search to avoid too many API calls
   const debounceTimeout = React.useRef(null);
@@ -50,6 +50,7 @@ const AssigneeSelect = ({
 
   // Handle search input with debouncing
   const handleInputChange = (inputValue, { action }) => {
+    console.debug("setSearchQuery", searchQuery);
     if (action === 'input-change') {
       setSearchQuery(inputValue);
 
