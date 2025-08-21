@@ -194,6 +194,40 @@ cd backend && go test ./...
 
 # Frontend only
 cd frontend && npm test
+
+# Local CI testing (mimics GitHub Actions)
+./ci-test.sh              # Run all tests
+./ci-test.sh backend      # Backend tests only
+./ci-test.sh frontend     # Frontend tests only
+./ci-test.sh docker       # Docker tests only
+```
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration with the following checks:
+
+### Automated Testing
+- **Backend**: Go unit tests, linting (golangci-lint), formatting, security scanning
+- **Frontend**: Jest tests, ESLint, npm audit, build verification
+- **Integration**: Docker build testing, health checks, API endpoint validation
+- **Security**: Trivy vulnerability scanning for filesystem and Docker images
+
+### Code Quality
+- **Coverage**: Minimum 60% test coverage requirement
+- **Linting**: Comprehensive linting for both Go and JavaScript/React
+- **Formatting**: Automated code formatting checks
+- **Dependencies**: Security vulnerability scanning
+
+### Triggers
+The CI pipeline runs when:
+- Push to `main` or `develop` branches (only if roadmap-planner files change)
+- Pull requests targeting `main` or `develop` branches
+- Changes to the CI workflow file itself
+
+### Local Testing
+Use the provided script to run the same checks locally:
+```bash
+./ci-test.sh --help  # See available options
 ```
 
 ## API Documentation

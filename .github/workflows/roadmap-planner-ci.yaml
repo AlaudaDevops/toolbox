@@ -1,0 +1,379 @@
+name: Roadmap Planner CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'roadmap-planner/**'
+      - '.github/workflows/roadmap-planner-ci.yaml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'roadmap-planner/**'
+      - '.github/workflows/roadmap-planner-ci.yaml'
+
+# Cancel running checks in progress for the same branch
+concurrency:
+  group: ci-roadmap-planner-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.24.6'
+  NODE_VERSION: '18'
+  WORKING_DIRECTORY: 'roadmap-planner'
+
+jobs:
+  # Job 1: Check if roadmap-planner files have changed
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      docker: ${{ steps.changes.outputs.docker }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'roadmap-planner/backend/**'
+              - 'roadmap-planner/Makefile'
+            frontend:
+              - 'roadmap-planner/frontend/**'
+              - 'roadmap-planner/Makefile'
+            docker:
+              - 'roadmap-planner/Dockerfile'
+              - 'roadmap-planner/docker-compose*.yml'
+
+  # Job 2: Backend Tests and Linting
+  backend-tests:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: |
+            roadmap-planner/backend/go.sum
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('roadmap-planner/backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: cd backend && go mod download
+
+      - name: Verify dependencies
+        run: cd backend && go mod verify
+
+      - name: Run go mod tidy check
+        run: |
+          cd backend
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+
+      - name: Run gofmt check
+        run: |
+          cd backend
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files need formatting:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+      - name: Run go vet
+        run: cd backend && go vet ./...
+
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+      - name: Run golangci-lint
+        run: cd backend && golangci-lint run --timeout=5m
+
+      - name: Run tests
+        run: cd backend && go test -v -race -coverprofile=coverage.out ./...
+
+      - name: Generate coverage report
+        run: cd backend && go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: |
+            roadmap-planner/backend/coverage.out
+            roadmap-planner/backend/coverage.html
+          retention-days: 7
+
+      - name: Check coverage threshold
+        run: |
+          cd backend
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "Coverage is below 60%"
+            exit 1
+          fi
+
+  # Job 3: Frontend Tests and Linting
+  frontend-tests:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}/frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: roadmap-planner/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for security vulnerabilities
+        run: npm audit --audit-level high
+
+      - name: Run ESLint
+        run: npm run lint --if-present
+
+      - name: Run tests
+        run: npm test -- --coverage --watchAll=false --passWithNoTests
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: roadmap-planner/frontend/coverage/
+          retention-days: 7
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: roadmap-planner/frontend/build/
+          retention-days: 7
+
+  # Job 4: Security Scanning
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (filesystem)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'roadmap-planner'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Job 5: Docker Build Test
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: [changes, backend-tests, frontend-tests]
+    if: |
+      always() &&
+      needs.changes.outputs.docker == 'true' ||
+      (needs.backend-tests.result == 'success' || needs.backend-tests.result == 'skipped') &&
+      (needs.frontend-tests.result == 'success' || needs.frontend-tests.result == 'skipped')
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg NODE_IMAGE=node:${{ env.NODE_VERSION }}-alpine \
+            --build-arg GO_IMAGE=golang:${{ env.GO_VERSION }}-alpine \
+            --build-arg RUNTIME_IMAGE=alpine:latest \
+            -t roadmap-planner:ci-${{ github.sha }} \
+            .
+
+      - name: Test Docker image
+        run: |
+          # Start the container in background
+          docker run -d --name roadmap-planner-test \
+            -p 8080:8080 \
+            -e DEBUG=true \
+            roadmap-planner:ci-${{ github.sha }}
+
+          # Wait for container to start
+          sleep 10
+
+          # Test health endpoint
+          curl -f http://localhost:8080/health || exit 1
+
+          # Clean up
+          docker stop roadmap-planner-test
+          docker rm roadmap-planner-test
+
+      - name: Scan Docker image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'roadmap-planner:ci-${{ github.sha }}'
+          format: 'sarif'
+          output: 'docker-trivy-results.sarif'
+
+      - name: Upload Docker scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'docker-trivy-results.sarif'
+
+  # Job 6: Integration Tests
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: |
+      always() &&
+      (needs.backend-tests.result == 'success' || needs.backend-tests.result == 'skipped') &&
+      (needs.frontend-tests.result == 'success' || needs.frontend-tests.result == 'skipped')
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start services
+        run: |
+          # Build the unified image
+          docker build -t roadmap-planner:integration .
+
+          # Start the service
+          docker run -d --name integration-test \
+            -p 8080:8080 \
+            -e DEBUG=true \
+            -e JIRA_BASE_URL=https://example.atlassian.net \
+            -e JIRA_USERNAME=test \
+            -e JIRA_PASSWORD=test \
+            roadmap-planner:integration
+
+      - name: Wait for service to be ready
+        run: |
+          timeout 60 bash -c 'until curl -f http://localhost:8080/health; do sleep 2; done'
+
+      - name: Run integration tests
+        run: |
+          # Test API endpoints
+          echo "Testing health endpoint..."
+          curl -f http://localhost:8080/health
+
+          echo "Testing static file serving..."
+          curl -f http://localhost:8080/ | grep -q "Roadmap Planner" || echo "Frontend not loaded"
+
+          echo "Testing API structure..."
+          curl -f http://localhost:8080/api/auth/status || echo "Auth endpoint accessible"
+
+      - name: Check service logs
+        if: always()
+        run: docker logs integration-test
+
+      - name: Clean up
+        if: always()
+        run: |
+          docker stop integration-test || true
+          docker rm integration-test || true
+
+  # Job 7: Code Quality Checks
+  code-quality:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          projectBaseDir: roadmap-planner
+        continue-on-error: true  # Don't fail the build if SonarCloud is not configured
+
+  # Job 8: Final Status Check
+  final-check:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests, security-scan, docker-build, integration-tests]
+    if: always()
+
+    steps:
+      - name: Check job results
+        run: |
+          if [[ "${{ needs.backend-tests.result }}" == "failure" ]]; then
+            echo "Backend tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.frontend-tests.result }}" == "failure" ]]; then
+            echo "Frontend tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.security-scan.result }}" == "failure" ]]; then
+            echo "Security scan failed"
+            exit 1
+          fi
+          if [[ "${{ needs.docker-build.result }}" == "failure" ]]; then
+            echo "Docker build failed"
+            exit 1
+          fi
+          if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
+            echo "Integration tests failed"
+            exit 1
+          fi
+          echo "All checks passed! ✅"

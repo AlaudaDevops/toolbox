@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
@@ -41,6 +42,10 @@ func NewClient(baseURL, username, password, project string) (*Client, error) {
 	tp := jira.BasicAuthTransport{
 		Username: username,
 		Password: password,
+	}
+
+	if _, err := url.ParseRequestURI(baseURL); err != nil {
+		return nil, fmt.Errorf("invalid base URL: %w", err)
 	}
 
 	clientLogger := logger.WithComponent("jira-client")

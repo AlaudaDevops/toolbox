@@ -1,0 +1,78 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  name: roadmap-planner-image
+  annotations:
+    pipelinesascode.tekton.dev/on-comment: "^((/test-all)|(/build-image)|(/roadmap-planner-image))"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: |-
+      target_branch.matches("^(main|release-.*)$") && "roadmap-planner/**".pathChanged()
+spec:
+  pipelineRef:
+    resolver: hub
+    params:
+      - name: catalog
+        value: alauda
+      - name: type
+        value: tekton
+      - name: kind
+        value: pipeline
+      - name: name
+        value: clone-image-build-test-scan
+      - name: version
+        value: "0.2"
+  params:
+    - name: git-url
+      value: "{{ repo_url }}"
+    - name: git-revision
+      value: "{{ source_branch }}"
+    - name: git-commit
+      value: "{{ revision }}"
+
+    - name: image-repository
+      value: "{{ registry_host }}/devops/roadmap-planner"
+
+    - name: build-extra-args
+      value: []
+        - "--build-arg BUILDER_IMAGE={{ docker_mirror_host }}/library/golang:1.24-alpine"
+        - "--build-arg RUNTIME_IMAGE={{ registry_host }}/ops/alpine:3.20"
+        - "--build-arg NODE_IMAGE={{ docker_mirror_host }}/library/node:24-alpine"
+
+    - name: dockerfile-path
+      value: "./roadmap-planner/Dockerfile"
+
+    - name: context
+      value: "./roadmap-planner"
+
+    - name: skip-commit
+      value: "true"
+
+    - name: ignore-trivy-scan
+      value: "true"
+
+  workspaces:
+    - name: source
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteMany
+          resources:
+            requests:
+              storage: 1Gi
+    - name: basic-auth
+      secret:
+        secretName: "{{ git_auth_secret }}"
+    - name: dockerconfig
+      secret:
+        secretName: "{{ docker_config_secret }}"
+    - name: gitversion-config
+      configMap:
+        name: "{{ git_revision_configmap }}"
+
+  taskRunTemplate:
+    podTemplate:
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        fsGroupChangePolicy: "OnRootMismatch"

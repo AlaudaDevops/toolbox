@@ -30,7 +30,6 @@ type Config struct {
 	Jira   Jira   `mapstructure:"jira"`
 	Server Server `mapstructure:"server"`
 	Cache  Cache  `mapstructure:"cache"`
-
 }
 
 // Logger represents logger configuration settings
@@ -51,8 +50,8 @@ type Jira struct {
 
 // Server represents server configuration settings
 type Server struct {
-	Port int  `mapstructure:"port"`
-	CORS CORS `mapstructure:"cors"`
+	Port            int    `mapstructure:"port"`
+	CORS            CORS   `mapstructure:"cors"`
 	StaticFilesPath string `mapstructure:"static_files_path"`
 }
 
