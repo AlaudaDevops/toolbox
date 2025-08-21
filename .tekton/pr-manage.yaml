@@ -31,6 +31,10 @@ spec:
     # - name: git_auth_secret_key
     #   value: "git-provider-token"
     #
+    # Container image for pr-cli tool (default: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest)
+    # - name: image
+    #   value: "registry.alauda.cn:60070/devops/toolbox/pr-cli:latest"
+    #
     # The /lgtm threshold needed of approvers for a PR to be approved (default: 1)
     # - name: lgtm_threshold
     #   value: "1"

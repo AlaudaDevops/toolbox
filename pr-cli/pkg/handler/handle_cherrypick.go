@@ -162,7 +162,7 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 	branchName := cherryPicker.GetCherryPickBranchName(lastCommit.SHA, targetBranch)
 
 	// Create a PR for the cherry-pick using the platform-specific client
-	title := fmt.Sprintf("[Cherry-pick %d] %s", h.config.PRNum, prInfo.Title)
+	title := fmt.Sprintf("[Cherry-pick #%d] %s", h.config.PRNum, prInfo.Title)
 	body := fmt.Sprintf("Cherry-pick of PR #%d to %s\n\nOriginal PR: #%d\nRequested by: @%s",
 		h.config.PRNum, targetBranch, h.config.PRNum, h.config.CommentSender)
 
@@ -207,7 +207,7 @@ func (h *PRHandler) performCherryPickWithAPI(commits []git.Commit, targetBranch 
 	}
 
 	// Create a PR for the cherry-pick
-	title := fmt.Sprintf("[Cherry-pick] %s", prInfo.Title)
+	title := fmt.Sprintf("[Cherry-pick #%d] %s", h.config.PRNum, prInfo.Title)
 	body := fmt.Sprintf("Cherry-pick of PR #%d to %s\n\nOriginal PR: #%d\nRequested by: @%s",
 		h.config.PRNum, targetBranch, h.config.PRNum, h.config.CommentSender)
 
