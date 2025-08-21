@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/andygrunwald/go-jira"
 )
 
@@ -34,8 +33,8 @@ type Pillar struct {
 	Key        string      `json:"key"`
 	Name       string      `json:"name"`
 	Priority   string      `json:"priority"`
-	Components  []string      `json:"components"`
-	Sequence   int         `json:"sequence"`   // For ordering pillars
+	Components []string    `json:"components"`
+	Sequence   int         `json:"sequence"` // For ordering pillars
 	Milestones []Milestone `json:"milestones"`
 }
 
@@ -53,15 +52,15 @@ type Milestone struct {
 
 // Epic represents a product requirement or set of stories
 type Epic struct {
-	ID          string `json:"id"`
-	Key         string `json:"key"`
-	Name        string `json:"name"`
-	Versions     []string `json:"versions"`     // Fix version for sorting
-	Components  []string `json:"components"`
+	ID           string   `json:"id"`
+	Key          string   `json:"key"`
+	Name         string   `json:"name"`
+	Versions     []string `json:"versions"` // Fix version for sorting
+	Components   []string `json:"components"`
 	MilestoneIDs []string `json:"milestone_ids"`
-	Status      string `json:"status"`
-	Priority    string `json:"priority"`
-	Assignee    *User  `json:"assignee,omitempty"`
+	Status       string   `json:"status"`
+	Priority     string   `json:"priority"`
+	Assignee     *User    `json:"assignee,omitempty"`
 }
 
 // User represents a Jira user
@@ -129,7 +128,7 @@ type BasicData struct {
 	Quarters   []string      `json:"quarters"`
 	Components []string      `json:"components"`
 	Versions   []string      `json:"versions"`
-	Project  	*Project 	 `json:"project"`
+	Project    *Project      `json:"project"`
 }
 
 // BasicPillar represents a pillar without its milestones and epics
@@ -144,29 +143,27 @@ type BasicPillar struct {
 
 // Project is a jira project object
 type Project struct {
-	ID string `json:"id"`
-	Name string `json:"name"`
-	Key string `json:"key"`
-	Versions []Version `json:"versions"`
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Key        string      `json:"key"`
+	Versions   []Version   `json:"versions"`
 	Components []Component `json:"components"`
 }
 
-
 // Component in a Jira Project
 type Component struct {
-	Name string `json:"name"`
-	ID string `json:"id"`
+	Name        string `json:"name"`
+	ID          string `json:"id"`
 	Description string `json:"description"`
 }
 
-
 // Version represents a version in a Jira project
 type Version struct {
-	ID string `json:"id"`
-	Name string `json:"name"`
-	Archieved bool `json:"archived"`
-	Released bool `json:"released"`
-	ReleaseDate string `json:"releaseDate"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Archieved       bool   `json:"archived"`
+	Released        bool   `json:"released"`
+	ReleaseDate     string `json:"releaseDate"`
 	UserReleaseDate string `json:"userReleaseDate"`
 }
 
@@ -186,7 +183,7 @@ func ConvertJiraIssueToPillar(issue *jira.Issue) *Pillar {
 		Key:        issue.Key,
 		Name:       issue.Fields.Summary,
 		Priority:   extractPriorityFromIssue(issue),
-		Components:  extractComponentsFromIssue(issue),
+		Components: extractComponentsFromIssue(issue),
 		Sequence:   extractSequenceFromIssue(issue),
 		Milestones: []Milestone{},
 	}
@@ -213,15 +210,15 @@ func ConvertJiraIssueToMilestone(issue *jira.Issue, pillarID string) *Milestone 
 // ConvertJiraIssueToEpic converts a Jira issue to an Epic model
 func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
 	epic := &Epic{
-		ID:          issue.ID,
-		Key:         issue.Key,
-		Name:        issue.Fields.Summary,
+		ID:           issue.ID,
+		Key:          issue.Key,
+		Name:         issue.Fields.Summary,
 		Versions:     extractVersionsFromIssue(issue),
 		Components:   extractComponentsFromIssue(issue),
 		MilestoneIDs: extractMilestoneIdsFromIssue(issue),
-		Status:      extractStatusFromIssue(issue),
-		Priority:    extractPriorityFromIssue(issue),
-		Assignee:    convertJiraUserToUser(issue.Fields.Assignee),
+		Status:       extractStatusFromIssue(issue),
+		Priority:     extractPriorityFromIssue(issue),
+		Assignee:     convertJiraUserToUser(issue.Fields.Assignee),
 	}
 
 	return epic
@@ -328,7 +325,7 @@ func extractVersionsFromIssue(issue *jira.Issue) (fixVersion []string) {
 
 // extractStatusFromIssue extracts the status from a Jira issue
 func extractStatusFromIssue(issue *jira.Issue) string {
-	if issue.Fields != nil &&  issue.Fields.Status != nil {
+	if issue.Fields != nil && issue.Fields.Status != nil {
 		return issue.Fields.Status.Name
 	}
 	return ""
@@ -357,12 +354,8 @@ func extractQuarterFromIssue(issue *jira.Issue) string {
 func extractMilestoneIdsFromIssue(issue *jira.Issue) (milestoneIDs []string) {
 	if issue.Fields != nil && len(issue.Fields.IssueLinks) > 0 {
 		for _, link := range issue.Fields.IssueLinks {
-			logger.GetSugar().Debugw("inspecting links", "link", link, "outward", link.OutwardIssue)
 			if link.Type.Name == "Blocks" && link.OutwardIssue != nil && link.OutwardIssue.Fields.Type.Name == "Milestone" {
-				logger.GetSugar().Debugw("GOT IT")
 				milestoneIDs = append(milestoneIDs, link.OutwardIssue.ID)
-			} else {
-				// logger.GetSugar().Debugw("NOPE", "link_type", link.Type.Name, "outward_issue", link.OutwardIssue, "issue type", link.OutwardIssue.Fields.Type.Name)
 			}
 		}
 	}

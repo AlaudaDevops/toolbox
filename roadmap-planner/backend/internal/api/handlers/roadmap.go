@@ -20,9 +20,9 @@ import (
 	"net/http"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/middleware"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/models"
-	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -95,9 +95,13 @@ func (h *RoadmapHandler) GetBasicData(c *gin.Context) {
 	// fetches default quarters from configuration
 	defaultQuarters := h.config.Jira.Quarters
 
+	projectKey, ok := middleware.GetProject(c)
+	if !ok {
+		projectKey = h.config.Jira.Project
+	}
 
 	// fetche project details
-	project, err := jiraClient.GetProjectDetails(c, h.config.Jira.Project)
+	project, err := jiraClient.GetProjectDetails(c, projectKey)
 	if err != nil {
 		h.logger.Error("Failed to fetch project details", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -106,10 +110,9 @@ func (h *RoadmapHandler) GetBasicData(c *gin.Context) {
 		return
 	}
 
-
 	basicData := models.BasicData{
-		Pillars:    basicPillars,
-		Quarters:   defaultQuarters,
+		Pillars:  basicPillars,
+		Quarters: defaultQuarters,
 		// Components: components,
 		// Versions:   versions,
 		Project: project,
@@ -522,7 +525,7 @@ func (h *RoadmapHandler) GetAssignableUsers(c *gin.Context) {
 // Health returns the health status of the API
 func (h *RoadmapHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"status": "healthy",
+		"status":  "healthy",
 		"service": "roadmap-planner",
 	})
 }

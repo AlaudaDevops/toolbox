@@ -25,8 +25,8 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/models"
 	"github.com/andygrunwald/go-jira"
-	"go.uber.org/zap"
 	"github.com/trivago/tgo/tcontainer"
+	"go.uber.org/zap"
 )
 
 // Client wraps the Jira client with roadmap-specific functionality
@@ -73,7 +73,7 @@ func (c *Client) GetPillars(ctx context.Context) ([]models.Pillar, error) {
 	jqlQuery := fmt.Sprintf("project = %s AND (issuetype in (Pillar) and resolution is empty) OR (issuetype in (Milestone, Epic) AND resolution is empty) ORDER BY priority DESC, created ASC", c.project)
 
 	searchOptions := &jira.SearchOptions{
-		Fields: []string{"summary", "priority", "components", "status", "issuetype", "parent", "quater", "issuelinks", "extras", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank", "created"},
+		Fields:     []string{"summary", "priority", "components", "status", "issuetype", "parent", "quater", "issuelinks", "extras", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank", "created"},
 		MaxResults: 2000,
 	}
 
@@ -85,20 +85,19 @@ func (c *Client) GetPillars(ctx context.Context) ([]models.Pillar, error) {
 	c.logger.Info("Found issues", zap.Int("count", len(issues)))
 
 	for _, childIssue := range issues {
-			c.logger.Info("Processing issue",
-				zap.String("type", childIssue.Fields.Type.Name),
-				zap.String("key", childIssue.Key),
-				zap.String("summary", childIssue.Fields.Summary))
-			if len(childIssue.Fields.IssueLinks) > 0 {
-				for _, link := range childIssue.Fields.IssueLinks {
-					c.logger.Debug("Issue link found",
-						zap.String("type", link.Type.Name),
-						zap.Any("inward_issue", link.InwardIssue),
-						zap.Any("outward_issue", link.OutwardIssue))
-				}
+		c.logger.Info("Processing issue",
+			zap.String("type", childIssue.Fields.Type.Name),
+			zap.String("key", childIssue.Key),
+			zap.String("summary", childIssue.Fields.Summary))
+		if len(childIssue.Fields.IssueLinks) > 0 {
+			for _, link := range childIssue.Fields.IssueLinks {
+				c.logger.Debug("Issue link found",
+					zap.String("type", link.Type.Name),
+					zap.Any("inward_issue", link.InwardIssue),
+					zap.Any("outward_issue", link.OutwardIssue))
 			}
 		}
-
+	}
 
 	pillars := make([]models.Pillar, 0, len(issues))
 	for _, issue := range issues {
@@ -119,8 +118,6 @@ func (c *Client) GetPillars(ctx context.Context) ([]models.Pillar, error) {
 		for _, milestoneIssue := range milestoneIssues {
 			milestone := models.ConvertJiraIssueToMilestone(&milestoneIssue, pillar.ID)
 			milestoneKey := milestone.Key
-
-
 
 			c.logger.Debug("Processing milestone",
 				zap.String("key", milestoneKey),
@@ -341,9 +338,9 @@ func (c *Client) CreateEpic(ctx context.Context, req models.CreateEpicRequest) (
 
 	// epic := models.ConvertJiraIssueToEpic(createdIssue, req.MilestoneID)
 	epic := &models.Epic{
-		ID:          createdIssue.ID,
-		Key:         createdIssue.Key,
-		Name:        req.Name,
+		ID:           createdIssue.ID,
+		Key:          createdIssue.Key,
+		Name:         req.Name,
 		Versions:     []string{req.Version},
 		Components:   []string{req.Component},
 		MilestoneIDs: []string{req.MilestoneID},
@@ -439,7 +436,6 @@ func (c *Client) UpdateEpic(ctx context.Context, epicID string, req models.Updat
 		return fmt.Errorf("failed to get epic %s: %s", epicID, c.handleError(resp, err))
 	}
 
-
 	updateFields := map[string]interface{}{}
 
 	if req.Name != "" {
@@ -459,7 +455,7 @@ func (c *Client) UpdateEpic(ctx context.Context, epicID string, req models.Updat
 			{"name": req.Component},
 		}
 	} else {
-		updateFields["components"] = nil
+		updateFields["components"] = []map[string]string{}
 	}
 
 	// Update version if specified
@@ -468,7 +464,7 @@ func (c *Client) UpdateEpic(ctx context.Context, epicID string, req models.Updat
 			{"name": req.Version},
 		}
 	} else {
-		updateFields["fixVersions"] = nil
+		updateFields["fixVersions"] = []map[string]string{}
 	}
 
 	// Update priority if specified
@@ -518,7 +514,6 @@ func (c *Client) GetComponentVersions(ctx context.Context, component string) ([]
 	return componentVersions, nil
 }
 
-
 // GetProjectDetails fetches details of the project
 func (c *Client) GetProjectDetails(ctx context.Context, projectKey string) (*models.Project, error) {
 	// Get project information to access versions
@@ -532,11 +527,9 @@ func (c *Client) GetProjectDetails(ctx context.Context, projectKey string) (*mod
 	return models.ConvertJiraProjectToProject(project), nil
 }
 
-
 // GetAssignableUsers fetches users that can be assigned to issues in the project
 func (c *Client) GetAssignableUsers(ctx context.Context, query string, projectKey string, issueKey string) ([]models.User, error) {
 	// Use the user search endpoint to get users
-
 
 	req, err := c.inner.NewRequestWithContext(ctx, "GET", "rest/api/latest/user/assignable/search", nil)
 	if err != nil {
@@ -615,7 +608,7 @@ func (c *Client) GetBasicPillars(ctx context.Context) ([]models.BasicPillar, err
 	jqlQuery := fmt.Sprintf("project = %s AND issuetype = Pillar AND resolution is empty ORDER BY priority DESC, created ASC", c.project)
 
 	searchOptions := &jira.SearchOptions{
-		Fields: []string{"summary", "priority", "components", "status", "customfield_10020", "customfield_10021", "customfield_12801", "created"},
+		Fields:     []string{"summary", "priority", "components", "status", "customfield_10020", "customfield_10021", "customfield_12801", "created"},
 		MaxResults: 1000,
 	}
 
@@ -696,7 +689,7 @@ func (c *Client) GetMilestonesWithFilter(ctx context.Context, pillarIDs []string
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
 
 	searchOptions := &jira.SearchOptions{
-		Fields: []string{"summary", "status", "parent", "customfield_*", "quater", "quater", "issuelinks", "extras", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank", "created"},
+		Fields:     []string{"summary", "status", "parent", "customfield_*", "quater", "quater", "issuelinks", "extras", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank", "created"},
 		MaxResults: 1000,
 	}
 
@@ -748,16 +741,10 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	jqlParts = append(jqlParts, "resolution is empty")
 
 	// Add milestone ID filter if provided
-	// if len(milestoneIDs) > 0 {
-	// 	milestoneFilter := fmt.Sprintf(`parent in (%s)`, strings.Join(milestoneIDs, ","))
-	// 	jqlParts = append(jqlParts, milestoneFilter)
-	// }
-	// milestones
 	if len(milestoneIDs) > 0 {
 		milestoneFilter := fmt.Sprintf(`issueFunction in linkedIssuesOf("id in (%s)", "is blocked by")`, strings.Join(milestoneIDs, ","))
 		jqlParts = append(jqlParts, milestoneFilter)
 	}
-
 
 	// Add pillar ID filter if provided (epics are grandchildren of pillars)
 	if len(pillarIDs) > 0 {
@@ -780,7 +767,7 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
 
 	searchOptions := &jira.SearchOptions{
-		Fields: []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		Fields:     []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
 		MaxResults: 2000,
 	}
 
@@ -796,7 +783,6 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 		zap.Strings("components", components),
 		zap.Strings("versions", versions))
 
-
 	milestoneIDsIndex := map[string]struct{}{}
 
 	for _, milestoneID := range milestoneIDs {
@@ -805,16 +791,8 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 
 	epics := make([]models.Epic, 0, len(issues))
 	for _, issue := range issues {
-		// Get the milestone ID from the parent
-		// if issue.Fields.Parent != nil {
-		// 	milestoneID = issue.Fields.Parent.ID
-		// }
-
-		c.logger.Sugar().Debugw("epic issue", "epic", issue)
 
 		epic := models.ConvertJiraIssueToEpic(&issue, "")
-
-		c.logger.Sugar().Debugw("got epic", "epic", *epic)
 
 		if len(milestoneIDsIndex) > 0 && !models.HasItem(milestoneIDsIndex, epic.MilestoneIDs) {
 			continue

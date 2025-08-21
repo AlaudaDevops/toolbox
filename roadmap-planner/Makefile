@@ -6,12 +6,15 @@
 help:
 	@echo "Available targets:"
 	@echo "  setup          - Set up development environment"
-	@echo "  dev            - Run development servers"
+	@echo "  dev            - Run development servers separately"
 	@echo "  build          - Build both backend and frontend"
+	@echo "  build-unified  - Build unified Docker image (production)"
 	@echo "  test           - Run tests"
 	@echo "  clean          - Clean build artifacts"
-	@echo "  docker-build   - Build Docker images"
-	@echo "  docker-run     - Run with Docker Compose"
+	@echo "  docker-build   - Build production Docker image"
+	@echo "  docker-build-dev - Build development Docker images"
+	@echo "  docker-run     - Run production with Docker Compose"
+	@echo "  docker-run-dev - Run development with Docker Compose"
 	@echo "  docker-stop    - Stop Docker containers"
 
 # Setup development environment
@@ -44,6 +47,11 @@ build-frontend:
 	@echo "Building frontend..."
 	@cd frontend && npm run build
 
+# Build unified production image
+build-unified:
+	@echo "Building unified Docker image..."
+	@docker build -t roadmap-planner:latest .
+
 # Run tests
 test: test-backend test-frontend
 
@@ -62,22 +70,32 @@ clean:
 	@rm -rf frontend/build
 	@rm -rf frontend/node_modules/.cache
 
-# Docker targets
+# Docker targets - Production
 docker-build:
-	@echo "Building Docker images..."
-	@docker-compose build
+	@echo "Building production Docker image..."
+	@docker build -t roadmap-planner:latest .
 
 docker-run:
-	@echo "Starting with Docker Compose..."
-	@docker-compose up -d
+	@echo "Starting production with Docker Compose..."
+	@docker-compose --profile production up -d
+
+# Docker targets - Development
+docker-build-dev:
+	@echo "Building development Docker images..."
+	@docker-compose -f docker-compose.dev.yml build
+
+docker-run-dev:
+	@echo "Starting development with Docker Compose..."
+	@docker-compose -f docker-compose.dev.yml up -d
 
 docker-stop:
 	@echo "Stopping Docker containers..."
-	@docker-compose down
+	@docker-compose down || true
+	@docker-compose -f docker-compose.dev.yml down || true
 
 docker-logs:
 	@echo "Showing Docker logs..."
-	@docker-compose logs -f
+	@docker-compose logs -f || docker-compose -f docker-compose.dev.yml logs -f
 
 # Development helpers
 backend-run:

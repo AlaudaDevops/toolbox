@@ -156,6 +156,3 @@ func GetProject(c *gin.Context) (string, bool) {
 	projectName, ok := project.(string)
 	return projectName, ok
 }
-
-
-

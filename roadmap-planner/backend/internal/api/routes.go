@@ -17,6 +17,10 @@ limitations under the License.
 package api
 
 import (
+	"net/http"
+	"os"
+	"path/filepath"
+
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/handlers"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/middleware"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
@@ -82,6 +86,37 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 			// User routes
 			protected.GET("/users/assignable", roadmapHandler.GetAssignableUsers)
 		}
+	}
+
+	// Serve static files from embedded frontend (production) or filesystem (development)
+	staticPath := cfg.Server.StaticFilesPath
+	if staticPath == "" {
+		staticPath = "../frontend/build" // Default path for development
+	}
+
+	// Check if static files directory exists
+	if _, err := os.Stat(staticPath); err == nil {
+		// Serve static assets
+		router.Static("/static", filepath.Join(staticPath, "static"))
+
+		// Serve other static files (manifest.json, etc.)
+		router.StaticFile("/manifest.json", filepath.Join(staticPath, "manifest.json"))
+		router.StaticFile("/asset-manifest.json", filepath.Join(staticPath, "asset-manifest.json"))
+
+		// Serve index.html for all non-API routes (SPA routing)
+		router.NoRoute(func(c *gin.Context) {
+			// Don't serve index.html for API routes
+			if c.Request.URL.Path != "/" &&
+				c.Request.URL.Path != "/health" &&
+				!gin.IsDebugging() {
+				// For API routes, return 404
+				if len(c.Request.URL.Path) > 4 && c.Request.URL.Path[:4] == "/api" {
+					c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+					return
+				}
+			}
+			c.File(filepath.Join(staticPath, "index.html"))
+		})
 	}
 
 	return router

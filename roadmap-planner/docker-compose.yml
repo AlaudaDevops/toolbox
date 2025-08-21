@@ -1,9 +1,10 @@
 version: '3.8'
 
 services:
-  backend:
+  # Production service - single container with backend serving frontend
+  app:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     ports:
       - "8080:8080"
@@ -13,6 +14,7 @@ services:
       - JIRA_PASSWORD=${JIRA_PASSWORD}
       - SERVER_PORT=8080
       - DEBUG=${DEBUG:-false}
+      - STATIC_FILES_PATH=/app/frontend/build
     volumes:
       - ./backend/config:/app/config:ro
     restart: unless-stopped
@@ -21,23 +23,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - REACT_APP_API_URL=http://localhost:8080
-    depends_on:
-      - backend
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    profiles:
+      - production
 
 networks:
   default:

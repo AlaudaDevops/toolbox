@@ -18,6 +18,7 @@ A web-based Kanban application for managing product roadmaps using direct Jira i
 - **Frontend**: React with drag-and-drop support
 - **Integration**: Jira REST API v8.4
 - **Authentication**: Jira Basic Auth
+- **Deployment**: Unified Docker container (backend serves frontend)
 
 ### Project Structure
 ```
@@ -66,25 +67,54 @@ roadmap-planner/
    JIRA_PASSWORD=your-api-token
    ```
 
-3. **Start development servers**:
+3. **Start development servers** (separate processes):
    ```bash
    make dev
    ```
 
 4. **Access the application**:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8080
+   - Development Frontend: http://localhost:3000
+   - Development Backend API: http://localhost:8080
+
+### Production Deployment
+
+For production, the application runs as a single container where the backend serves both the API and frontend files:
+
+```bash
+# Build unified production image
+make build-unified
+
+# Run production container
+make docker-run
+```
+
+In production mode:
+- **Application**: http://localhost:8080 (single endpoint for everything)
+- No CORS issues as frontend and backend are served from the same origin
 
 ### Alternative Setup Methods
 
-#### Using Docker Compose
+#### Using Docker Compose (Production)
 ```bash
 # Set environment variables
 cp .env.example .env
 # Edit .env with your Jira credentials
 
-# Start the application
+# Start the unified application
 make docker-run
+# Access at: http://localhost:8080
+```
+
+#### Using Docker Compose (Development)
+```bash
+# Set environment variables
+cp .env.example .env
+# Edit .env with your Jira credentials
+
+# Start separate development containers
+make docker-run-dev
+# Frontend: http://localhost:3000
+# Backend: http://localhost:8080
 ```
 
 #### Manual Setup
@@ -144,12 +174,14 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development instructions.
 ### Quick Commands
 
 ```bash
-make help          # Show all available commands
-make setup         # Set up development environment
-make dev           # Run development servers
-make test          # Run all tests
-make build         # Build for production
-make docker-build  # Build Docker images
+make help             # Show all available commands
+make setup            # Set up development environment
+make dev              # Run development servers (separate)
+make test             # Run all tests
+make build            # Build for local development
+make build-unified    # Build unified production Docker image
+make docker-run       # Run production (unified container)
+make docker-run-dev   # Run development (separate containers)
 ```
 
 ### Testing

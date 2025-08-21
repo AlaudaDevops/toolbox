@@ -146,27 +146,27 @@ func TestClient_Methods(t *testing.T) {
 
 	// Example of what integration tests would look like:
 	/*
-	client, err := NewClient("https://test.atlassian.net", "test", "token", "TEST")
-	if err != nil {
-		t.Fatalf("Failed to create client: %v", err)
-	}
+		client, err := NewClient("https://test.atlassian.net", "test", "token", "TEST")
+		if err != nil {
+			t.Fatalf("Failed to create client: %v", err)
+		}
 
-	ctx := context.Background()
+		ctx := context.Background()
 
-	// Test connection
-	err = client.TestConnection(ctx)
-	if err != nil {
-		t.Errorf("TestConnection() failed: %v", err)
-	}
+		// Test connection
+		err = client.TestConnection(ctx)
+		if err != nil {
+			t.Errorf("TestConnection() failed: %v", err)
+		}
 
-	// Test getting pillars
-	pillars, err := client.GetPillars(ctx)
-	if err != nil {
-		t.Errorf("GetPillars() failed: %v", err)
-	}
+		// Test getting pillars
+		pillars, err := client.GetPillars(ctx)
+		if err != nil {
+			t.Errorf("GetPillars() failed: %v", err)
+		}
 
-	if len(pillars) == 0 {
-		t.Log("No pillars found (this might be expected for test environment)")
-	}
+		if len(pillars) == 0 {
+			t.Log("No pillars found (this might be expected for test environment)")
+		}
 	*/
 }

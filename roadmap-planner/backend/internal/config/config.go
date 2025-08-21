@@ -30,6 +30,7 @@ type Config struct {
 	Jira   Jira   `mapstructure:"jira"`
 	Server Server `mapstructure:"server"`
 	Cache  Cache  `mapstructure:"cache"`
+
 }
 
 // Logger represents logger configuration settings
@@ -41,10 +42,10 @@ type Logger struct {
 
 // Jira represents Jira configuration settings
 type Jira struct {
-	BaseURL  string `mapstructure:"base_url"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	Project  string `mapstructure:"project"`
+	BaseURL  string   `mapstructure:"base_url"`
+	Username string   `mapstructure:"username"`
+	Password string   `mapstructure:"password"`
+	Project  string   `mapstructure:"project"`
 	Quarters []string `mapstructure:"quarters"`
 }
 
@@ -52,6 +53,7 @@ type Jira struct {
 type Server struct {
 	Port int  `mapstructure:"port"`
 	CORS CORS `mapstructure:"cors"`
+	StaticFilesPath string `mapstructure:"static_files_path"`
 }
 
 // CORS represents CORS configuration settings
@@ -79,9 +81,10 @@ func Load() (*Config, error) {
 	viper.SetDefault("logger.development", false)
 	viper.SetDefault("logger.encoding", "json")
 	viper.SetDefault("server.port", 8080)
+	viper.SetDefault("server.static_file_path", "../frontend/build")
 	viper.SetDefault("server.cors.allowed_origins", []string{"http://localhost:3000"})
 	viper.SetDefault("jira.project", "DEVOPS")
-	viper.SetDefault("jira.quarters", []string{"2025Q1","2025Q2","2025Q3","2025Q4","2026Q1","2026Q2","2026Q4"})
+	viper.SetDefault("jira.quarters", []string{"2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q4"})
 	viper.SetDefault("cache.ttl", "5m")
 	viper.SetDefault("cache.refresh_interval", "1m")
 
@@ -93,6 +96,7 @@ func Load() (*Config, error) {
 	viper.BindEnv("jira.base_url", "JIRA_BASE_URL")
 	viper.BindEnv("jira.username", "JIRA_USERNAME")
 	viper.BindEnv("jira.password", "JIRA_PASSWORD")
+	viper.BindEnv("server.static_files_path", "STATIC_FILES_PATH")
 	viper.BindEnv("server.port", "SERVER_PORT")
 	viper.BindEnv("debug", "DEBUG")
 
@@ -106,17 +110,6 @@ func Load() (*Config, error) {
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
-	}
-
-	// Validate required fields
-	if config.Jira.BaseURL == "" {
-		return nil, fmt.Errorf("jira.base_url is required")
-	}
-	if config.Jira.Username == "" {
-		return nil, fmt.Errorf("jira.username is required")
-	}
-	if config.Jira.Password == "" {
-		return nil, fmt.Errorf("jira.password is required")
 	}
 
 	return &config, nil

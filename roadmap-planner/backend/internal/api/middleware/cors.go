@@ -33,14 +33,21 @@ func CORSMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		// Check if origin is allowed
 		allowed := false
-		for _, allowedOrigin := range cfg.Server.CORS.AllowedOrigins {
-			if allowedOrigin == "*" || allowedOrigin == origin {
-				allowed = true
-				break
+
+		// If no origin header (same-origin request), allow it
+		if origin == "" {
+			allowed = true
+		} else {
+			// Check configured origins
+			for _, allowedOrigin := range cfg.Server.CORS.AllowedOrigins {
+				if allowedOrigin == "*" || allowedOrigin == origin {
+					allowed = true
+					break
+				}
 			}
 		}
 
-		if allowed {
+		if allowed && origin != "" {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
 
