@@ -1,0 +1,575 @@
+/* Kanban Board Styles */
+.kanban-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  gap: 2rem;
+}
+
+.kanban-title h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.kanban-title p {
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.kanban-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Main App Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.app-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+}
+
+.app-title {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.app-subtitle {
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 400;
+}
+
+.app-header-right {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Compact Controls Bar */
+.controls-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.quarter-selection-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.quarter-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.quarter-checkboxes-compact {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.quarter-checkbox-compact {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: #475569;
+  transition: color 0.2s;
+}
+
+.quarter-checkbox-compact:hover {
+  color: #1e293b;
+}
+
+.quarter-checkbox-compact input[type="checkbox"] {
+  width: 0.875rem;
+  height: 0.875rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.quarter-checkbox-compact input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quarter-label-compact {
+  font-weight: 500;
+  user-select: none;
+}
+
+.future-controls {
+  /* Placeholder for future controls */
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Ghost Button Style for Header */
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.btn-ghost:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #e2e8f0;
+}
+
+.btn-ghost:active {
+  background: #e2e8f0;
+}
+
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+}
+
+/* Quarter Selection */
+.quarter-selection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: center;
+}
+
+.quarter-selection-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  text-align: center;
+}
+
+.quarter-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 0.375rem;
+  border: 1px solid #e2e8f0;
+  justify-content: center;
+}
+
+.quarter-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #475569;
+  transition: color 0.2s;
+}
+
+.quarter-checkbox:hover {
+  color: #1e293b;
+}
+
+.quarter-checkbox input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+.quarter-checkbox input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quarter-checkbox-label {
+  font-weight: 500;
+  user-select: none;
+}
+
+.kanban-board {
+  flex: 1;
+  overflow: auto;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.kanban-quarters-header {
+  display: grid;
+  grid-template-columns: 200px repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1px;
+  background-color: #e2e8f0;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.kanban-pillar-header,
+.kanban-quarter-header {
+  background: #f8fafc;
+  padding: .5rem;
+  font-weight: 600;
+  color: #475569;
+  text-align: center;
+  border-right: 1px solid #e2e8f0;
+}
+
+.kanban-pillar-header {
+  text-align: left;
+}
+
+.kanban-pillar-row {
+  display: grid;
+  grid-template-columns: 200px repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1px;
+  background-color: #e2e8f0;
+  min-height: 200px;
+}
+
+.kanban-pillar-info {
+  background: white;
+  padding: 1rem;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kanban-pillar-info h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.25rem;
+}
+
+.pillar-key {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-family: monospace;
+}
+
+.pillar-component {
+  font-size: 0.75rem;
+  background: #e0e7ff;
+  color: #3730a3;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  align-self: flex-start;
+}
+
+.kanban-quarter-cell {
+  background: white;
+  padding: 1rem;
+  border-right: 1px solid #e2e8f0;
+  min-height: 200px;
+}
+
+.milestone-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.milestone-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  border-left: 2px solid #3b82f6;
+}
+
+/* Remove margin from the first milestone wrapper for better spacing */
+.milestone-wrapper:first-child {
+  margin-bottom: 1rem;
+}
+
+/* Reduce margin for subsequent milestone wrappers */
+.milestone-wrapper:not(:first-child) {
+  margin-bottom: 0.25rem;
+}
+
+.milestone-epics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.create-epic-btn {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border: 1px dashed #cbd5e1;
+  background: transparent;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+.create-epic-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.epics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-height: 60px;
+  padding: 0.5rem;
+  border: 2px dashed transparent;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+  background: white;
+}
+
+.epics-container.drag-over {
+  border-color: #667eea;
+  background-color: #f0f4ff;
+}
+
+.epic-draggable {
+  transition: transform 0.2s;
+}
+
+.epic-draggable.dragging {
+  /* Let the epic-card handle its own dragging styles */
+  transform: none;
+  box-shadow: none;
+}
+
+/* Epic Drag Handle (defined in KanbanBoard) */
+.epic-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  background: #e2e8f0;
+  border-right: 1px solid #cbd5e1;
+  cursor: grab;
+  color: #64748b;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.epic-drag-handle:hover {
+  background: #cbd5e1;
+  color: #475569;
+}
+
+.epic-drag-handle:active {
+  cursor: grabbing;
+  background: #cbd5e1;
+}
+
+.empty-quarter {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #cbd5e1;
+  border-radius: 0.375rem;
+  min-height: 150px;
+}
+
+.create-milestone-btn {
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.create-milestone-btn:hover {
+  opacity: 1;
+}
+
+/* Loading and Error States */
+.kanban-loading,
+.kanban-error,
+.kanban-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1rem;
+  text-align: center;
+}
+
+.kanban-error h3,
+.kanban-empty h3 {
+  color: #ef4444;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.kanban-error p {
+  color: #64748b;
+  max-width: 400px;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .kanban-quarters-header,
+  .kanban-pillar-row {
+    grid-template-columns: 200px repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .kanban-pillar-info {
+    padding: 0.75rem;
+  }
+
+  .kanban-quarter-cell {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .kanban-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .app-header {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .app-header-left {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .app-header-right {
+    justify-content: center;
+  }
+
+  .controls-bar {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .quarter-selection-compact {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .quarter-checkboxes-compact {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .quarter-selection {
+    order: 2;
+  }
+
+  .kanban-actions {
+    justify-content: center;
+    order: 3;
+  }
+
+  .quarter-checkboxes {
+    min-width: auto;
+  }
+
+  .kanban-quarters-header,
+  .kanban-pillar-row {
+    grid-template-columns: 150px repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .kanban-pillar-info h3 {
+    font-size: 0.675rem;
+  }
+
+  .kanban-quarter-cell {
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 640px) {
+  .kanban-container {
+    padding: 0.5rem;
+  }
+
+  .quarter-selection {
+    gap: 0.5rem;
+  }
+
+  .quarter-checkboxes {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .app-header {
+    padding: 0.5rem;
+  }
+
+  .controls-bar {
+    padding: 0.5rem;
+  }
+
+  .app-title {
+    font-size: 1.125rem;
+  }
+
+  .quarter-selection-compact {
+    gap: 0.5rem;
+  }
+
+  .quarter-checkboxes-compact {
+    gap: 0.375rem;
+  }
+
+  .kanban-quarters-header,
+  .kanban-pillar-row {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kanban-pillar-info,
+  .kanban-quarter-cell {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .kanban-quarter-header {
+    text-align: left;
+  }
+}

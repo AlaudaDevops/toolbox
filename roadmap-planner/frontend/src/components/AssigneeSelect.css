@@ -1,0 +1,147 @@
+/* AssigneeSelect Component Styles */
+.assignee-select-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Override react-select default styles */
+.assignee-select .assignee-select__control {
+  border-radius: 0.5rem;
+  border-width: 1px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.assignee-select .assignee-select__control--is-focused {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.assignee-select.error .assignee-select__control {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.assignee-select.error .assignee-select__control--is-focused {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.assignee-select .assignee-select__placeholder {
+  color: #9ca3af;
+  font-size: 0.875rem;
+}
+
+.assignee-select .assignee-select__input-container {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.assignee-select .assignee-select__single-value {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.assignee-select .assignee-select__menu {
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.assignee-select .assignee-select__menu-list {
+  padding: 0;
+  max-height: 200px;
+}
+
+.assignee-select .assignee-select__option {
+  padding: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.assignee-select .assignee-select__option:last-child {
+  border-bottom: none;
+}
+
+.assignee-select .assignee-select__option--is-focused {
+  background-color: #f8fafc;
+}
+
+.assignee-select .assignee-select__option--is-selected {
+  background-color: #667eea;
+  color: white;
+}
+
+.assignee-select .assignee-select__option--is-selected.assignee-select__option--is-focused {
+  background-color: #5a67d8;
+}
+
+.assignee-select .assignee-select__loading-indicator {
+  color: #667eea;
+}
+
+.assignee-select .assignee-select__clear-indicator {
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.assignee-select .assignee-select__clear-indicator:hover {
+  color: #6b7280;
+}
+
+.assignee-select .assignee-select__dropdown-indicator {
+  color: #9ca3af;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.assignee-select .assignee-select__dropdown-indicator:hover {
+  color: #6b7280;
+}
+
+.assignee-select .assignee-select__indicator-separator {
+  background-color: #e5e7eb;
+}
+
+/* Loading and no options messages */
+.assignee-select .assignee-select__menu-notice {
+  padding: 1rem;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .assignee-select .assignee-select__menu {
+    font-size: 0.8125rem;
+  }
+  
+  .assignee-select .assignee-select__option {
+    padding: 0.625rem;
+  }
+  
+  .assignee-select .assignee-select__control {
+    min-height: 38px;
+  }
+}
+
+/* Focus styles for accessibility */
+.assignee-select .assignee-select__control:focus-within {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+/* Animation for loading state */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.assignee-select .assignee-select__loading-indicator svg {
+  animation: spin 1s linear infinite;
+}

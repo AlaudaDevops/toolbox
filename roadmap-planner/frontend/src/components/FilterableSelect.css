@@ -1,0 +1,61 @@
+/* FilterableSelect Component Styles */
+.filterable-select {
+  position: relative;
+  width: 100%;
+}
+
+/* Error state styling for the container */
+.filterable-select.error .react-select-container .react-select__control {
+  border-color: #ef4444 !important;
+}
+
+.filterable-select.error .react-select-container .react-select__control:hover {
+  border-color: #ef4444 !important;
+}
+
+.filterable-select.error .react-select-container .react-select__control--is-focused {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
+}
+
+/* Ensure consistent styling with form elements */
+.filterable-select .react-select__control {
+  font-family: inherit;
+}
+
+.filterable-select .react-select__input-container {
+  color: #374151;
+}
+
+.filterable-select .react-select__placeholder {
+  color: #9ca3af;
+}
+
+/* Custom scrollbar for the menu */
+.filterable-select .react-select__menu-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.filterable-select .react-select__menu-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.filterable-select .react-select__menu-list::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.filterable-select .react-select__menu-list::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .filterable-select .react-select__menu {
+    font-size: 13px;
+  }
+
+  .filterable-select .react-select__control {
+    font-size: 13px;
+  }
+}
