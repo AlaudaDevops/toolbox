@@ -1,35 +1,9 @@
 import React from 'react';
-import { AlertCircle, PlayCircle, CheckCircle, Clock, ExternalLink, ArrowRightLeft, Edit, Tag } from 'lucide-react';
+import { ExternalLink, ArrowRightLeft, Edit, Tag } from 'lucide-react';
 import { getJiraIssueUrl } from '../utils/jiraUtils';
 import './EpicCard.css';
 
 const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone }) => {
-  const getStatusIcon = (status) => {
-    switch (status?.toLowerCase()) {
-      case '已完成':
-      case '已取消':
-      case 'done':
-      case 'closed':
-      case 'resolved':
-        return <CheckCircle title={status} size={14} />;
-      case '调研中':
-      case '调研完成':
-      case '设计完成':
-      case '开发完成':
-      case '测试完成':
-      case '验收完成':
-      case 'in progress':
-      case 'in-progress':
-        return <PlayCircle title={status} size={14} />;
-      case '待处理':
-      case 'to do':
-      case 'todo':
-      case 'open':
-        return <Clock title={status} size={14} />;
-      default:
-        return <AlertCircle title={status} size={14} />;
-    }
-  };
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -125,9 +99,9 @@ const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone
             </div>
           )}
         <Tag size={13}/>
-        {epic.versions && (
+        {(epic.versions && (
           <span className="epic-versions">{epic.versions.join(', ')}</span>
-        ) || (
+        )) || (
           <span className="epic-versions">-</span>
         )}
         </div>

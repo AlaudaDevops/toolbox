@@ -61,7 +61,7 @@ const KanbanBoard = () => {
         saveSelectedQuarters(validatedQuarters);
       }
     }
-  }, [roadmapData?.quarters]);
+  }, [roadmapData?.quarters, selectedQuarters]);
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;

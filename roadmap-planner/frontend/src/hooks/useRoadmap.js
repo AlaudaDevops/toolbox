@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { roadmapAPI, handleAPIError } from '../services/api';
-import { sortRoadmapData } from '../utils/sortingUtils';
 import toast from 'react-hot-toast';
 
 const RoadmapContext = createContext();
@@ -222,47 +221,6 @@ export const RoadmapProvider = ({ children }) => {
     loadRoadmap();
   }, [loadRoadmap]);
 
-  // Smart refresh functions for targeted updates
-  const refreshPillarMilestones = useCallback(async (pillarId) => {
-    const requestKey = `refresh-pillar-milestones-${pillarId}`;
-    return deduplicateRequest(requestKey, async () => {
-      try {
-        console.log('Refreshing milestones for pillar:', pillarId);
-        const milestones = await roadmapAPI.getMilestones({ pillarIds: [pillarId] });
-
-        setRoadmapData(prevData => {
-          if (!prevData) return prevData;
-
-          const updatedPillars = prevData.pillars.map(pillar => {
-            if (pillar.id === pillarId) {
-              return {
-                ...pillar,
-                milestones: milestones.milestones || [],
-              };
-            }
-            return pillar;
-          });
-
-          return {
-            ...prevData,
-            pillars: updatedPillars,
-          };
-        });
-
-        // Load epics for the refreshed milestones
-        const milestoneIds = milestones.milestones?.map(m => m.id) || [];
-        if (milestoneIds.length > 0) {
-          await refreshMilestoneEpics(milestoneIds);
-        }
-
-        return { success: true };
-      } catch (error) {
-        console.error('Failed to refresh pillar milestones:', error);
-        return { success: false, error: error.message };
-      }
-    });
-  }, [deduplicateRequest]);
-
   const refreshMilestoneEpics = useCallback(async (milestoneIds) => {
     const requestKey = `refresh-milestone-epics-${milestoneIds.sort().join(',')}`;
     return deduplicateRequest(requestKey, async () => {
@@ -312,6 +270,48 @@ export const RoadmapProvider = ({ children }) => {
       }
     });
   }, [deduplicateRequest]);
+
+  // Smart refresh functions for targeted updates
+  const refreshPillarMilestones = useCallback(async (pillarId) => {
+    const requestKey = `refresh-pillar-milestones-${pillarId}`;
+    return deduplicateRequest(requestKey, async () => {
+      try {
+        console.log('Refreshing milestones for pillar:', pillarId);
+        const milestones = await roadmapAPI.getMilestones({ pillarIds: [pillarId] });
+
+        setRoadmapData(prevData => {
+          if (!prevData) return prevData;
+
+          const updatedPillars = prevData.pillars.map(pillar => {
+            if (pillar.id === pillarId) {
+              return {
+                ...pillar,
+                milestones: milestones.milestones || [],
+              };
+            }
+            return pillar;
+          });
+
+          return {
+            ...prevData,
+            pillars: updatedPillars,
+          };
+        });
+
+        // Load epics for the refreshed milestones
+        const milestoneIds = milestones.milestones?.map(m => m.id) || [];
+        if (milestoneIds.length > 0) {
+          await refreshMilestoneEpics(milestoneIds);
+        }
+
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to refresh pillar milestones:', error);
+        return { success: false, error: error.message };
+      }
+    });
+  }, [deduplicateRequest, refreshMilestoneEpics]);
+
 
   // Batch refresh function for multiple operations
   const batchRefresh = useCallback(async (operations) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Toaster } from 'react-hot-toast';
 import KanbanBoard from './components/KanbanBoard';
 import LoginModal from './components/modals/LoginModal';

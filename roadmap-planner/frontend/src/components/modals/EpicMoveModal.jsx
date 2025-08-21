@@ -124,7 +124,6 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
                       milestone.data.quarter.toLowerCase().includes(search) ||
                       milestone.data.key.toLowerCase().includes(search)
                     );
-                    return true;
                   }}
                   emptyMessage="No milestones found"
                   isClearable={false}
