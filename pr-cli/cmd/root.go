@@ -57,7 +57,8 @@ Example usage:
 Tekton Results:
   When used in Tekton pipelines, pr-cli writes result files to the configured results directory.
   Available results:
-  - merge-successful: Written with value "true" when a merge operation completes successfully`,
+  - merge-successful: Written with value "true" when a merge operation completes successfully
+  - has-cherry-pick-comments: Written with value "true"/"false" during /merge or /ready operations to indicate if cherry-pick comments exist in the PR`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Handle --version flag

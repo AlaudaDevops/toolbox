@@ -166,6 +166,7 @@ When used in Tekton pipelines, pr-cli writes result files to the configured resu
 | Result Name | Value | Condition | Description |
 |-------------|-------|-----------|-------------|
 | `merge-successful` | `"true"` | When merge operation completes successfully | Indicates that a PR has been successfully merged |
+| `has-cherry-pick-comments` | `"true"`/`"false"` | During `/merge` or `/ready` operations | Indicates if there are cherry-pick comments in the PR |
 
 ## Development
 

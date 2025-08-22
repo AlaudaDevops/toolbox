@@ -191,11 +191,16 @@ func (h *PRHandler) postMergeSuccessMessage(method string, validVotes int, lgtmU
 	successMessage := fmt.Sprintf(messages.MergeSuccessTemplate,
 		method, h.config.CommentSender, validVotes, h.config.LGTMThreshold, usersTable)
 
+	// Check for cherry-pick comments and write result before merge
+	hasCherryPickComments := h.checkForCherryPickComments()
+	h.writeTektonResult("has-cherry-pick-comments", fmt.Sprintf("%t", hasCherryPickComments))
+
+	h.writeTektonResult("merge-successful", "true")
+
 	if err := h.client.PostComment(successMessage); err != nil {
 		return err
 	}
 
-	h.writeTektonResult("merge-successful", "true")
 	return nil
 }
 
@@ -208,6 +213,26 @@ func (h *PRHandler) buildRobotUsersMap(lgtmUsers map[string]string) map[string]b
 		}
 	}
 	return robotUsers
+}
+
+// checkForCherryPickComments checks if there are any cherry-pick comments in the PR
+func (h *PRHandler) checkForCherryPickComments() bool {
+	// Get all comments from the PR
+	comments, err := h.client.GetComments()
+	if err != nil {
+		h.Logger.Errorf("Failed to get comments for cherry-pick check: %v", err)
+		return false
+	}
+
+	// Check if any comment contains cherry-pick commands
+	for _, comment := range comments {
+		if cherryPickPattern.MatchString(comment.Body) {
+			h.Logger.Infof("Found cherry-pick comment: %s", comment.Body)
+			return true
+		}
+	}
+
+	return false
 }
 
 var (
