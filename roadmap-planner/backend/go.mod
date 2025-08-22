@@ -1,6 +1,6 @@
 module github.com/AlaudaDevops/toolbox/roadmap-planner/backend
 
-go 1.24.6
+go 1.25.0
 
 require (
 	github.com/andygrunwald/go-jira v1.16.0
