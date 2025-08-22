@@ -56,6 +56,7 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	// Platform and authentication configuration
 	flags.StringVar(&p.Config.Platform, "platform", p.Config.Platform, "Git platform (github or gitlab)")
 	flags.StringVar(&p.Config.Token, "token", "", "Git platform API token for authentication")
+	flags.StringVar(&p.Config.CommentToken, "comment-token", "", "Git platform API token for posting comments (optional, falls back to --token)")
 	flags.StringVar(&p.Config.BaseURL, "base-url", "", "API base URL (optional, defaults per platform)")
 	flags.StringVar(&p.Config.Owner, "repo-owner", "", "Repository owner (organization or user)")
 	flags.StringVar(&p.Config.Repo, "repo-name", "", "Repository name")
@@ -128,6 +129,7 @@ func (p *PROption) readAllFromViper() {
 	// Clean up string values by trimming whitespace and newlines
 	p.Config.Platform = strings.TrimSpace(p.Config.Platform)
 	p.Config.Token = strings.TrimSpace(p.Config.Token)
+	p.Config.CommentToken = strings.TrimSpace(p.Config.CommentToken)
 	p.Config.BaseURL = strings.TrimSpace(p.Config.BaseURL)
 	p.Config.Owner = strings.TrimSpace(p.Config.Owner)
 	p.Config.Repo = strings.TrimSpace(p.Config.Repo)

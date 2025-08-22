@@ -91,6 +91,8 @@ The Pipeline supports the following configurable parameters:
 | Parameter | Default Value | Description |
 |-----------|---------------|-------------|
 | `git_auth_secret_key` | `git-provider-token` | The key in git_auth_secret that contains the token |
+| `git_comment_auth_secret` | `github-credentials` | Secret containing the token for posting comments |
+| `git_comment_auth_secret_key` | `token` | The key in git_comment_auth_secret that contains the comment token |
 | `image` | `registry.alauda.cn:60070/devops/toolbox/pr-cli:latest` | Container image for pr-cli tool |
 | `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM, allow read permission for internal repositories |
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
@@ -171,6 +173,12 @@ spec:
     # The key in git_auth_secret that contains the token (default: git-provider-token)
     # - name: git_auth_secret_key
     #   value: "git-provider-token"
+    #
+    # Optional: Separate secret for posting comments (default: github-credentials)
+    # - name: git_comment_auth_secret
+    #   value: "github-credentials"
+    # - name: git_comment_auth_secret_key
+    #   value: "token"
     #
     # Container image for pr-cli tool (default: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest)
     # - name: image
