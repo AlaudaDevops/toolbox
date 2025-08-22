@@ -40,6 +40,7 @@ func NewPRHandler(logger *logrus.Logger, cfg *config.Config) (*PRHandler, error)
 	clientConfig := &git.Config{
 		Platform:      cfg.Platform,
 		Token:         cfg.Token,
+		CommentToken:  cfg.CommentToken,
 		BaseURL:       cfg.BaseURL,
 		Owner:         cfg.Owner,
 		Repo:          cfg.Repo,

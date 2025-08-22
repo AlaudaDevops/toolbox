@@ -39,7 +39,8 @@ var (
 // Client implements the GitClient interface for GitHub
 type Client struct {
 	logger        *logrus.Logger
-	client        *github.Client  // GitHub API client
+	client        *github.Client  // GitHub API client for general operations
+	commentClient *github.Client  // GitHub API client for comment operations (may use different token)
 	ctx           context.Context // Request context
 	owner         string          // Repository owner
 	repo          string          // Repository name
@@ -53,28 +54,51 @@ type Client struct {
 // Factory implements ClientFactory for GitHub
 type Factory struct{}
 
-// CreateClient creates a new GitHub client
-func (f *Factory) CreateClient(logger *logrus.Logger, config *git.Config) (git.GitClient, error) {
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: config.Token},
-	)
+// createGitHubClient creates a GitHub client with the specified token
+func createGitHubClient(ctx context.Context, token, baseURL string) (*github.Client, error) {
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	tc := oauth2.NewClient(ctx, ts)
-
 	client := github.NewClient(tc)
 
 	// Set custom base URL if provided
-	if config.BaseURL != "" && config.BaseURL != "https://api.github.com" {
+	if baseURL != "" && baseURL != "https://api.github.com" {
 		var err error
-		client, err = client.WithEnterpriseURLs(config.BaseURL, config.BaseURL)
+		client, err = client.WithEnterpriseURLs(baseURL, baseURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to set GitHub enterprise URL: %w", err)
 		}
 	}
 
+	return client, nil
+}
+
+// CreateClient creates a new GitHub client
+func (f *Factory) CreateClient(logger *logrus.Logger, config *git.Config) (git.GitClient, error) {
+	ctx := context.Background()
+
+	// Create primary client with main token
+	client, err := createGitHubClient(ctx, config.Token, config.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create main GitHub client: %w", err)
+	}
+
+	// Create comment client - only if CommentToken is different from main Token
+	var commentClient *github.Client
+	if config.CommentToken != "" && config.CommentToken != config.Token {
+		logger.Debugf("Using separate comment token for posting comments")
+		commentClient, err = createGitHubClient(ctx, config.CommentToken, config.BaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create comment GitHub client: %w", err)
+		}
+	} else {
+		logger.Debugf("Using main token for posting comments")
+		commentClient = client
+	}
+
 	return &Client{
 		logger:        logger,
 		client:        client,
+		commentClient: commentClient,
 		ctx:           ctx,
 		owner:         config.Owner,
 		repo:          config.Repo,
@@ -130,7 +154,7 @@ func (c *Client) PostComment(message string) error {
 		Body: github.Ptr(message),
 	}
 
-	_, _, err := c.client.Issues.CreateComment(c.ctx, c.owner, c.repo, c.prNum, comment)
+	_, _, err := c.commentClient.Issues.CreateComment(c.ctx, c.owner, c.repo, c.prNum, comment)
 	return err
 }
 

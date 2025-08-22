@@ -36,6 +36,10 @@ spec:
       default: "true"
     - name: robot_accounts
       default: "alaudabot,dependabot,renovate,alaudaa-renovate,edge-katanomi-app2,edge-katanomi-app2[bot]"
+    - name: git_comment_auth_secret
+      default: "github-credentials"
+    - name: git_comment_auth_secret_key
+      default: "token"
   tasks:
     - name: pr-merge-management
       displayName: PR Merge & Management Operations
@@ -91,6 +95,12 @@ spec:
                 value: $(params.verbose)
               - name: PR_ROBOT_ACCOUNTS
                 value: $(params.robot_accounts)
+              - name: PR_COMMENT_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.git_comment_auth_secret)
+                    key: $(params.git_comment_auth_secret_key)
+                    optional: true
   finally:
     # Execute cherry-pick operations in finally block because after PR merge,
     # the pipeline will be cancelled (set to CancelledRunFinally), so these
@@ -141,3 +151,9 @@ spec:
                 value: $(params.verbose)
               - name: PR_POST_MERGE_CHERRY_PICK
                 value: "true"
+              - name: PR_COMMENT_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: $(params.git_comment_auth_secret)
+                    key: $(params.git_comment_auth_secret_key)
+                    optional: true

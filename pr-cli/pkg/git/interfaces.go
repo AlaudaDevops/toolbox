@@ -137,6 +137,7 @@ type GitClient interface {
 type Config struct {
 	Platform      string // "github" or "gitlab"
 	Token         string
+	CommentToken  string   // Token specifically for posting comments (optional, falls back to Token)
 	BaseURL       string   // API base URL
 	Owner         string   // Repository owner/namespace
 	Repo          string   // Repository name

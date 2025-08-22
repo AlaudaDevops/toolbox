@@ -26,9 +26,10 @@ import (
 // Config holds the configuration for PR CLI operations
 type Config struct {
 	// Platform configuration
-	Platform string `json:"platform" yaml:"platform" mapstructure:"platform"`
-	Token    string `json:"token" yaml:"token" mapstructure:"token"`
-	BaseURL  string `json:"base_url,omitempty" yaml:"base_url,omitempty" mapstructure:"base-url"`
+	Platform     string `json:"platform" yaml:"platform" mapstructure:"platform"`
+	Token        string `json:"token" yaml:"token" mapstructure:"token"`
+	CommentToken string `json:"comment_token,omitempty" yaml:"comment_token,omitempty" mapstructure:"comment-token"`
+	BaseURL      string `json:"base_url,omitempty" yaml:"base_url,omitempty" mapstructure:"base-url"`
 
 	// Repository configuration
 	Owner string `json:"owner" yaml:"owner" mapstructure:"repo-owner"`
@@ -82,6 +83,7 @@ func NewDefaultConfig() *Config {
 func (c *Config) DebugString() string {
 	debugConfig := *c
 	debugConfig.Token = "[REDACTED]"
+	debugConfig.CommentToken = "[REDACTED]"
 
 	data, err := json.MarshalIndent(debugConfig, "", "  ")
 	if err != nil {
