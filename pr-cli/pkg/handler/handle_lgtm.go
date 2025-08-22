@@ -33,7 +33,7 @@ func (h *PRHandler) HandleLGTM(_ []string) error {
 		h.Logger.Infof("PR author %s attempted to LGTM their own PR", h.config.CommentSender)
 
 		// Get current LGTM status to include in the message
-		validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+		validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 		if err != nil {
 			return fmt.Errorf("failed to get LGTM votes: %w", err)
 		}
@@ -63,7 +63,7 @@ func (h *PRHandler) HandleLGTM(_ []string) error {
 	}
 
 	// User has permission, now get all LGTM votes to check if threshold is met
-	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+	validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return fmt.Errorf("failed to get LGTM votes: %w", err)
 	}

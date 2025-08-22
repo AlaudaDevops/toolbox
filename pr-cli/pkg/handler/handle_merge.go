@@ -127,7 +127,7 @@ func (h *PRHandler) convertToMessageCheckStatuses(failedChecks []git.CheckRun) [
 
 // validateAndProcessLGTMVotes validates LGTM votes and processes admin/write user logic
 func (h *PRHandler) validateAndProcessLGTMVotes(userPerm string) (int, map[string]string, error) {
-	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+	validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to get LGTM votes: %w", err)
 	}
@@ -218,7 +218,7 @@ func (h *PRHandler) buildRobotUsersMap(lgtmUsers map[string]string) map[string]b
 // checkForCherryPickComments checks if there are any cherry-pick comments in the PR
 func (h *PRHandler) checkForCherryPickComments() bool {
 	// Get all comments from the PR
-	comments, err := h.client.GetComments()
+	comments, err := h.GetCommentsWithCache()
 	if err != nil {
 		h.Logger.Errorf("Failed to get comments for cherry-pick check: %v", err)
 		return false
@@ -258,7 +258,7 @@ func (h *PRHandler) HandlePostMergeCherryPick() error {
 	h.Logger.Infof("PR is %s, proceeding with cherry-pick operations", prInfo.State)
 
 	// Get all comments from the PR
-	comments, err := h.client.GetComments()
+	comments, err := h.GetCommentsWithCache()
 	if err != nil {
 		return fmt.Errorf("failed to get comments: %w", err)
 	}
