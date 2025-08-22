@@ -243,8 +243,15 @@ func TestPRHandler_HandleLGTM(t *testing.T) {
 		"reviewer2": "write",
 	}
 
+	// Mock GetComments for caching
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetComments().
+		Return([]git.Comment{}, nil).
+		Times(1)
+
+	// Mock GetLGTMVotes call
+	mockClient.EXPECT().
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false).
 		Return(2, lgtmUsers, nil).
 		Times(1)
 
@@ -332,8 +339,14 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		"reviewer1": "write",
 	}
 
+	// Mock GetComments for caching (first call)
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
+		GetComments().
+		Return([]git.Comment{}, nil).
+		Times(1)
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false, "commenter").
 		Return(2, lgtmUsers, nil).
 		Times(1)
 
@@ -348,8 +361,9 @@ func TestPRHandler_HandleRemoveLGTM(t *testing.T) {
 		"reviewer1": "write",
 	}
 
+	// Second call will use cached comments, but still need to mock GetLGTMVotes
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false).
 		Return(1, updatedLgtmUsers, nil).
 		Times(1)
 
@@ -436,15 +450,21 @@ func TestPRHandler_HandleRemoveLGTM_NoUserVote(t *testing.T) {
 		"reviewer1": "write",
 	}
 
+	// Mock GetComments for caching (first call)
+	mockClient.EXPECT().
+		GetComments().
+		Return([]git.Comment{}, nil).
+		Times(1)
+
 	// First call: Get LGTM votes before processing remove-lgtm (with ignore parameter)
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false, "commenter").
 		Return(1, lgtmUsers, nil).
 		Times(1)
 
-	// Second call: Get final LGTM votes after processing all comments (no ignore parameter)
+	// Second call: Get final LGTM votes after processing all comments (no ignore parameter) - uses cache
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false).
 		Return(1, lgtmUsers, nil).
 		Times(1)
 
@@ -496,8 +516,14 @@ func TestPRHandler_HandleRemoveLGTM_NoApproval(t *testing.T) {
 		"reviewer1": "write",
 	}
 
+	// Mock GetComments for caching (first call)
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
+		GetComments().
+		Return([]git.Comment{}, nil).
+		Times(1)
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false, "commenter").
 		Return(2, lgtmUsers, nil).
 		Times(1)
 
@@ -507,9 +533,9 @@ func TestPRHandler_HandleRemoveLGTM_NoApproval(t *testing.T) {
 		Return(fmt.Errorf("no approval review found")).
 		Times(1)
 
-	// Mock LGTM votes response after failed dismissal (continue with normal flow)
+	// Mock LGTM votes response after failed dismissal (continue with normal flow) - uses cache
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false).
 		Return(2, lgtmUsers, nil).
 		Times(1)
 
@@ -563,20 +589,26 @@ func TestPRHandler_HandleRemoveLGTM_RemoveWontDropBelowThreshold(t *testing.T) {
 		"reviewer2": "admin",
 	}
 
+	// Mock GetComments for caching (first call)
+	mockClient.EXPECT().
+		GetComments().
+		Return([]git.Comment{}, nil).
+		Times(1)
+
 	// First call: Get LGTM votes before processing remove-lgtm (with ignore parameter)
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false, "commenter").
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false, "commenter").
 		Return(3, lgtmUsers, nil).
 		Times(1)
 
 	// Second call: Get final LGTM votes after processing all comments (no ignore parameter)
-	// Should return 2 votes since commenter's vote was removed
+	// Should return 2 votes since commenter's vote was removed - uses cache
 	lgtmUsersAfter := map[string]string{
 		"reviewer1": "write",
 		"reviewer2": "admin",
 	}
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false).
 		Return(2, lgtmUsersAfter, nil).
 		Times(1)
 

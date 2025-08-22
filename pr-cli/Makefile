@@ -153,7 +153,7 @@ clean-mocks:
 
 ## all: Run all tasks (clean, build, test)
 .PHONY: all
-all: clean fmt vet test build
+all: clean generate fmt vet test build
 
 ## dev: Development workflow with mock generation
 .PHONY: dev

@@ -39,8 +39,14 @@ func TestPRHandler_HandleCheck_NoArgs(t *testing.T) {
 		"reviewer2": "write",
 	}
 
+	// Mock GetComments for caching
 	mockClient.EXPECT().
-		GetLGTMVotes([]string{"admin", "write"}, false).
+		GetComments().
+		Return([]git.Comment{}, nil).
+		Times(1)
+
+	mockClient.EXPECT().
+		GetLGTMVotes([]git.Comment{}, []string{"admin", "write"}, false).
 		Return(2, lgtmUsers, nil).
 		Times(1)
 

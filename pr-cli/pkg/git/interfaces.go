@@ -104,9 +104,9 @@ type GitClient interface {
 	// CheckUserPermissions validates if user has required permissions
 	CheckUserPermissions(username string, requiredPerms []string) (bool, string, error)
 
-	// GetLGTMVotes retrieves and validates LGTM votes from comments and reviews
+	// GetLGTMVotes retrieves and validates LGTM votes using provided comments for optimization
 	// If ignoreUserRemove is provided, it will ignore that user's latest /remove-lgtm comment
-	GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error)
+	GetLGTMVotes(comments []Comment, requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error)
 
 	// MergePR merges the pull request with the specified method
 	MergePR(method string) error

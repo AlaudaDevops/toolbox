@@ -327,8 +327,8 @@ func (c *Client) RemoveReviewers(reviewers []string) error {
 	return err
 }
 
-// GetLGTMVotes retrieves and validates LGTM votes from comments and reviews
-func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
+// GetLGTMVotes retrieves and validates LGTM votes using provided or fetched comments
+func (c *Client) GetLGTMVotes(comments []git.Comment, requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
 	ignoreUser := c.getIgnoreUser(ignoreUserRemove)
 	lgtmUsers := make(map[string]string)
 
@@ -339,7 +339,7 @@ func (c *Client) GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUser
 	}
 
 	// 2. Process comment votes
-	if err := c.processCommentVotes(lgtmUsers, userLatestReviews, debugMode, ignoreUser); err != nil {
+	if err := c.processCommentVotesWithComments(comments, lgtmUsers, userLatestReviews, debugMode, ignoreUser); err != nil {
 		return 0, nil, err
 	}
 
@@ -405,6 +405,20 @@ func (c *Client) processCommentVotes(lgtmUsers map[string]string, userLatestRevi
 	comments, err := c.GetComments()
 	if err != nil {
 		return fmt.Errorf("failed to get comments: %w", err)
+	}
+
+	return c.processCommentVotesWithComments(comments, lgtmUsers, userLatestReviews, debugMode, ignoreUser)
+}
+
+// processCommentVotesWithComments processes LGTM commands from provided or fetched comments
+func (c *Client) processCommentVotesWithComments(comments []git.Comment, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool, ignoreUser string) error {
+	// If no comments provided, fetch them
+	if comments == nil {
+		var err error
+		comments, err = c.GetComments()
+		if err != nil {
+			return fmt.Errorf("failed to get comments: %w", err)
+		}
 	}
 
 	ignoreCommentIndex := c.findIgnoreCommentIndex(comments, ignoreUser)

@@ -28,9 +28,10 @@ import (
 // PRHandler encapsulates Git client and configuration for PR operations
 type PRHandler struct {
 	*logrus.Logger
-	client   git.GitClient  // Git platform client interface
-	config   *config.Config // Configuration
-	prSender string         // Pull request author username (retrieved from API)
+	client        git.GitClient  // Git platform client interface
+	config        *config.Config // Configuration
+	prSender      string         // Pull request author username (retrieved from API)
+	commentsCache []git.Comment  // Cached comments to avoid multiple API calls
 }
 
 // NewPRHandler creates a new PR handler with Git client and configuration
@@ -128,9 +129,33 @@ func (h *PRHandler) generateLGTMStatusMessage(validVotes int, lgtmUsers map[stri
 	return messages.BuildLGTMStatusMessage(opts)
 }
 
-// GetComments retrieves all comments from the pull request
-func (h *PRHandler) GetComments() ([]git.Comment, error) {
-	return h.client.GetComments()
+// GetCommentsWithCache retrieves all comments from the pull request with caching
+func (h *PRHandler) GetCommentsWithCache() ([]git.Comment, error) {
+	if h.commentsCache != nil {
+		h.Logger.Debugf("Using cached comments (%d comments)", len(h.commentsCache))
+		return h.commentsCache, nil
+	}
+
+	comments, err := h.client.GetComments()
+	if err != nil {
+		return nil, err
+	}
+
+	h.commentsCache = comments
+	h.Logger.Debugf("Cached comments (%d comments)", len(h.commentsCache))
+	return comments, nil
+}
+
+// GetLGTMVotes retrieves and validates LGTM votes with optimized comments caching
+func (h *PRHandler) GetLGTMVotes(requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
+	// Use cached comments for better performance
+	comments, err := h.GetCommentsWithCache()
+	if err != nil {
+		return 0, nil, fmt.Errorf("failed to get comments: %w", err)
+	}
+
+	// Use the optimized method that accepts pre-fetched comments
+	return h.client.GetLGTMVotes(comments, requiredPerms, debugMode, ignoreUserRemove...)
 }
 
 // PostComment posts a comment to the pull request

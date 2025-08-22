@@ -43,6 +43,8 @@ spec:
         results:
           - name: merge-successful
             description: Indicates if a merge operation was successful
+          - name: has-cherry-pick-comments
+            description: Indicates if there are cherry-pick comments in the PR (only written during /merge or /ready operations)
         steps:
           - name: cli
             image: $(params.image)
@@ -97,6 +99,9 @@ spec:
       displayName: Post-Merge Cherry-Pick Operations
       when:
         - input: $(tasks.pr-merge-management.results.merge-successful)
+          operator: in
+          values: ["true"]
+        - input: $(tasks.pr-merge-management.results.has-cherry-pick-comments)
           operator: in
           values: ["true"]
       taskSpec:

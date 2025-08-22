@@ -252,7 +252,7 @@ func (p *PROption) shouldSkipPRStatusCheck(command string) bool {
 // validateCommentSender verifies that the comment-sender actually posted the trigger-comment
 func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 	// Get all comments from the PR
-	comments, err := prHandler.GetComments()
+	comments, err := prHandler.GetCommentsWithCache()
 	if err != nil {
 		return fmt.Errorf("failed to get PR comments: %w", err)
 	}

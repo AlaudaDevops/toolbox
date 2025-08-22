@@ -77,7 +77,7 @@ func (h *PRHandler) validateRemoveLGTMPermissions() (string, bool, error) {
 // processLGTMRemoval handles the core logic of LGTM removal
 func (h *PRHandler) processLGTMRemoval(userPermission string) (*RemovalResult, error) {
 	// Get LGTM status before processing current /remove-lgtm command
-	beforeRemoveVotes, beforeRemoveUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug, h.config.CommentSender)
+	beforeRemoveVotes, beforeRemoveUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug, h.config.CommentSender)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get votes before current remove LGTM: %w", err)
 	}
@@ -156,7 +156,7 @@ func (h *PRHandler) logRemovalReason(result *RemovalResult) {
 // postRemoveLGTMStatus generates and posts the final status message
 func (h *PRHandler) postRemoveLGTMStatus(_ *RemovalResult) error {
 	// Get final LGTM status after processing all comments
-	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+	validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return fmt.Errorf("failed to get final LGTM votes: %w", err)
 	}

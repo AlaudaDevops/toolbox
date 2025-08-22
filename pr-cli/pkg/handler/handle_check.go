@@ -39,7 +39,7 @@ func (h *PRHandler) handleOriginalCheck() error {
 	h.Logger.Info("Checking LGTM status and check runs status")
 
 	// Get all LGTM votes to check current status
-	validVotes, lgtmUsers, err := h.client.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
+	validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return fmt.Errorf("failed to get LGTM votes: %w", err)
 	}
