@@ -287,7 +287,7 @@ You need either:
 
 PR #%d has an unknown state. Cherrypick can be performed on:
 - **Merged PRs** (cherrypick is created immediately)
-- **Open PRs** (cherrypick is scheduled for when the PR merges)  
+- **Open PRs** (cherrypick is scheduled for when the PR merges)
 - **Closed PRs** (cherrypick the last commit)
 
 Current PR state: %s`
@@ -298,7 +298,7 @@ Failed to cherry-pick changes from PR #%d to branch ` + "`%s`" + `:
 * Requested by: @%s
 * Error: ` + "`%s`" + `
 
-*Possible causes:* 
+*Possible causes:*
 * Merge conflicts
 * Branch protection rules
 * Invalid branch name
@@ -310,7 +310,7 @@ Please resolve any issues and try again.`
 
 Successfully cherry-picked changes from PR #%d to branch ` + "`%s`" + `.
 
-*Details:* 
+*Details:*
 * Source PR: #%d
 * Cherry-pick PR: #%d
 * Target Branch: ` + "`%s`" + `
