@@ -1,6 +1,6 @@
 module github.com/AlaudaDevops/toolbox/pr-cli
 
-go 1.24.6
+go 1.25.0
 
 require (
 	github.com/golang/mock v1.6.0
