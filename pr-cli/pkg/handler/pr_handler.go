@@ -89,11 +89,6 @@ func (h *PRHandler) isRobotUser(user string) bool {
 	return h.config.IsRobotUser(user)
 }
 
-// hasLGTMPermission checks if the given permission is in the LGTM permissions list
-func (h *PRHandler) hasLGTMPermission(userPerm string) bool {
-	return h.config.HasLGTMPermission(userPerm)
-}
-
 // generateLGTMStatusMessage generates a formatted LGTM status message with check runs status
 func (h *PRHandler) generateLGTMStatusMessage(validVotes int, lgtmUsers map[string]string, includeThreshold bool) string {
 	// Check check runs status

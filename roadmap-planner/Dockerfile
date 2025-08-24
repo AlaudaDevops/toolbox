@@ -1,7 +1,7 @@
 # Multi-stage build for roadmap planner
 # Stage 1: Build frontend
 ARG NODE_IMAGE=node:24-alpine
-ARG GO_IMAGE=golang:1.24.6-alpine
+ARG GO_IMAGE=golang:1.25-alpine
 ARG RUNTIME_IMAGE=alpine:latest
 FROM ${NODE_IMAGE} AS frontend-builder
 
@@ -19,7 +19,7 @@ COPY frontend/ ./
 # Build the frontend
 RUN npm run build
 
-ARG GO_IMAGE=golang:1.24.6-alpine
+ARG GO_IMAGE=golang:1.25-alpine
 # Stage 2: Build backend
 FROM ${GO_IMAGE} AS backend-builder
 
