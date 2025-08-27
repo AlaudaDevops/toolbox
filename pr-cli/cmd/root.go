@@ -54,6 +54,14 @@ Example usage:
   # Use ready command (alias for merge)
   pr-cli --trigger-comment "/ready" --platform github --repo-owner owner --repo-name repo --pr-num 123 --comment-sender user --token $TOKEN
 
+Supported Comment Commands:
+  Regular commands:
+  - /help, /assign, /unassign, /lgtm, /remove-lgtm, /merge, /ready, /rebase
+  - /check, /batch, /cherry-pick, /cherrypick, /label, /unlabel, /retest
+
+  Built-in commands (system internal):
+  - __post-merge-cherry-pick
+
 Tekton Results:
   When used in Tekton pipelines, pr-cli writes result files to the configured results directory.
   Available results:
