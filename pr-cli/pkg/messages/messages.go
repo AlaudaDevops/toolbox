@@ -299,10 +299,17 @@ Failed to cherry-pick changes from PR #%d to branch ` + "`%s`" + `:
 * Error: ` + "`%s`" + `
 
 *Possible causes:*
-* Merge conflicts
-* Branch protection rules
-* Invalid branch name
-* Missing permissions
+* **🔀 Merge conflicts** - Changes conflict with target branch
+* **🍴 Fork PR** - Commits may not be available in target repository  
+* **🔒 Branch protection rules** - Target branch has restrictions
+* **📁 Binary file conflicts** - Binary files cannot be auto-merged
+* **🔗 Missing dependencies** - Required commits not present in target branch
+* **❌ Invalid branch name** - Target branch doesn't exist
+
+*Manual resolution options:*
+* Create the cherry-pick PR manually using git commands
+* Resolve conflicts locally and create PR
+* For fork PRs, ensure commits are accessible in target repository
 
 Please resolve any issues and try again.`
 

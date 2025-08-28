@@ -377,7 +377,12 @@ func (cp *CherryPicker) performCherryPick(commitSHA string) error {
 		err = cp.runGitCommand("cherry-pick", commitSHA)
 		if err != nil {
 			// Check if it's a conflict
-			if strings.Contains(err.Error(), "CONFLICT") || strings.Contains(err.Error(), "conflict") {
+			if strings.Contains(err.Error(), "CONFLICT") || strings.Contains(err.Error(), "conflict") ||
+				strings.Contains(err.Error(), "unmerged files") {
+				cp.logger.Errorf("❌ CHERRY-PICK CONFLICT DETECTED for commit %s", commitSHA)
+				cp.logger.Errorf("💡 This may be caused by: fork PR, merge conflicts, or missing dependencies")
+				cp.logger.Infof("🔧 Attempting automatic conflict resolution...")
+
 				// Abort the current cherry-pick
 				cp.runGitCommand("cherry-pick", "--abort")
 
@@ -397,6 +402,7 @@ func (cp *CherryPicker) performCherryPick(commitSHA string) error {
 							}
 							return nil
 						}
+						cp.logger.Errorf("❌ CHERRY-PICK FAILED: All conflict resolution strategies failed for commit %s", commitSHA)
 						return fmt.Errorf("failed to cherry-pick commit %s with automatic conflict resolution: %w", commitSHA, err)
 					}
 				}
