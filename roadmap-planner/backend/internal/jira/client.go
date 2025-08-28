@@ -73,7 +73,7 @@ func (c *Client) TestConnection(ctx context.Context) error {
 }
 
 // ListProjects lists all projects
-func (c *Client) ListProjects(ctx context.Context) ([]models.Project,  error) {
+func (c *Client) ListProjects(ctx context.Context) ([]models.Project, error) {
 	projectList, resp, err := c.inner.Project.GetListWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects: %s", c.handleError(resp, err))

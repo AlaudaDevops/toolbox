@@ -82,7 +82,7 @@ func (h *RoadmapHandler) GetBasicData(c *gin.Context) {
 	basicData := models.BasicData{
 		Pillars:  basicPillars,
 		Quarters: defaultQuarters,
-		Project: project,
+		Project:  project,
 	}
 
 	c.JSON(http.StatusOK, basicData)
