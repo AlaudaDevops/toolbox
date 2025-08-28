@@ -146,8 +146,8 @@ type Project struct {
 	ID         string      `json:"id"`
 	Name       string      `json:"name"`
 	Key        string      `json:"key"`
-	Versions   []Version   `json:"versions"`
-	Components []Component `json:"components"`
+	Versions   []Version   `json:"versions,omitempty"`
+	Components []Component `json:"components,omitempty"`
 }
 
 // Component in a Jira Project

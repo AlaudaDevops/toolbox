@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI, getStoredAuth, setStoredAuth, clearStoredAuth, handleAPIError } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -15,7 +15,9 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [project, setProject] = useState('');
   const [user, setUser] = useState(null);
+  const [projectCallbacks, setProjectCallbacks] = useState(new Set());
 
   // Check authentication status on mount
   useEffect(() => {
@@ -46,25 +48,64 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Add callback registration for project changes
+  const onProjectChange = useCallback((callback) => {
+    setProjectCallbacks(prev => new Set(prev).add(callback));
+
+    // Return unsubscribe function
+    return () => {
+      setProjectCallbacks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(callback);
+        return newSet;
+      });
+    };
+  }, []);
+
+
+  // Enhanced setProject function that triggers callbacks
+  const updateProject = useCallback((newProject) => {
+    setProject(prevProject => {
+      if (prevProject !== newProject) {
+        // Update auth data
+        setStoredAuth(prevAuth => ({
+          ...prevAuth,
+          project: newProject,
+        }));
+
+        // Trigger all registered callbacks
+        projectCallbacks.forEach(callback => {
+          try {
+            callback(newProject, prevProject);
+          } catch (error) {
+            console.error('Project change callback error:', error);
+          }
+        });
+      }
+      return newProject;
+    });
+  }, [projectCallbacks]);
+
   const login = async (credentials) => {
     try {
       setIsLoading(true);
-      
+
       // Validate credentials with server
       const response = await authAPI.login(credentials);
-      
+
       // Store credentials for API requests
       const authData = {
         username: credentials.username,
         password: credentials.password,
         baseURL: credentials.base_url,
-        project: 'DEVOPS', // Default project
+        project: credentials.project,
       };
-      
+
+      setProject(credentials.project);
       setStoredAuth(authData);
       setIsAuthenticated(true);
       setUser(response.user);
-      
+
       toast.success('Successfully logged in!');
       return { success: true };
     } catch (error) {
@@ -85,6 +126,7 @@ export const AuthProvider = ({ children }) => {
       clearStoredAuth();
       setIsAuthenticated(false);
       setUser(null);
+      setProject('');
       toast.success('Successfully logged out!');
     }
   };
@@ -93,9 +135,12 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated,
     isLoading,
     user,
+    project,
     login,
     logout,
     checkAuthStatus,
+    onProjectChange,
+    updateProject,
   };
 
   return (

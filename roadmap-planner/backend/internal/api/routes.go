@@ -39,6 +39,7 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	// Create handlers
 	authHandler := handlers.NewAuthHandler()
 	roadmapHandler := handlers.NewRoadmapHandler(cfg)
+	projectsHandler := handlers.NewProjectsHandler(cfg)
 
 	// Health check endpoint (no auth required)
 	router.GET("/health", roadmapHandler.Health)
@@ -58,6 +59,8 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 		protected := api.Group("")
 		protected.Use(middleware.AuthMiddleware())
 		{
+			// Projects routes
+			protected.GET("/projects", projectsHandler.ListProjects)
 			// Roadmap routes
 			protected.GET("/roadmap", roadmapHandler.GetRoadmap)
 			protected.GET("/basic", roadmapHandler.GetBasicData)

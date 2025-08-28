@@ -4,7 +4,7 @@
 # @jiraPassword =
 # @jiraProject =
 
-GET {{jiraBaseUrl}}/rest/api/2/issue/{{issueIdOrKey}}
+GET {{jiraBaseUrl}}/rest/api/2/issue/{{issueIdOrKey}}?fields=*all
 Authorization: Basic {{jiraUsername}}:{{jiraPassword}}
 Accept: application/json
 

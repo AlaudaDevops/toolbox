@@ -42,7 +42,12 @@ X-Jira-Password: {{jiraPassword}}
 X-Jira-BaseURL: {{jiraBaseUrl}}
 X-Jira-Project: {{jiraProject}}
 
-###
+### Get Project list
+GET {{baseUrl}}/api/projects
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
 
 ### Get Complete Roadmap Data
 GET {{baseUrl}}/api/roadmap
