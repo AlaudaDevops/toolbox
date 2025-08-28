@@ -4,11 +4,12 @@ This document describes the REST API endpoints for the Roadmap Planner applicati
 
 ## Recent Changes
 
-**Version 1.1.0 Updates:**
-- **Breaking Change**: Assignee is now required for milestone and epic creation
-- **New Endpoint**: `GET /api/users/assignable` to fetch assignable users
+**Version 1.2.0 Updates:**
+- **API Cleanup**: Removed unused endpoints `/api/roadmap`, `/api/pillars`, `/api/pillars/:id/milestones`, and `/api/milestones/:id/epics`
+- **Streamlined Architecture**: Frontend now uses optimized filtering APIs for better performance
+- **Projects API**: Kept `/api/projects` endpoint for future use
+- **Assignee Requirements**: Assignee is still required for milestone and epic creation
 - **Enhanced Filtering**: Pillars with resolved/cancelled status are automatically filtered out
-- **Improved Data Models**: Added User model and updated request models
 
 ## Base URL
 
@@ -24,7 +25,7 @@ The API uses Jira credentials passed via HTTP headers for authentication:
 X-Jira-Username: your-username
 X-Jira-Password: your-api-token
 X-Jira-BaseURL: https://your-jira-instance.atlassian.net
-X-Jira-Project: DEVOPS
+X-Jira-Project: PROJECT-KEY
 ```
 
 ## Endpoints
@@ -91,9 +92,9 @@ Check authentication status.
 
 ### Roadmap Data
 
-#### GET /api/roadmap
+#### GET /api/basic
 
-Get complete roadmap data including pillars, milestones, and epics.
+Get basic roadmap data including pillars, quarters, components, and versions.
 
 **Response:**
 ```json
@@ -104,50 +105,111 @@ Get complete roadmap data including pillars, milestones, and epics.
       "key": "DEVOPS-123",
       "name": "Tool Integration",
       "priority": "High",
-      "component": "connectors-operator",
-      "milestones": [
-        {
-          "id": "456",
-          "key": "DEVOPS-456",
-          "name": "Q1 Integration Milestone",
-          "quarter": "2025Q1",
-          "pillar_id": "123",
-          "status": "In Progress",
-          "epics": [
-            {
-              "id": "789",
-              "key": "DEVOPS-789",
-              "name": "Implement OAuth Integration",
-              "version": "connectors-operator-1.2.0",
-              "component": "connectors-operator",
-              "milestone_id": "456",
-              "status": "To Do",
-              "priority": "High"
-            }
-          ]
-        }
-      ]
+      "component": "connectors-operator"
     }
   ],
-  "quarters": ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q3", "2026Q4"]
+  "quarters": ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q3", "2026Q4"],
+  "project": {
+    "id": "10000",
+    "name": "DevOps Project",
+    "key": "DEVOPS",
+    "components": [
+      {
+        "name": "connectors-operator",
+        "id": "10001",
+        "description": "Connectors Operator Component"
+      }
+    ],
+    "versions": [
+      {
+        "name": "connectors-operator-1.0.0",
+        "id": "10002",
+        "archived": false,
+        "released": true,
+        "releaseDate": "2025-01-01",
+        "userReleaseDate": "2025-01-01"
+      }
+    ]
+  }
 }
 ```
 
-#### GET /api/pillars
+#### GET /api/milestones
 
-Get all pillars with their milestones and epics.
+Get milestones with optional filtering.
+
+**Query Parameters:**
+- `pillar_id` (optional): Filter by pillar IDs (can be repeated)
+- `quarter` (optional): Filter by quarters (can be repeated)
+
+**Examples:**
+- `/api/milestones?pillar_id=123&pillar_id=456` - Get milestones for specific pillars
+- `/api/milestones?quarter=2025Q1&quarter=2025Q2` - Get milestones for specific quarters
+- `/api/milestones?pillar_id=123&quarter=2025Q1` - Combined filtering
 
 **Response:**
 ```json
 {
-  "pillars": [
+  "milestones": [
     {
-      "id": "123",
-      "key": "DEVOPS-123",
-      "name": "Tool Integration",
-      "priority": "High",
+      "id": "456",
+      "key": "DEVOPS-456",
+      "name": "Q1 Integration Milestone",
+      "quarter": "2025Q1",
+      "pillar_id": "123",
+      "status": "In Progress"
+    }
+  ]
+}
+```
+
+#### GET /api/epics
+
+Get epics with optional filtering.
+
+**Query Parameters:**
+- `milestone_id` (optional): Filter by milestone IDs (can be repeated)
+- `pillar_id` (optional): Filter by pillar IDs (can be repeated)
+- `component` (optional): Filter by components (can be repeated)
+- `version` (optional): Filter by versions (can be repeated)
+
+**Examples:**
+- `/api/epics?milestone_id=456` - Get epics for a specific milestone
+- `/api/epics?component=connectors-operator&version=1.2.0` - Filter by component and version
+- `/api/epics?pillar_id=123&component=connectors-operator` - Combined filtering
+
+**Response:**
+```json
+{
+  "epics": [
+    {
+      "id": "789",
+      "key": "DEVOPS-789",
+      "name": "Implement OAuth Integration",
+      "version": "connectors-operator-1.2.0",
       "component": "connectors-operator",
-      "milestones": [...]
+      "milestone_id": "456",
+      "status": "To Do",
+      "priority": "High"
+    }
+  ]
+}
+```
+
+### Projects
+
+#### GET /api/projects
+
+Get list of available projects (kept for future use).
+
+**Response:**
+```json
+{
+  "projects": [
+    {
+      "key": "DEVOPS",
+      "name": "DevOps Project",
+      "id": "10000"
     }
   ]
 }
@@ -456,9 +518,27 @@ curl -X POST http://localhost:8080/api/auth/login \
   }'
 ```
 
-**Get roadmap data:**
+**Get basic data:**
 ```bash
-curl -X GET http://localhost:8080/api/roadmap \
+curl -X GET http://localhost:8080/api/basic \
+  -H "X-Jira-Username: your-username" \
+  -H "X-Jira-Password: your-api-token" \
+  -H "X-Jira-BaseURL: https://your-jira-instance.atlassian.net" \
+  -H "X-Jira-Project: DEVOPS"
+```
+
+**Get milestones:**
+```bash
+curl -X GET "http://localhost:8080/api/milestones?pillar_id=123&quarter=2025Q1" \
+  -H "X-Jira-Username: your-username" \
+  -H "X-Jira-Password: your-api-token" \
+  -H "X-Jira-BaseURL: https://your-jira-instance.atlassian.net" \
+  -H "X-Jira-Project: DEVOPS"
+```
+
+**Get epics:**
+```bash
+curl -X GET "http://localhost:8080/api/epics?milestone_id=456" \
   -H "X-Jira-Username: your-username" \
   -H "X-Jira-Password: your-api-token" \
   -H "X-Jira-BaseURL: https://your-jira-instance.atlassian.net" \
@@ -536,9 +616,17 @@ const usersResponse = await fetch('/api/users/assignable?issueKey=DEVOPS-123', {
 const usersData = await usersResponse.json();
 console.log('Available users:', usersData.users);
 
-// Get roadmap data
-const response = await fetch('/api/roadmap', { headers });
-const roadmapData = await response.json();
+// Get basic data
+const response = await fetch('/api/basic', { headers });
+const basicData = await response.json();
+
+// Get milestones for a specific pillar and quarter
+const milestonesResponse = await fetch('/api/milestones?pillar_id=123&quarter=2025Q1', { headers });
+const milestonesData = await milestonesResponse.json();
+
+// Get epics for specific milestones
+const epicsResponse = await fetch('/api/epics?milestone_id=456', { headers });
+const epicsData = await epicsResponse.json();
 
 // Create milestone
 const milestoneData = {

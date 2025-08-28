@@ -79,28 +79,8 @@ export const authAPI = {
 };
 
 export const roadmapAPI = {
-  getRoadmap: async () => {
-    const response = await api.get('/api/roadmap');
-    return response.data;
-  },
-
-  getPillars: async () => {
-    const response = await api.get('/api/pillars');
-    return response.data;
-  },
-
   getBasicData: async () => {
     const response = await api.get('/api/basic');
-    return response.data;
-  },
-
-  getPillarMilestones: async (pillarId) => {
-    const response = await api.get(`/api/pillars/${pillarId}/milestones`);
-    return response.data;
-  },
-
-  getMilestoneEpics: async (milestoneId) => {
-    const response = await api.get(`/api/milestones/${milestoneId}/epics`);
     return response.data;
   },
 
@@ -177,14 +157,6 @@ export const roadmapAPI = {
     }
 
     const response = await api.get(`/api/users/assignable?${params.toString()}`);
-    return response.data;
-  },
-};
-
-// Health check
-export const healthAPI = {
-  check: async () => {
-    const response = await api.get('/health');
     return response.data;
   },
 };
