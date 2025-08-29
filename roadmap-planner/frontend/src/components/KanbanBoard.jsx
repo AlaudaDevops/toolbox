@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { useRoadmap } from '../hooks/useRoadmap';
+import { useAuth } from '../hooks/useAuth';
 import MilestoneCard from './MilestoneCard';
 import EpicCard from './EpicCard';
 import CreateMilestoneModal from './modals/CreateMilestoneModal';
@@ -19,6 +20,7 @@ import { sortQuarters, validateAndSortSelectedQuarters } from '../utils/sortingU
 import './KanbanBoard.css';
 
 const KanbanBoard = () => {
+  const { onProjectChange } = useAuth();
   const { roadmapData, isLoading, error, loadRoadmap, moveEpic } = useRoadmap();
   const [showCreateMilestone, setShowCreateMilestone] = useState(false);
   const [showCreateEpic, setShowCreateEpic] = useState(false);
@@ -62,6 +64,19 @@ const KanbanBoard = () => {
       }
     }
   }, [roadmapData?.quarters, selectedQuarters]);
+
+  // Register refresh the Roadmap data on project change
+  React.useEffect(() => {
+    const unsubscribe = onProjectChange((newProject, prevProject) => {
+      if (newProject !== prevProject) {
+        loadRoadmap();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [onProjectChange, loadRoadmap]);
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
@@ -206,6 +221,7 @@ const KanbanBoard = () => {
           <div><button onClick={loadRoadmap} className="btn btn-sm" title="Refresh data">
             <RefreshCw size={16} />
           </button></div>
+
         </div>
 
         {/* Future: Add more controls here like pending epics filter */}

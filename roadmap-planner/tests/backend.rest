@@ -42,15 +42,12 @@ X-Jira-Password: {{jiraPassword}}
 X-Jira-BaseURL: {{jiraBaseUrl}}
 X-Jira-Project: {{jiraProject}}
 
-###
-
-### Get Complete Roadmap Data
-GET {{baseUrl}}/api/roadmap
+### Get Project list
+GET {{baseUrl}}/api/projects
 X-Jira-Username: {{jiraUsername}}
 X-Jira-Password: {{jiraPassword}}
 X-Jira-BaseURL: {{jiraBaseUrl}}
 X-Jira-Project: {{jiraProject}}
-
 
 ### Get Basic Roadmap Data
 GET {{baseUrl}}/api/basic
@@ -79,16 +76,6 @@ X-Jira-Project: {{jiraProject}}
 
 ### Get Assignable Users (with required issueKey)
 GET {{baseUrl}}/api/users/assignable?issueKey={{issueKey}}&query=
-X-Jira-Username: {{jiraUsername}}
-X-Jira-Password: {{jiraPassword}}
-X-Jira-BaseURL: {{jiraBaseUrl}}
-X-Jira-Project: {{jiraProject}}
-
-###
-
-
-### Get All Pillars
-GET {{baseUrl}}/api/pillars
 X-Jira-Username: {{jiraUsername}}
 X-Jira-Password: {{jiraPassword}}
 X-Jira-BaseURL: {{jiraBaseUrl}}
@@ -296,7 +283,7 @@ X-Jira-Project: {{jiraProject}}
 ###
 
 ### Test with Invalid Authentication (Should Fail)
-GET {{baseUrl}}/api/roadmap
+GET {{baseUrl}}/api/basic
 X-Jira-Username: invalid-user
 X-Jira-Password: invalid-password
 X-Jira-BaseURL: {{jiraBaseUrl}}

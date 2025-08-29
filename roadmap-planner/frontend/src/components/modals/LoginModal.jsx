@@ -17,6 +17,7 @@ const LoginModal = () => {
       base_url: 'https://jira.alauda.cn',
       username: '',
       password: '',
+      project: '',
     },
   });
 
@@ -101,6 +102,28 @@ const LoginModal = () => {
             </div>
             {errors.password && (
               <span className="form-error">{errors.password.message}</span>
+            )}
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="project" className="form-label">
+              Project Key
+            </label>
+            <input
+              id="project"
+              type="text"
+              className={`form-input ${errors.project ? 'error' : ''}`}
+              placeholder=""
+              {...register('project', {
+                required: 'Project is required',
+                pattern: {
+                  value: /^[A-Z][A-Z0-9]+/,
+                  message: 'Please enter a valid project name',
+                },
+              })}
+            />
+            {errors.project && (
+              <span className="form-error">{errors.project.message}</span>
             )}
           </div>
 

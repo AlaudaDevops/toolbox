@@ -2,12 +2,12 @@ name: Roadmap Planner CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, release-*]
     paths:
       - 'roadmap-planner/**'
       - '.github/workflows/roadmap-planner-ci.yaml'
   pull_request:
-    branches: [main, develop]
+    branches: [main, release-*]
     paths:
       - 'roadmap-planner/**'
       - '.github/workflows/roadmap-planner-ci.yaml'
@@ -206,7 +206,7 @@ jobs:
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -266,7 +266,7 @@ jobs:
 
       - name: Upload Docker scan results
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         with:
           sarif_file: 'docker-trivy-results.sarif'
 

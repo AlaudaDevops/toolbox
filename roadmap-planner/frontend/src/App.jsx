@@ -29,9 +29,11 @@ function AppContent() {
       <div className="app">
         <header className="app-header">
           <h2>Roadmap Planner</h2>
-          <button onClick={logout} className="btn " title="Logout">
-            <LogOut size={16} />
-          </button>
+          <div class="right-top">
+            <button onClick={logout} className="btn " title="Logout">
+              <LogOut size={16} />
+            </button>
+          </div>
         </header>
         <main className="app-main">
           <KanbanBoard />

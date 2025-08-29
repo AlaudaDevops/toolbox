@@ -72,6 +72,28 @@ func (c *Client) TestConnection(ctx context.Context) error {
 	return nil
 }
 
+// ListProjects lists all projects
+func (c *Client) ListProjects(ctx context.Context) ([]models.Project, error) {
+	projectList, resp, err := c.inner.Project.GetListWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %s", c.handleError(resp, err))
+	}
+	if projectList == nil {
+		return nil, fmt.Errorf("response is nil")
+	}
+	array := *projectList
+
+	projects := make([]models.Project, 0, len(array))
+	for _, project := range array {
+		projects = append(projects, models.Project{
+			ID:   project.ID,
+			Name: project.Name,
+			Key:  project.Key,
+		})
+	}
+	return projects, nil
+}
+
 // GetPillars fetches all active pillars (parent issues) from the specified project
 func (c *Client) GetPillars(ctx context.Context) ([]models.Pillar, error) {
 	// JQL to find all active pillars in the project

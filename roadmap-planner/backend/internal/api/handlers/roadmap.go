@@ -41,37 +41,6 @@ func NewRoadmapHandler(cfg *config.Config) *RoadmapHandler {
 	}
 }
 
-// GetRoadmap returns the complete roadmap data
-func (h *RoadmapHandler) GetRoadmap(c *gin.Context) {
-	jiraClient, ok := middleware.GetJiraClient(c)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Jira client not available",
-		})
-		return
-	}
-
-	// Fetch pillars with their milestones and epics
-	pillars, err := jiraClient.GetPillars(c.Request.Context())
-	if err != nil {
-		h.logger.Error("Failed to fetch pillars", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch roadmap data",
-		})
-		return
-	}
-
-	// Generate quarters for the roadmap
-	quarters := models.GenerateQuarters()
-
-	roadmapData := models.RoadmapData{
-		Pillars:  pillars,
-		Quarters: quarters,
-	}
-
-	c.JSON(http.StatusOK, roadmapData)
-}
-
 // GetBasicData returns basic roadmap data (pillars, quarters, components, versions)
 func (h *RoadmapHandler) GetBasicData(c *gin.Context) {
 	jiraClient, ok := middleware.GetJiraClient(c)
@@ -113,9 +82,7 @@ func (h *RoadmapHandler) GetBasicData(c *gin.Context) {
 	basicData := models.BasicData{
 		Pillars:  basicPillars,
 		Quarters: defaultQuarters,
-		// Components: components,
-		// Versions:   versions,
-		Project: project,
+		Project:  project,
 	}
 
 	c.JSON(http.StatusOK, basicData)
@@ -136,38 +103,6 @@ func (h *RoadmapHandler) GetMilestones(c *gin.Context) {
 	quarters := c.QueryArray("quarter")
 
 	milestones, err := jiraClient.GetMilestonesWithFilter(c.Request.Context(), pillarIDs, quarters)
-	if err != nil {
-		h.logger.Error("Failed to fetch milestones", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch milestones",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"milestones": milestones,
-	})
-}
-
-// GetPillarMilestones returns milestones for a specific pillar (backward compatibility)
-func (h *RoadmapHandler) GetPillarMilestones(c *gin.Context) {
-	jiraClient, ok := middleware.GetJiraClient(c)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Jira client not available",
-		})
-		return
-	}
-
-	pillarID := c.Param("id")
-	if pillarID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Pillar ID is required",
-		})
-		return
-	}
-
-	milestones, err := jiraClient.GetMilestones(c.Request.Context(), pillarID)
 	if err != nil {
 		h.logger.Error("Failed to fetch milestones", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -208,62 +143,6 @@ func (h *RoadmapHandler) GetEpics(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"epics": epics,
-	})
-}
-
-// GetMilestoneEpics returns epics for a specific milestone (backward compatibility)
-func (h *RoadmapHandler) GetMilestoneEpics(c *gin.Context) {
-	jiraClient, ok := middleware.GetJiraClient(c)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Jira client not available",
-		})
-		return
-	}
-
-	milestoneID := c.Param("id")
-	if milestoneID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Milestone ID is required",
-		})
-		return
-	}
-
-	epics, err := jiraClient.GetEpics(c.Request.Context(), milestoneID)
-	if err != nil {
-		h.logger.Error("Failed to fetch epics", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch epics",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"epics": epics,
-	})
-}
-
-// GetPillars returns all pillars
-func (h *RoadmapHandler) GetPillars(c *gin.Context) {
-	jiraClient, ok := middleware.GetJiraClient(c)
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Jira client not available",
-		})
-		return
-	}
-
-	pillars, err := jiraClient.GetPillars(c.Request.Context())
-	if err != nil {
-		h.logger.Error("Failed to fetch pillars", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch pillars",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"pillars": pillars,
 	})
 }
 
