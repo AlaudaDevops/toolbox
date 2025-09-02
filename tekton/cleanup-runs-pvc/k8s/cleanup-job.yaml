@@ -1,0 +1,85 @@
+# Tekton PVC 自动清理 CronJob 配置
+# 用于定期清理已完成的 Tekton PipelineRun/TaskRun 产生的孤儿 PVC
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: tekton-pvc-cleanup-cron
+  namespace: tekton-pipelines             # 部署在 Tekton Pipelines 命名空间
+  labels:
+    app: tekton-pvc-cleanup
+    component: tekton-pvc-cleanup-cron
+spec:
+  # 调度配置：每 30 分钟执行一次
+  schedule: "*/30 * * * *"                # 每30分钟执行一次
+  # 保留最近的执行历史记录数量
+  successfulJobsHistoryLimit: 3           # 保留 3 个成功的 Job 记录
+  failedJobsHistoryLimit: 3               # 保留 3 个失败的 Job 记录
+  jobTemplate:
+    metadata:
+      labels:
+        app: tekton-pvc-cleanup
+        component: tekton-pvc-cleanup
+    spec:
+      # Job 配置
+      backoffLimit: 0                     # 失败后不重试，等待下一次调度
+      ttlSecondsAfterFinished: 43200      # Job 完成 12 小时后自动清理
+      template:
+        metadata:
+          labels:
+            app: tekton-pvc-cleanup
+            component: tekton-pvc-cleanup
+        spec:
+          # 使用专用的 ServiceAccount 进行 RBAC 权限控制
+          serviceAccountName: tekton-pvc-cleaner
+          restartPolicy: Never            # Job 任务完成后不重启
+          # 安全上下文：使用非 root 用户运行
+          securityContext:
+            runAsUser: 65532              # 非特权用户 ID
+            runAsGroup: 65532             # 非特权组 ID
+            fsGroup: 65532                # 文件系统组 ID
+            fsGroupChangePolicy: "OnRootMismatch"
+          containers:
+            - name: cleanup
+              # 清理脚本镜像
+              image: registry.alauda.cn:60070/devops/tektoncd/toolbox/cleanup-pvc:latest
+              imagePullPolicy: Always     # 总是拉取最新镜像
+              # 环境变量配置
+              env:
+                - name: THRESHOLD_MINUTES
+                  value: "10"             # 清理阈值，单位分钟，默认10分钟。只有超过该时间且未被使用的 tekton 创建的 PVC 才会被清理，用户自建的不会被清理。
+              # 执行命令
+              command:
+                # - "/bin/bash"           # 调试模式
+                # - "-x"                  # 显示执行的命令
+                - "/app/cleanup-tekton-pvcs.sh"
+              # 脚本参数配置
+              args:
+                - --all-namespaces # 清理所有命名空间的 PVC，与 --namespaces 互斥
+                # - "--namespaces" # 指定命名空间，多个命名空间用逗号分隔
+                # - "devops,default"
+                - --threshold
+                - $(THRESHOLD_MINUTES)  # 使用环境变量设置时间阈值
+                - --audit-dir # 审计日志目录
+                - /app/audit # 审计日志目录
+                - --cleanup-pods # 删除占用 PVC 且处于 Completed、Succeeded、Failed 状态的 Pod
+                - --verbose # 输出详细日志
+                # - --keep-cache # 保留缓存 PVC，一般只需要在调试时开启，会记录处理时的 pods、taskrun、pipelinerun 信息。
+                # - --dry-run # 仅模拟执行，不实际删除资源，测试时使用，生产环境请移除该参数
+              # 存储卷挂载：用于保存审计日志
+              volumeMounts:
+                - name: audit-storage
+                  mountPath: /app/audit   # 挂载审计日志目录
+              # 资源配置
+              resources:
+                requests:                 # 资源请求
+                  cpu: "500m"
+                  memory: "256Mi"
+                limits:                   # 资源限制
+                  cpu: "1"
+                  memory: "512Mi"
+          # 存储卷配置
+          volumes:
+            - name: audit-storage
+              # emptyDir: {}              # 临时存储（Pod 重启后丢失）
+              persistentVolumeClaim:      # 持久化存储（推荐用于审计日志）
+                claimName: tekton-pvc-cleanup

@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tekton-pvc-cleaner
+  namespace: tekton-pipelines
+  labels:
+    app: tekton-pvc-cleanup
+    component: rbac
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tekton-pvc-cleaner
+  labels:
+    app: tekton-pvc-cleanup
+    component: rbac
+rules:
+# 读取PVC权限
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["get", "list", "delete", "watch"]
+
+# 读取和删除Pod权限
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "delete", "watch"]
+
+# 读取Tekton PipelineRun权限
+- apiGroups: ["tekton.dev"]
+  resources: ["pipelineruns"]
+  verbs: ["get", "list", "watch"]
+
+# 读取Tekton TaskRun权限
+- apiGroups: ["tekton.dev"]
+  resources: ["taskruns"]
+  verbs: ["get", "list", "watch"]
+
+# 如果需要跨命名空间操作，需要这些权限
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tekton-pvc-cleaner
+  labels:
+    app: tekton-pvc-cleanup
+    component: rbac
+subjects:
+- kind: ServiceAccount
+  name: tekton-pvc-cleaner
+  namespace: tekton-pipelines
+roleRef:
+  kind: ClusterRole
+  name: tekton-pvc-cleaner
+  apiGroup: rbac.authorization.k8s.io
+---
+# 如果只需要在特定命名空间操作，可以使用这个Role和RoleBinding替代上面的ClusterRole
+---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: Role
+# metadata:
+#   name: tekton-pvc-cleaner-namespace
+#   namespace: tekton-pipelines
+#   labels:
+#     app: tekton-pvc-cleanup
+#     component: rbac
+# rules:
+# # 读取PVC权限
+# - apiGroups: [""]
+#   resources: ["persistentvolumeclaims"]
+#   verbs: ["get", "list", "delete"]
+
+# # 读取和删除Pod权限
+# - apiGroups: [""]
+#   resources: ["pods"]
+#   verbs: ["get", "list", "delete"]
+
+# # 读取Tekton PipelineRun权限
+# - apiGroups: ["tekton.dev"]
+#   resources: ["pipelineruns"]
+#   verbs: ["get", "list"]
+
+# # 读取Tekton TaskRun权限
+# - apiGroups: ["tekton.dev"]
+#   resources: ["taskruns"]
+#   verbs: ["get", "list"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: RoleBinding
+# metadata:
+#   name: tekton-pvc-cleaner-namespace
+#   namespace: tekton-pipelines
+#   labels:
+#     app: tekton-pvc-cleanup
+#     component: rbac
+# subjects:
+# - kind: ServiceAccount
+#   name: tekton-pvc-cleaner
+#   namespace: tekton-pipelines
+# roleRef:
+#   kind: Role
+#   name: tekton-pvc-cleaner-namespace
+#   apiGroup: rbac.authorization.k8s.io
