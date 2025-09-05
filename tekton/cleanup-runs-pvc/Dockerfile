@@ -1,5 +1,7 @@
 # use curl to download cli
-FROM build-harbor.alauda.cn/ops/photon:5-alauda-202507071048 AS download
+ARG BUILDER_IMAGE=build-harbor.alauda.cn/ops/photon:5-alauda-202507071048
+ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202502271510
+FROM ${BUILDER_IMAGE} AS download
 
 # renovate: datasource=github-releases depName=kubectl packageName=AlaudaDevops/kubernetes
 ARG KUBECTL_VERSION=v1.33.5-alauda-0
@@ -19,7 +21,7 @@ RUN set -eux; \
 RUN kubectl version --client
 
 # 使用轻量级的Alpine Linux作为基础镜像
-FROM build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202502271510
+FROM ${RUNTIME_IMAGE}
 
 # 安装必要的工具
 RUN apk add --no-cache \
