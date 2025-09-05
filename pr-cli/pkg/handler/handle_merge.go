@@ -236,7 +236,7 @@ func (h *PRHandler) checkForCherryPickComments() bool {
 }
 
 var (
-	cherryPickPattern = regexp.MustCompile(`^/cherry-pick\s+(\S+)`)
+	cherryPickPattern = regexp.MustCompile(`^/cherry-?pick\s+(\S+)`)
 )
 
 // HandlePostMergeCherryPick processes any cherry-pick commands found in PR comments after merge
