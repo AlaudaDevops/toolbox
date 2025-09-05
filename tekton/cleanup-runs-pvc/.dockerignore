@@ -1,0 +1,17 @@
+# Git相关
+.git
+.gitignore
+
+# 日志文件
+*.log
+
+# 审计目录（构建时不包含）
+audit/
+
+# 文档文件
+README.md
+docs/
+
+# 临时文件
+*.tmp
+.DS_Store

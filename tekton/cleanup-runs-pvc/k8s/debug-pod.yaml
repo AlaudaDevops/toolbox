@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tekton-pvc-cleanup-debug
+  namespace: tekton-pipelines
+  labels:
+    app: tekton-pvc-cleanup
+    component: debug-pod
+spec:
+  serviceAccountName: tekton-pvc-cleaner
+  restartPolicy: Never
+  securityContext:
+    runAsUser: 65532
+    runAsGroup: 65532
+    fsGroup: 65532
+    fsGroupChangePolicy: "OnRootMismatch"
+  containers:
+  - name: cleanup-debug
+    image: registry.alauda.cn:60070/devops/tektoncd/toolbox/cleanup-pvc:latest
+    imagePullPolicy: Always
+    # 使用 sleep 保持容器运行，方便调试
+    command:
+    - "/bin/bash"
+    - "-c"
+    - |
+      echo "调试 Pod 启动，容器将保持运行状态..."
+      echo "可以使用以下命令进入容器："
+      echo "kubectl exec -it tekton-pvc-cleanup-debug -n tekton-pipelines -- /bin/bash"
+      echo ""
+      echo "脚本位置: /app/cleanup-tekton-pvcs.sh"
+      echo "审计目录: /app/audit"
+      echo ""
+      echo "测试脚本示例命令："
+      echo "/app/cleanup-tekton-pvcs.sh --namespaces devops,default --threshold 30 --audit-dir /app/audit --dry-run --verbose"
+      echo ""
+      # 保持容器运行
+      sleep 3600
+    env:
+    - name: THRESHOLD_MINUTES
+      value: "30"
+    volumeMounts:
+    - name: audit-storage
+      mountPath: /app/audit
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  volumes:
+  - name: audit-storage
+    persistentVolumeClaim:
+      claimName: tekton-pvc-cleanup

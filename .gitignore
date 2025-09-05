@@ -12,3 +12,6 @@ pr-cli/bin/
 pr-cli/pr-cli
 pr-cli/test-pr-cli.sh
 pr-cli/coverage.*
+audit/
+.claude
+*.log
