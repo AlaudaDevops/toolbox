@@ -354,13 +354,13 @@ cache_all_data() {
             # 处理所有命名空间 - 串行获取（避免内存峰值）
             verbose_log "获取 PVC 数据..."
             kubectl get pvc --all-namespaces -o json > "$TEMP_DIR/pvcs.json"
-            
+
             verbose_log "获取 PipelineRun 数据..."
             kubectl get pipelinerun --all-namespaces -o json > "$TEMP_DIR/pipelineruns.json" 2>/dev/null || echo '{"items":[]}' > "$TEMP_DIR/pipelineruns.json"
-            
+
             verbose_log "获取 TaskRun 数据..."
             kubectl get taskrun --all-namespaces -o json > "$TEMP_DIR/taskruns.json" 2>/dev/null || echo '{"items":[]}' > "$TEMP_DIR/taskruns.json"
-            
+
             verbose_log "获取 Pod 数据..."
             kubectl get pods --all-namespaces -o json > "$TEMP_DIR/pods.json"
         fi
@@ -424,13 +424,13 @@ cache_all_data() {
     verbose_log "数据缓存完成"
 }
 
-cleanup_audit_data() {
+cleanup_cache_data() {
     if [[ "$KEEP_CACHE" == "true" ]]; then
         log "保留审计数据和缓存文件: $AUDIT_SESSION_DIR"
     else
-        if [[ -n "$AUDIT_SESSION_DIR" && -d "$AUDIT_SESSION_DIR" ]]; then
-            verbose_log "清理审计目录: $AUDIT_SESSION_DIR"
-            rm -rf "$AUDIT_SESSION_DIR" || true
+        if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
+            verbose_log "清理临时缓存目录: $TEMP_DIR"
+            rm -rf "$TEMP_DIR" || true
         fi
     fi
 }
@@ -620,8 +620,8 @@ main() {
 
     log "脚本开始执行时间: $(date '+%Y-%m-%d %H:%M:%S')"
 
-    # 设置退出时清理审计文件
-    trap cleanup_audit_data EXIT INT TERM
+    # 设置退出时清理缓存文件
+    trap cleanup_cache_data EXIT INT TERM
 
     if [[ "$DRY_RUN" == "true" ]]; then
         log "运行在预览模式，不会实际删除任何资源"
