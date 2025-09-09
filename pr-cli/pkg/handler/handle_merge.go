@@ -25,6 +25,9 @@ import (
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
 
+// preferredMergeMethods defines the priority order for auto merge method selection
+var preferredMergeMethods = []string{"rebase", "squash", "merge"}
+
 // HandleMerge merges the PR if conditions are met
 func (h *PRHandler) HandleMerge(args []string) error {
 	// Validate user permissions
@@ -155,11 +158,50 @@ func (h *PRHandler) postNotEnoughLGTMMessage(validVotes int) error {
 func (h *PRHandler) determineMergeMethod(args []string) string {
 	method := h.config.MergeMethod
 	if len(args) > 0 {
-		if args[0] == "merge" || args[0] == "squash" || args[0] == "rebase" {
+		if args[0] == "merge" || args[0] == "squash" || args[0] == "rebase" || args[0] == "auto" {
 			method = args[0]
 		}
 	}
+
+	// If method is "auto", determine the best available method
+	if method == "auto" {
+		return h.selectAutoMergeMethod()
+	}
+
 	return method
+}
+
+// selectAutoMergeMethod selects the best available merge method automatically
+// Priority: rebase > squash > merge
+func (h *PRHandler) selectAutoMergeMethod() string {
+	availableMethods, err := h.client.GetAvailableMergeMethods()
+	if err != nil {
+		h.Logger.Warnf("Failed to get available merge methods, falling back to squash: %v", err)
+		return "squash"
+	}
+
+	h.Logger.Debugf("Available merge methods: %v", availableMethods)
+
+	// Check preferred methods in priority order
+	for _, preferred := range preferredMergeMethods {
+		for _, available := range availableMethods {
+			if preferred == available {
+				h.Logger.Infof("Auto-selected merge method: %s", preferred)
+				return preferred
+			}
+		}
+	}
+
+	// Fallback to the first available method if none of the preferred methods are available
+	if len(availableMethods) > 0 {
+		method := availableMethods[0]
+		h.Logger.Infof("Auto-selected fallback merge method: %s", method)
+		return method
+	}
+
+	// Final fallback
+	h.Logger.Warn("No available merge methods found, falling back to squash")
+	return "squash"
 }
 
 // executeMerge performs the actual merge operation

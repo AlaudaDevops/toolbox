@@ -73,7 +73,7 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&p.robotAccountsStr, "robot-accounts", "", "Robot/bot account usernames (comma-separated) for managing bot approval reviews")
 
 	// Merge configuration
-	flags.StringVar(&p.Config.MergeMethod, "merge-method", p.Config.MergeMethod, "Default merge method (merge, squash, rebase)")
+	flags.StringVar(&p.Config.MergeMethod, "merge-method", p.Config.MergeMethod, "Default merge method (auto, merge, squash, rebase)")
 
 	// Check configuration
 	flags.StringVar(&p.Config.SelfCheckName, "self-check-name", p.Config.SelfCheckName, "Name of the tool's own check run to exclude from status checks")

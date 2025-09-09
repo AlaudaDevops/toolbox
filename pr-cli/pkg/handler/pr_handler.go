@@ -79,6 +79,16 @@ func NewPRHandler(logger *logrus.Logger, cfg *config.Config) (*PRHandler, error)
 	}, nil
 }
 
+// NewPRHandlerWithClient creates a new PR handler with a provided client (for testing)
+func NewPRHandlerWithClient(logger *logrus.Logger, cfg *config.Config, client git.GitClient, prSender string) (*PRHandler, error) {
+	return &PRHandler{
+		Logger:   logger,
+		client:   client,
+		config:   cfg,
+		prSender: prSender,
+	}, nil
+}
+
 // CheckPRStatus verifies if the PR is in the expected state
 func (h *PRHandler) CheckPRStatus(expectedState string) error {
 	return h.client.CheckPRStatus(expectedState)

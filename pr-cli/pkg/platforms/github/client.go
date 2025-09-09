@@ -731,6 +731,41 @@ func (c *Client) RebasePR() error {
 	return err
 }
 
+// GetAvailableMergeMethods retrieves the available merge methods for the pull request
+func (c *Client) GetAvailableMergeMethods() ([]string, error) {
+	pr, err := c.GetPR()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PR: %w", err)
+	}
+
+	// Get repository settings to determine available merge methods
+	repo, _, err := c.client.Repositories.Get(c.ctx, c.owner, c.repo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository settings: %w", err)
+	}
+
+	var availableMethods []string
+
+	// Check which merge methods are allowed in the repository
+	// GitHub API returns boolean values for each merge method
+	if repo.GetAllowRebaseMerge() && pr.Head.SHA != pr.Base.SHA {
+		availableMethods = append(availableMethods, "rebase")
+	}
+	if repo.GetAllowSquashMerge() {
+		availableMethods = append(availableMethods, "squash")
+	}
+	if repo.GetAllowMergeCommit() {
+		availableMethods = append(availableMethods, "merge")
+	}
+
+	// If no methods are available, return an error
+	if len(availableMethods) == 0 {
+		return nil, fmt.Errorf("no merge methods are available for this repository")
+	}
+
+	return availableMethods, nil
+}
+
 // CheckRunsStatus checks if all check runs are successful with pagination
 func (c *Client) CheckRunsStatus() (bool, []git.CheckRun, error) {
 	pr, err := c.GetPR()

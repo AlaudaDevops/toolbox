@@ -71,9 +71,12 @@ Available commands for managing this Pull Request:
 ### 📋 Merge Methods
 | Method | Description |
 |--------|-------------|
+| `+"`auto`"+` | Automatically select the best available method (default) |
 | `+"`merge`"+` | Create a merge commit |
-| `+"`squash`"+` | Squash and merge all commits (default) |
+| `+"`squash`"+` | Squash and merge all commits |
 | `+"`rebase`"+` | Rebase and merge |
+
+> 💡 **Auto Mode Priority**: When using `+"`auto`"+`, the system will automatically select the best available merge method in the following order: `+"`rebase`"+` > `+"`squash`"+` > `+"`merge`"+`.
 
 ### 🍒 Cherrypick Commands
 | Command | Description | PR State |
