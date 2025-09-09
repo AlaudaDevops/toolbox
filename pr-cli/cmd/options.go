@@ -265,7 +265,7 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 	// Check if any comment from the comment-sender contains the trigger-comment
 	found := false
 	for _, comment := range comments {
-		if comment.User.Login == p.Config.CommentSender &&
+		if strings.EqualFold(comment.User.Login, p.Config.CommentSender) &&
 			(comment.Body == p.Config.TriggerComment || strings.Contains(comment.Body, p.Config.TriggerComment)) {
 			found = true
 			break

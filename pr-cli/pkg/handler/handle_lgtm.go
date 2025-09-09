@@ -28,7 +28,7 @@ func (h *PRHandler) HandleLGTM(_ []string) error {
 	h.Info("Processing LGTM")
 
 	// Check if the comment sender is the PR author (not in debug mode)
-	if h.config.CommentSender == h.prSender && !h.config.Debug {
+	if strings.EqualFold(h.config.CommentSender, h.prSender) && !h.config.Debug {
 		// PR author is trying to LGTM their own PR - post informational message with status
 		h.Infof("PR author %s attempted to LGTM their own PR", h.config.CommentSender)
 

@@ -311,7 +311,7 @@ func (c *Client) AssignReviewers(reviewers []string) error {
 		// Check if the reviewer was successfully assigned
 		if response != nil && len(response.RequestedReviewers) > 0 {
 			for _, assignedReviewer := range response.RequestedReviewers {
-				if assignedReviewer.GetLogin() == reviewer {
+				if strings.EqualFold(assignedReviewer.GetLogin(), reviewer) {
 					assignedReviewers = append(assignedReviewers, reviewer)
 					c.Debugf("Successfully assigned reviewer: %s\n", reviewer)
 					break
@@ -353,7 +353,7 @@ func (c *Client) RemoveReviewers(reviewers []string) error {
 
 // GetLGTMVotes retrieves and validates LGTM votes using provided or fetched comments
 func (c *Client) GetLGTMVotes(comments []git.Comment, requiredPerms []string, debugMode bool, ignoreUserRemove ...string) (int, map[string]string, error) {
-	ignoreUser := c.getIgnoreUser(ignoreUserRemove)
+	ignoreUser := strings.ToLower(c.getIgnoreUser(ignoreUserRemove))
 	lgtmUsers := make(map[string]string)
 
 	// 1. Process review votes
@@ -400,9 +400,9 @@ func (c *Client) findLatestReviews(reviews []git.Review) map[string]*git.Review 
 
 	for i := range reviews {
 		review := &reviews[i]
-		user := review.User.Login
+		user := strings.ToLower(review.User.Login)
 
-		if user == c.prSender { // Skip self-approvals
+		if strings.EqualFold(user, c.prSender) { // Skip self-approvals
 			continue
 		}
 
@@ -456,7 +456,7 @@ func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser strin
 	}
 
 	for i := len(comments) - 1; i >= 0; i-- {
-		if comments[i].User.Login == ignoreUser {
+		if strings.EqualFold(comments[i].User.Login, ignoreUser) {
 			body := strings.TrimSpace(comments[i].Body)
 			if removeLgtmRegexp.MatchString(body) {
 				c.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
@@ -471,7 +471,7 @@ func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser strin
 
 // processLGTMComment processes a single LGTM-related comment
 func (c *Client) processLGTMComment(comment git.Comment, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
-	user := comment.User.Login
+	user := strings.ToLower(comment.User.Login)
 	body := strings.TrimSpace(comment.Body)
 
 	switch {
@@ -506,12 +506,12 @@ func (c *Client) handleLGTMCancel(user string, lgtmUsers map[string]string, user
 
 // handleLGTM processes /lgtm commands
 func (c *Client) handleLGTM(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
-	if user == c.prSender && !debugMode {
+	if strings.EqualFold(user, c.prSender) && !debugMode {
 		c.Debugf("Skipping LGTM from PR author %s (not allowed)", user)
 		return
 	}
 
-	if user == c.prSender && debugMode {
+	if strings.EqualFold(user, c.prSender) && debugMode {
 		c.Debugf("Debug mode: allowing PR author %s to give LGTM to their own PR", user)
 	}
 
@@ -651,7 +651,7 @@ func (c *Client) findLatestApprovalByUser(username string) (int64, error) {
 
 	var latestApprovalID int64 = 0
 	for _, review := range reviews {
-		if review.GetUser().GetLogin() == username && review.GetState() == "APPROVED" {
+		if strings.EqualFold(review.GetUser().GetLogin(), username) && review.GetState() == "APPROVED" {
 			if review.GetID() > latestApprovalID {
 				latestApprovalID = review.GetID()
 			}

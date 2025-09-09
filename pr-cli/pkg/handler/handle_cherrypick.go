@@ -41,7 +41,7 @@ func (h *PRHandler) HandleCherrypick(args []string) error {
 	}
 
 	// Allow cherrypick if user has write permission OR is the PR creator
-	isPRCreator := h.config.CommentSender == h.prSender
+	isPRCreator := strings.EqualFold(h.config.CommentSender, h.prSender)
 	if !hasPermission && !isPRCreator {
 		message := fmt.Sprintf(messages.CherryPickInsufficientPermissionsTemplate,
 			h.config.CommentSender, userPerm, strings.Join(h.config.LGTMPermissions, ", "), h.prSender, strings.Join(h.config.LGTMPermissions, ", "))

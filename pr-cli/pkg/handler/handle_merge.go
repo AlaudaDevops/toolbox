@@ -67,7 +67,7 @@ func (h *PRHandler) validateMergePermissions() (string, error) {
 		return "", fmt.Errorf("failed to check user permissions: %w", err)
 	}
 
-	isPRCreator := h.config.CommentSender == h.prSender
+	isPRCreator := strings.EqualFold(h.config.CommentSender, h.prSender)
 	if !hasPermission && !isPRCreator {
 		return userPerm, h.postInsufficientPermissionsMessage(userPerm)
 	}
