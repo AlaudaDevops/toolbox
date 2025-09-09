@@ -56,7 +56,7 @@ func sanitizeErrorMessage(message string) string {
 
 // CherryPicker handles Git CLI cherry-pick operations
 type CherryPicker struct {
-	logger     *logrus.Logger
+	*logrus.Logger
 	repoURL    string
 	token      string
 	owner      string
@@ -70,7 +70,7 @@ type CherryPicker struct {
 func NewCherryPicker(logger *logrus.Logger, repoURL, token, owner, repo string, prID int) *CherryPicker {
 	currentDir, _ := os.Getwd()
 	return &CherryPicker{
-		logger:     logger,
+		Logger:     logger,
 		repoURL:    repoURL,
 		token:      token,
 		owner:      owner,
@@ -90,9 +90,13 @@ func (cp *CherryPicker) CherryPickCommit(commitSHA, targetBranch string) error {
 	defer func() {
 		// Cleanup: restore original directory and remove temp directory
 		if cp.currentDir != "" {
-			os.Chdir(cp.currentDir)
+			if err := os.Chdir(cp.currentDir); err != nil {
+				cp.Errorf("Failed to restore original directory: %v", err)
+			}
 		}
-		os.RemoveAll(tempDir)
+		if err := os.RemoveAll(tempDir); err != nil {
+			cp.Errorf("Failed to remove temp directory: %v", err)
+		}
 	}()
 
 	cp.workingDir = tempDir
@@ -145,9 +149,13 @@ func (cp *CherryPicker) CherryPickCommits(commits []git.Commit, targetBranch str
 	defer func() {
 		// Cleanup: restore original directory and remove temp directory
 		if cp.currentDir != "" {
-			os.Chdir(cp.currentDir)
+			if err := os.Chdir(cp.currentDir); err != nil {
+				cp.Errorf("Failed to restore original directory: %v", err)
+			}
 		}
-		os.RemoveAll(tempDir)
+		if err := os.RemoveAll(tempDir); err != nil {
+			cp.Errorf("Failed to remove temp directory: %v", err)
+		}
 	}()
 
 	cp.workingDir = tempDir
@@ -196,7 +204,7 @@ func (cp *CherryPicker) CherryPickCommits(commits []git.Commit, targetBranch str
 
 // cloneRepository clones the repository to the temporary directory
 func (cp *CherryPicker) cloneRepository() error {
-	cp.logger.Debugf("Cloning repository %s to %s", sanitizeErrorMessage(cp.repoURL), cp.workingDir)
+	cp.Debugf("Cloning repository %s to %s", sanitizeErrorMessage(cp.repoURL), cp.workingDir)
 	// First, try cloning with token in URL (existing method)
 	cloneCmd := exec.Command("git", "clone", cp.repoURL, cp.workingDir)
 
@@ -217,7 +225,7 @@ func (cp *CherryPicker) cloneRepository() error {
 		}
 		return nil
 	} else {
-		cp.logger.Debugf("Repository cloned successfully: %s", sanitizeErrorMessage(cp.repoURL))
+		cp.Debugf("Repository cloned successfully: %s", sanitizeErrorMessage(cp.repoURL))
 	}
 	return nil
 }
@@ -261,7 +269,7 @@ func (cp *CherryPicker) cloneWithCredentialHelper() error {
 		sanitizedOutput := sanitizeErrorMessage(string(output))
 		return fmt.Errorf("credential helper clone failed: %w, output: %s", err, sanitizedOutput)
 	} else {
-		cp.logger.Debugf("Repository cloned successfully: %s", sanitizeErrorMessage(cp.repoURL))
+		cp.Debugf("Repository cloned successfully: %s", sanitizeErrorMessage(cp.repoURL))
 	}
 
 	return nil
@@ -379,30 +387,34 @@ func (cp *CherryPicker) performCherryPick(commitSHA string) error {
 			// Check if it's a conflict
 			if strings.Contains(err.Error(), "CONFLICT") || strings.Contains(err.Error(), "conflict") ||
 				strings.Contains(err.Error(), "unmerged files") {
-				cp.logger.Errorf("❌ CHERRY-PICK CONFLICT DETECTED for commit %s", commitSHA)
-				cp.logger.Errorf("💡 This may be caused by: fork PR, merge conflicts, or missing dependencies")
-				cp.logger.Infof("🔧 Attempting automatic conflict resolution...")
+				cp.Errorf("❌ CHERRY-PICK CONFLICT DETECTED for commit %s", commitSHA)
+				cp.Errorf("💡 This may be caused by: fork PR, merge conflicts, or missing dependencies")
+				cp.Infof("🔧 Attempting automatic conflict resolution...")
 
 				// Abort the current cherry-pick
-				cp.runGitCommand("cherry-pick", "--abort")
+				if abortErr := cp.runGitCommand("cherry-pick", "--abort"); abortErr != nil {
+					cp.Warnf("Failed to abort cherry-pick: %v", abortErr)
+				}
 
 				// Try with strategy options for automatic conflict resolution
 				err = cp.runGitCommand("cherry-pick", "--strategy=recursive", "--strategy-option=theirs", commitSHA)
 				if err != nil {
 					// If conflict resolution fails, try ours strategy
-					cp.runGitCommand("cherry-pick", "--abort")
+					if abortErr := cp.runGitCommand("cherry-pick", "--abort"); abortErr != nil {
+						cp.Warnf("Failed to abort cherry-pick: %v", abortErr)
+					}
 					err = cp.runGitCommand("cherry-pick", "--strategy=recursive", "--strategy-option=ours", commitSHA)
 					if err != nil {
 						// Check if this is an empty commit error
 						if cp.isEmptyCommitError(err) {
-							cp.logger.Warnf("Cherry-pick resulted in empty commit for %s, skipping with --allow-empty", commitSHA)
+							cp.Warnf("Cherry-pick resulted in empty commit for %s, skipping with --allow-empty", commitSHA)
 							// Try to skip the empty commit
 							if skipErr := cp.runGitCommand("cherry-pick", "--skip"); skipErr != nil {
-								cp.logger.Warnf("Failed to skip empty commit, continuing anyway: %v", skipErr)
+								cp.Warnf("Failed to skip empty commit, continuing anyway: %v", skipErr)
 							}
 							return nil
 						}
-						cp.logger.Errorf("❌ CHERRY-PICK FAILED: All conflict resolution strategies failed for commit %s", commitSHA)
+						cp.Errorf("❌ CHERRY-PICK FAILED: All conflict resolution strategies failed for commit %s", commitSHA)
 						return fmt.Errorf("failed to cherry-pick commit %s with automatic conflict resolution: %w", commitSHA, err)
 					}
 				}

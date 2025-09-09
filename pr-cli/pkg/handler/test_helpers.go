@@ -27,3 +27,8 @@ func (h *PRHandler) ExposedDetermineMergeMethod(args []string) string {
 func (h *PRHandler) ExposedSelectAutoMergeMethod() string {
 	return h.selectAutoMergeMethod()
 }
+
+// ExposedValidateRebaseMerge exposes validateRebaseMerge for testing
+func (h *PRHandler) ExposedValidateRebaseMerge() error {
+	return h.validateRebaseMerge()
+}

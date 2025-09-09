@@ -25,7 +25,7 @@ import (
 
 // HandleRemoveLGTM processes the removal of LGTM by dismissing approval if threshold was met
 func (h *PRHandler) HandleRemoveLGTM(_ []string) error {
-	h.Logger.Info("Processing remove LGTM")
+	h.Info("Processing remove LGTM")
 
 	// Check permissions first
 	userPermission, hasPermission, err := h.validateRemoveLGTMPermissions()
@@ -102,7 +102,7 @@ func (h *PRHandler) calculateRemovalResult(beforeVotes int, beforeUsers map[stri
 		afterVotes = beforeVotes - 1
 	}
 
-	h.Logger.Debugf("Before remove LGTM: %d votes, after remove LGTM: %d votes (current user has vote: %t)",
+	h.Debugf("Before remove LGTM: %d votes, after remove LGTM: %d votes (current user has vote: %t)",
 		beforeVotes, afterVotes, currentUserHasVote)
 
 	return &RemovalResult{
@@ -131,13 +131,13 @@ func (h *PRHandler) dismissApproval(userPermission string) {
 	dismissMessage := fmt.Sprintf(messages.RemoveLGTMDismissTemplate, h.config.CommentSender)
 	if err := h.client.DismissApprove(dismissMessage); err != nil {
 		if !strings.Contains(err.Error(), "no approval review found") {
-			h.Logger.Errorf("Failed to dismiss approval: %v", err)
+			h.Errorf("Failed to dismiss approval: %v", err)
 		} else {
-			h.Logger.Debugf("No approval review found to dismiss for user %s with permission: %s",
+			h.Debugf("No approval review found to dismiss for user %s with permission: %s",
 				h.config.CommentSender, userPermission)
 		}
 	} else {
-		h.Logger.Infof("✅ User %s successfully dismissed approval (removing vote would drop below threshold) with permission: %s",
+		h.Infof("✅ User %s successfully dismissed approval (removing vote would drop below threshold) with permission: %s",
 			h.config.CommentSender, userPermission)
 	}
 }
@@ -145,10 +145,10 @@ func (h *PRHandler) dismissApproval(userPermission string) {
 // logRemovalReason logs why the approval was not dismissed
 func (h *PRHandler) logRemovalReason(result *RemovalResult) {
 	if !result.CurrentUserHasVote {
-		h.Logger.Infof("User %s requested remove LGTM but has no existing vote with permission: %s",
+		h.Infof("User %s requested remove LGTM but has no existing vote with permission: %s",
 			h.config.CommentSender, result.UserPermission)
 	} else {
-		h.Logger.Infof("User %s requested remove LGTM but removing vote would not drop below threshold (before: %d, after: %d, threshold: %d) with permission: %s",
+		h.Infof("User %s requested remove LGTM but removing vote would not drop below threshold (before: %d, after: %d, threshold: %d) with permission: %s",
 			h.config.CommentSender, result.BeforeVotes, result.AfterVotes, h.config.LGTMThreshold, result.UserPermission)
 	}
 }

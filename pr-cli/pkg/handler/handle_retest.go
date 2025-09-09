@@ -129,10 +129,10 @@ func (h *PRHandler) retestPipelines(pipelineNames []string) error {
 	// Post individual comments for each pipeline to trigger retests
 	for _, comment := range comments {
 		if err := h.client.PostComment(comment); err != nil {
-			h.Logger.Errorf("Failed to post retest comment '%s': %v", comment, err)
+			h.Errorf("Failed to post retest comment '%s': %v", comment, err)
 			return fmt.Errorf("failed to trigger retest for pipeline: %w", err)
 		}
-		h.Logger.Infof("Posted retest comment: %s", comment)
+		h.Infof("Posted retest comment: %s", comment)
 	}
 
 	// Post a summary comment

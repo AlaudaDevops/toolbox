@@ -78,7 +78,7 @@ func (h *PRHandler) processBatchCommand(subCmd SubCommand) string {
 
 	// Execute the batch command (reuse existing logic)
 	if err := h.executeSubCommand(subCmd.Command, subCmd.Args); err != nil {
-		h.Logger.Errorf("Batch command '%s' failed: %v", subCmd.Command, err)
+		h.Errorf("Batch command '%s' failed: %v", subCmd.Command, err)
 		return h.formatResult("❌", subCmd, fmt.Sprintf("failed: %v", err))
 	}
 
@@ -98,13 +98,13 @@ func (h *PRHandler) validateBatchCommand(subCmd SubCommand) string {
 
 	// Filter out built-in commands (starting with __)
 	if IsBuiltInCommand(subCmd.Command) {
-		h.Logger.Warnf("Built-in command '%s' is not allowed via batch", subCmd.Command)
+		h.Warnf("Built-in command '%s' is not allowed via batch", subCmd.Command)
 		return fmt.Sprintf("❌ Command `%s` is not allowed in batch execution", cmdDisplay)
 	}
 
 	// Filter out prohibited commands for batch execution
 	if batchProhibitedCommands[subCmd.Command] {
-		h.Logger.Warnf("Command '%s' is prohibited in batch execution", subCmd.Command)
+		h.Warnf("Command '%s' is prohibited in batch execution", subCmd.Command)
 		return fmt.Sprintf("❌ Command `%s` is not allowed in batch execution", cmdDisplay)
 	}
 

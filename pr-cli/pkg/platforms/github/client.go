@@ -38,7 +38,7 @@ var (
 
 // Client implements the GitClient interface for GitHub
 type Client struct {
-	logger        *logrus.Logger
+	*logrus.Logger
 	client        *github.Client  // GitHub API client for general operations
 	commentClient *github.Client  // GitHub API client for comment operations (may use different token)
 	ctx           context.Context // Request context
@@ -96,7 +96,7 @@ func (f *Factory) CreateClient(logger *logrus.Logger, config *git.Config) (git.G
 	}
 
 	return &Client{
-		logger:        logger,
+		Logger:        logger,
 		client:        client,
 		commentClient: commentClient,
 		ctx:           ctx,
@@ -217,7 +217,7 @@ func (c *Client) GetReviews() ([]git.Review, error) {
 	result := make([]git.Review, len(allReviews))
 	for i, review := range allReviews {
 		submittedAt := ""
-		if review.GetSubmittedAt().IsZero() == false {
+		if !review.GetSubmittedAt().IsZero() {
 			submittedAt = review.GetSubmittedAt().Format("2006-01-02T15:04:05Z07:00") // ISO 8601 format
 		}
 
@@ -287,7 +287,7 @@ func (c *Client) AssignReviewers(reviewers []string) error {
 	}
 
 	// Debug: Log what we're about to send
-	c.logger.Debugf("Requesting reviewers one by one: %v\n", cleanReviewers)
+	c.Debugf("Requesting reviewers one by one: %v\n", cleanReviewers)
 
 	var assignedReviewers []string
 	var failedReviewers []string
@@ -295,7 +295,7 @@ func (c *Client) AssignReviewers(reviewers []string) error {
 	// GitHub API has issues when assigning multiple reviewers at once,
 	// so we use individual assignment as a fallback solution
 	for _, reviewer := range cleanReviewers {
-		c.logger.Debugf("Assigning individual reviewer: %s\n", reviewer)
+		c.Debugf("Assigning individual reviewer: %s\n", reviewer)
 
 		reviewerRequest := github.ReviewersRequest{
 			Reviewers: []string{reviewer},
@@ -303,7 +303,7 @@ func (c *Client) AssignReviewers(reviewers []string) error {
 
 		response, _, err := c.client.PullRequests.RequestReviewers(c.ctx, c.owner, c.repo, c.prNum, reviewerRequest)
 		if err != nil {
-			c.logger.Debugf("Failed to assign reviewer %s: %v\n", reviewer, err)
+			c.Debugf("Failed to assign reviewer %s: %v\n", reviewer, err)
 			failedReviewers = append(failedReviewers, reviewer)
 			continue
 		}
@@ -313,7 +313,7 @@ func (c *Client) AssignReviewers(reviewers []string) error {
 			for _, assignedReviewer := range response.RequestedReviewers {
 				if assignedReviewer.GetLogin() == reviewer {
 					assignedReviewers = append(assignedReviewers, reviewer)
-					c.logger.Debugf("Successfully assigned reviewer: %s\n", reviewer)
+					c.Debugf("Successfully assigned reviewer: %s\n", reviewer)
 					break
 				}
 			}
@@ -321,11 +321,11 @@ func (c *Client) AssignReviewers(reviewers []string) error {
 			// If no response or empty, still consider it potentially successful
 			// (GitHub API sometimes doesn't return the full list)
 			assignedReviewers = append(assignedReviewers, reviewer)
-			c.logger.Debugf("Reviewer assignment request sent for: %s\n", reviewer)
+			c.Debugf("Reviewer assignment request sent for: %s\n", reviewer)
 		}
 	}
 
-	c.logger.Debugf("Assignment summary - Assigned: %v, Failed: %v\n", assignedReviewers, failedReviewers)
+	c.Debugf("Assignment summary - Assigned: %v, Failed: %v\n", assignedReviewers, failedReviewers)
 
 	// If some assignments failed, return an error with details
 	if len(failedReviewers) > 0 {
@@ -419,19 +419,9 @@ func (c *Client) addApprovedReviews(lgtmUsers map[string]string, userLatestRevie
 	for user, latestReview := range userLatestReviews {
 		if latestReview.State == "APPROVED" {
 			lgtmUsers[user] = ""
-			c.logger.Debugf("Found APPROVED from user: %s (latest review)", user)
+			c.Debugf("Found APPROVED from user: %s (latest review)", user)
 		}
 	}
-}
-
-// processCommentVotes processes LGTM commands from comments
-func (c *Client) processCommentVotes(lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool, ignoreUser string) error {
-	comments, err := c.GetComments()
-	if err != nil {
-		return fmt.Errorf("failed to get comments: %w", err)
-	}
-
-	return c.processCommentVotesWithComments(comments, lgtmUsers, userLatestReviews, debugMode, ignoreUser)
 }
 
 // processCommentVotesWithComments processes LGTM commands from provided or fetched comments
@@ -449,7 +439,7 @@ func (c *Client) processCommentVotesWithComments(comments []git.Comment, lgtmUse
 
 	for i, comment := range comments {
 		if i == ignoreCommentIndex {
-			c.logger.Debugf("Skipping ignored comment at index %d from user: %s", i, comment.User.Login)
+			c.Debugf("Skipping ignored comment at index %d from user: %s", i, comment.User.Login)
 			continue
 		}
 
@@ -469,7 +459,7 @@ func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser strin
 		if comments[i].User.Login == ignoreUser {
 			body := strings.TrimSpace(comments[i].Body)
 			if removeLgtmRegexp.MatchString(body) {
-				c.logger.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
+				c.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
 				return i
 			}
 			break
@@ -498,9 +488,9 @@ func (c *Client) processLGTMComment(comment git.Comment, lgtmUsers map[string]st
 func (c *Client) handleRemoveLGTM(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review) {
 	if c.canRemoveLGTM(user, userLatestReviews) {
 		delete(lgtmUsers, user)
-		c.logger.Debugf("Found `/remove-lgtm` from user: %s", user)
+		c.Debugf("Found `/remove-lgtm` from user: %s", user)
 	} else {
-		c.logger.Debugf("Ignoring `/remove-lgtm` from user: %s (has latest APPROVED review)", user)
+		c.Debugf("Ignoring `/remove-lgtm` from user: %s (has latest APPROVED review)", user)
 	}
 }
 
@@ -508,28 +498,28 @@ func (c *Client) handleRemoveLGTM(user string, lgtmUsers map[string]string, user
 func (c *Client) handleLGTMCancel(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review) {
 	if c.canRemoveLGTM(user, userLatestReviews) {
 		delete(lgtmUsers, user)
-		c.logger.Debugf("Found `/lgtm cancel` from user: %s", user)
+		c.Debugf("Found `/lgtm cancel` from user: %s", user)
 	} else {
-		c.logger.Debugf("Ignoring `/lgtm cancel` from user: %s (has latest APPROVED review)", user)
+		c.Debugf("Ignoring `/lgtm cancel` from user: %s (has latest APPROVED review)", user)
 	}
 }
 
 // handleLGTM processes /lgtm commands
 func (c *Client) handleLGTM(user string, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
 	if user == c.prSender && !debugMode {
-		c.logger.Debugf("Skipping LGTM from PR author %s (not allowed)", user)
+		c.Debugf("Skipping LGTM from PR author %s (not allowed)", user)
 		return
 	}
 
 	if user == c.prSender && debugMode {
-		c.logger.Debugf("Debug mode: allowing PR author %s to give LGTM to their own PR", user)
+		c.Debugf("Debug mode: allowing PR author %s to give LGTM to their own PR", user)
 	}
 
 	if c.canAddLGTM(user, userLatestReviews) {
 		lgtmUsers[user] = ""
-		c.logger.Debugf("Found /lgtm from user: %s", user)
+		c.Debugf("Found /lgtm from user: %s", user)
 	} else {
-		c.logger.Debugf("Ignoring /lgtm from user: %s (already has latest APPROVED review)", user)
+		c.Debugf("Ignoring /lgtm from user: %s (already has latest APPROVED review)", user)
 	}
 }
 
@@ -548,9 +538,9 @@ func (c *Client) canAddLGTM(user string, userLatestReviews map[string]*git.Revie
 // logCollectedUsers logs the collected LGTM users
 func (c *Client) logCollectedUsers(lgtmUsers map[string]string, ignoreUser string) {
 	if ignoreUser != "" {
-		c.logger.Debugf("Collected LGTM users (ignoring %s): %v", ignoreUser, lgtmUsers)
+		c.Debugf("Collected LGTM users (ignoring %s): %v", ignoreUser, lgtmUsers)
 	} else {
-		c.logger.Debugf("Collected LGTM users: %v", lgtmUsers)
+		c.Debugf("Collected LGTM users: %v", lgtmUsers)
 	}
 }
 
@@ -584,7 +574,7 @@ func (c *Client) ApprovePR(message string) error {
 
 	// Check if the error is due to trying to approve one's own PR
 	if err != nil && strings.Contains(err.Error(), "Can not approve your own pull request") {
-		c.logger.Warnf("Cannot approve own PR (robot account limitation), posting comment instead: %v", err)
+		c.Warnf("Cannot approve own PR (robot account limitation), posting comment instead: %v", err)
 		// Post the approval message as a comment instead
 		return c.PostComment(fmt.Sprintf("✅ **Auto-approved** (LGTM threshold met)\n\n%s\n\n> Note: Cannot create formal approval review due to GitHub's self-approval restriction.", message))
 	}
@@ -601,14 +591,14 @@ func (c *Client) DismissApprove(message string) error {
 	if err != nil {
 		// If we get a 403 error (insufficient permissions), try to find bot approvals to dismiss
 		if strings.Contains(err.Error(), "403") {
-			c.logger.Debugf("Cannot get authenticated user due to permissions (403), looking for bot approvals to dismiss")
+			c.Debugf("Cannot get authenticated user due to permissions (403), looking for bot approvals to dismiss")
 			return c.dismissBotApproval(message)
 		}
 		return fmt.Errorf("failed to get authenticated user: %w", err)
 	}
 
 	tokenUser = authenticatedUser.GetLogin()
-	c.logger.Debugf("Attempting to dismiss approval review by token user: %s", tokenUser)
+	c.Debugf("Attempting to dismiss approval review by token user: %s", tokenUser)
 
 	// Find and dismiss the user's approval
 	reviewID, err := c.findLatestApprovalByUser(tokenUser)
@@ -636,10 +626,10 @@ func (c *Client) dismissBotApproval(message string) error {
 
 	for botUser, reviewID := range botApprovals {
 		if err := c.dismissReview(reviewID, message); err != nil {
-			c.logger.Errorf("Failed to dismiss approval from bot %s (review ID: %d): %v", botUser, reviewID, err)
+			c.Errorf("Failed to dismiss approval from bot %s (review ID: %d): %v", botUser, reviewID, err)
 			lastErr = err
 		} else {
-			c.logger.Infof("✅ Successfully dismissed approval from bot: %s (review ID: %d)", botUser, reviewID)
+			c.Infof("✅ Successfully dismissed approval from bot: %s (review ID: %d)", botUser, reviewID)
 			dismissedCount++
 		}
 	}
@@ -648,7 +638,7 @@ func (c *Client) dismissBotApproval(message string) error {
 		return fmt.Errorf("failed to dismiss any bot approvals, last error: %w", lastErr)
 	}
 
-	c.logger.Infof("Successfully dismissed %d bot approval(s)", dismissedCount)
+	c.Infof("Successfully dismissed %d bot approval(s)", dismissedCount)
 	return nil
 }
 
@@ -689,10 +679,10 @@ func (c *Client) findBotApprovals() (map[string]int64, error) {
 			if c.isBotAccount(username) {
 				if existingID, exists := botApprovals[username]; !exists || review.GetID() > existingID {
 					botApprovals[username] = review.GetID()
-					c.logger.Debugf("Found APPROVED review from bot: %s (review ID: %d)", username, review.GetID())
+					c.Debugf("Found APPROVED review from bot: %s (review ID: %d)", username, review.GetID())
 				}
 			} else {
-				c.logger.Debugf("Skipping non-bot approval from user: %s (review ID: %d)", username, review.GetID())
+				c.Debugf("Skipping non-bot approval from user: %s (review ID: %d)", username, review.GetID())
 			}
 		}
 	}
@@ -812,7 +802,7 @@ func (c *Client) fetchAllCheckRuns(sha string) ([]*github.CheckRun, error) {
 
 // analyzeCheckRuns analyzes check runs and returns failed ones
 func (c *Client) analyzeCheckRuns(allCheckRuns []*github.CheckRun) []git.CheckRun {
-	c.logger.Debugf("Check run: selfCheckName: %q", c.selfCheckName)
+	c.Debugf("Check run: selfCheckName: %q", c.selfCheckName)
 
 	var failedChecks []git.CheckRun
 	for _, check := range allCheckRuns {
@@ -828,7 +818,7 @@ func (c *Client) analyzeCheckRuns(allCheckRuns []*github.CheckRun) []git.CheckRu
 
 // logCheckRunDetails logs details of a check run
 func (c *Client) logCheckRunDetails(check *github.CheckRun) {
-	c.logger.Debugf("Check run: %q, Status: %q, Conclusion: %q, URL: %q",
+	c.Debugf("Check run: %q, Status: %q, Conclusion: %q, URL: %q",
 		check.GetName(), check.GetStatus(), check.GetConclusion(), check.GetHTMLURL())
 }
 
@@ -882,7 +872,7 @@ func (c *Client) AddLabels(labels []string) error {
 		return fmt.Errorf("no labels specified")
 	}
 
-	c.logger.Debugf("Adding labels to PR #%d: %v", c.prNum, labels)
+	c.Debugf("Adding labels to PR #%d: %v", c.prNum, labels)
 
 	// Get current labels first
 	currentLabels, err := c.GetLabels()
@@ -916,7 +906,7 @@ func (c *Client) RemoveLabels(labels []string) error {
 		return fmt.Errorf("no labels specified")
 	}
 
-	c.logger.Debugf("Removing labels from PR #%d: %v", c.prNum, labels)
+	c.Debugf("Removing labels from PR #%d: %v", c.prNum, labels)
 
 	// Get current labels first
 	currentLabels, err := c.GetLabels()
@@ -960,7 +950,7 @@ func (c *Client) GetLabels() ([]string, error) {
 
 // CreateBranch creates a new branch from the specified base branch
 func (c *Client) CreateBranch(branchName, baseBranch string) error {
-	c.logger.Debugf("Creating branch %s from %s", branchName, baseBranch)
+	c.Debugf("Creating branch %s from %s", branchName, baseBranch)
 
 	// Get the SHA of the base branch
 	baseRef, _, err := c.client.Git.GetRef(c.ctx, c.owner, c.repo, "heads/"+baseBranch)
@@ -984,7 +974,7 @@ func (c *Client) CreateBranch(branchName, baseBranch string) error {
 
 // GetCommits retrieves commits from a pull request
 func (c *Client) GetCommits() ([]git.Commit, error) {
-	c.logger.Debugf("Getting commits for PR #%d", c.prNum)
+	c.Debugf("Getting commits for PR #%d", c.prNum)
 
 	opts := &github.ListOptions{}
 	var allCommits []git.Commit
@@ -1014,7 +1004,7 @@ func (c *Client) GetCommits() ([]git.Commit, error) {
 
 // CreatePR creates a new pull request
 func (c *Client) CreatePR(title, body, head, base string) (*git.PullRequest, error) {
-	c.logger.Debugf("Creating PR: %s -> %s", head, base)
+	c.Debugf("Creating PR: %s -> %s", head, base)
 
 	newPR := &github.NewPullRequest{
 		Title: github.Ptr(title),
@@ -1047,7 +1037,7 @@ func (c *Client) CreatePR(title, body, head, base string) (*git.PullRequest, err
 
 // CherryPickCommit cherry-picks a commit to a branch by applying only the changes from that commit
 func (c *Client) CherryPickCommit(commitSHA, targetBranch string) error {
-	c.logger.Debugf("Cherry-picking commit %s to branch %s", commitSHA, targetBranch)
+	c.Debugf("Cherry-picking commit %s to branch %s", commitSHA, targetBranch)
 
 	// 1. Get and validate the commit to cherry-pick
 	commit, parentSHA, err := c.prepareCommitForCherryPick(commitSHA)
@@ -1103,7 +1093,7 @@ func (c *Client) determineParentSHA(commit *github.Commit, commitSHA string) (st
 	parentSHA := commit.Parents[0].GetSHA()
 
 	if len(commit.Parents) > 1 {
-		c.logger.Infof("Cherry-picking merge commit %s (using first parent %s)", commitSHA, parentSHA)
+		c.Infof("Cherry-picking merge commit %s (using first parent %s)", commitSHA, parentSHA)
 	}
 
 	return parentSHA, nil
@@ -1193,7 +1183,7 @@ func (c *Client) createAndApplyCherryPickCommit(commit *github.Commit, newTree *
 		return fmt.Errorf("failed to update target branch: %w", err)
 	}
 
-	c.logger.Debugf("Cherry-pick successful, created commit: %s", createdCommit.GetSHA())
+	c.Debugf("Cherry-pick successful, created commit: %s", createdCommit.GetSHA())
 	return nil
 }
 

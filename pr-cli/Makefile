@@ -153,11 +153,11 @@ clean-mocks:
 
 ## all: Run all tasks (clean, build, test)
 .PHONY: all
-all: clean generate fmt vet test build
+all: clean generate fmt vet lint test build
 
 ## dev: Development workflow with mock generation
 .PHONY: dev
-dev: clean-mocks generate fmt vet test build
+dev: clean-mocks generate fmt vet lint test build
 
 # Docker variables
 DOCKER_IMAGE=build-harbor.alauda.cn/devps/toolbox/pr-cli

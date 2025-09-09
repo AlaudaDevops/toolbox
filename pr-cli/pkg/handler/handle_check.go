@@ -36,7 +36,7 @@ func (h *PRHandler) HandleCheck(args []string) error {
 
 // handleOriginalCheck executes the original check logic
 func (h *PRHandler) handleOriginalCheck() error {
-	h.Logger.Info("Checking LGTM status and check runs status")
+	h.Info("Checking LGTM status and check runs status")
 
 	// Get all LGTM votes to check current status
 	validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)

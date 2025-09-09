@@ -24,12 +24,12 @@ import (
 
 // HandleRebase rebases the PR branch
 func (h *PRHandler) HandleRebase(_ []string) error {
-	h.Logger.Info("Rebasing PR")
+	h.Info("Rebasing PR")
 
 	if err := h.client.RebasePR(); err != nil {
 		message := fmt.Sprintf(messages.RebaseFailedTemplate, err)
 		if postErr := h.client.PostComment(message); postErr != nil {
-			h.Logger.Errorf("Failed to post rebase error comment: %v", postErr)
+			h.Errorf("Failed to post rebase error comment: %v", postErr)
 			return fmt.Errorf("rebase failed: %w", err)
 		}
 		return &CommentedError{Err: err}

@@ -44,7 +44,11 @@ func init() {
 	rootCmd.Flags().StringVarP(&outputFormat, "output", "o", "text", "Output format for version (text|json)")
 
 	// Bind flags to viper for environment variable support
-	viper.BindPFlags(rootCmd.Flags())
+	if err := viper.BindPFlags(rootCmd.Flags()); err != nil {
+		// Log error but don't fail initialization
+		// This is typically a programming error rather than runtime error
+		panic("failed to bind flags: " + err.Error())
+	}
 }
 
 func initConfig() {

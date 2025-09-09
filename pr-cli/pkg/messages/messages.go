@@ -192,6 +192,20 @@ Failed to merge PR #%d: %v
 
 Please check the PR status and try again.`
 
+	MergeMultipleCommitsRebaseTemplate = `❌ **Cannot rebase merge: Multiple commits detected**
+
+This PR contains **%d commits**. Rebase merge is only allowed for PRs with a single commit to maintain clean history.
+
+**Options:**
+- Use ` + "`/merge squash`" + ` to squash all commits into one before merging
+- Use ` + "`/merge merge`" + ` to create a merge commit  
+- Squash your commits locally to a single commit and push
+
+**Current commits:**
+%s
+
+Please choose an alternative merge method or modify your PR to have only one commit.`
+
 	MergeSuccessTemplate = `🎉 **PR Successfully Merged!**
 
 **Merge details:**

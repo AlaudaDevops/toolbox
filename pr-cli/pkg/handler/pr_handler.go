@@ -104,7 +104,7 @@ func (h *PRHandler) generateLGTMStatusMessage(validVotes int, lgtmUsers map[stri
 	// Check check runs status
 	allPassed, failedChecks, err := h.client.CheckRunsStatus()
 	if err != nil {
-		h.Logger.Errorf("Failed to check run status: %v", err)
+		h.Errorf("Failed to check run status: %v", err)
 		// Continue without check runs status if there's an error
 		allPassed = true
 		failedChecks = nil
@@ -138,7 +138,7 @@ func (h *PRHandler) generateLGTMStatusMessage(validVotes int, lgtmUsers map[stri
 // GetCommentsWithCache retrieves all comments from the pull request with caching
 func (h *PRHandler) GetCommentsWithCache() ([]git.Comment, error) {
 	if h.commentsCache != nil {
-		h.Logger.Debugf("Using cached comments (%d comments)", len(h.commentsCache))
+		h.Debugf("Using cached comments (%d comments)", len(h.commentsCache))
 		return h.commentsCache, nil
 	}
 
@@ -148,7 +148,7 @@ func (h *PRHandler) GetCommentsWithCache() ([]git.Comment, error) {
 	}
 
 	h.commentsCache = comments
-	h.Logger.Debugf("Cached comments (%d comments)", len(h.commentsCache))
+	h.Debugf("Cached comments (%d comments)", len(h.commentsCache))
 	return comments, nil
 }
 

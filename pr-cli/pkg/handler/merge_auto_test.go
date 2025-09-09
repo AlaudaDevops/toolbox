@@ -44,10 +44,10 @@ func TestDetermineMergeMethod(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		args         []string
-		setupMock    func()
-		expected     string
+		name      string
+		args      []string
+		setupMock func()
+		expected  string
 	}{
 		{
 			name:     "should use explicit squash argument",
@@ -95,7 +95,7 @@ func TestDetermineMergeMethod(t *testing.T) {
 			if tt.setupMock != nil {
 				tt.setupMock()
 			}
-			
+
 			result := handler.determineMergeMethod(tt.args)
 			if result != tt.expected {
 				t.Errorf("expected %s, got %s", tt.expected, result)
@@ -120,40 +120,40 @@ func TestSelectAutoMergeMethod(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
+		name             string
 		availableMethods []string
-		apiError       error
-		expected       string
+		apiError         error
+		expected         string
 	}{
 		{
-			name:           "should select rebase when available",
+			name:             "should select rebase when available",
 			availableMethods: []string{"merge", "rebase", "squash"},
-			expected:       "rebase",
+			expected:         "rebase",
 		},
 		{
-			name:           "should select squash when rebase not available",
+			name:             "should select squash when rebase not available",
 			availableMethods: []string{"merge", "squash"},
-			expected:       "squash",
+			expected:         "squash",
 		},
 		{
-			name:           "should select merge when only merge available",
+			name:             "should select merge when only merge available",
 			availableMethods: []string{"merge"},
-			expected:       "merge",
+			expected:         "merge",
 		},
 		{
-			name:           "should fallback to squash when API fails",
-			apiError:       errors.New("API error"),
-			expected:       "squash",
+			name:     "should fallback to squash when API fails",
+			apiError: errors.New("API error"),
+			expected: "squash",
 		},
 		{
-			name:           "should fallback to squash when no methods available",
+			name:             "should fallback to squash when no methods available",
 			availableMethods: []string{},
-			expected:       "squash",
+			expected:         "squash",
 		},
 		{
-			name:           "should use first available method as fallback",
+			name:             "should use first available method as fallback",
 			availableMethods: []string{"custom"},
-			expected:       "custom",
+			expected:         "custom",
 		},
 	}
 

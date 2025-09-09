@@ -28,7 +28,7 @@ These commands can be directly triggered by PR comments and will automatically s
 | `/lgtm cancel` | Remove LGTM approval (alias) | - | `/lgtm cancel` |
 | `/remove-lgtm` | Remove LGTM approval | `[message]` | `/remove-lgtm` |
 | `/merge` | Merge the PR | `[method]` | `/merge` or `/merge squash` |
-| `/ready` | Merge the PR (alias for `/merge`) | `[method]` | `/ready` or `/ready squash` |
+| `/ready` | Merge the PR (alias for `/merge`) | `[method]` | `/ready` or `/ready auto` |
 | `/rebase` | Rebase the PR | - | `/rebase` |
 | `/check` | Check PR status or execute multiple commands | `[/cmd1 args... /cmd2 args...]` | `/check` or `/check /assign user1 /merge rebase` |
 | `/batch` | Execute multiple commands in batch mode | `/cmd1 args... [/cmd2 args...]` | `/batch /assign user1 /merge squash` |
@@ -71,6 +71,36 @@ Both `/check` and `/batch` commands support executing multiple commands in a sin
 - All commands use the same permissions as direct execution
 - Execution continues even if some commands fail
 
+## Merge Method Configuration
+
+### Auto Merge Method
+
+The `auto` merge method automatically selects the best available merge method based on repository configuration and capabilities. This is the default setting.
+
+**Selection Priority (high to low):**
+1. **rebase** - Preferred for clean commit history
+2. **squash** - Good for consolidating multiple commits
+3. **merge** - Fallback option with merge commit
+
+**How it works:**
+- The system queries the repository for available merge methods
+- Selects the highest priority method from those available
+- Falls back to `squash` if API call fails
+- Respects repository branch protection rules and settings
+
+**Examples:**
+```bash
+/merge              # Uses auto selection (default)
+/merge auto         # Explicitly uses auto selection
+/merge rebase       # Forces rebase method
+/ready auto         # Auto selection with ready command
+```
+
+**Benefits:**
+- Automatically adapts to repository configuration changes
+- Ensures optimal merge method without manual configuration
+- Maintains consistent behavior across different repositories
+
 ## Pipeline Configuration Parameters
 
 The Pipeline supports the following configurable parameters:
@@ -97,7 +127,7 @@ The Pipeline supports the following configurable parameters:
 | `lgtm_permissions` | `admin,write,read` | Permission levels required for LGTM, allow read permission for internal repositories |
 | `lgtm_threshold` | `1` | LGTM approval count threshold |
 | `lgtm_review_event` | `APPROVE` | LGTM review event type |
-| `merge_method` | `squash` | Default merge method |
+| `merge_method` | `auto` | Merge method (options: auto, merge, squash, rebase) |
 | `self_check_name` | `pr-manage` | Self-check name |
 | `platform` | `github` | The platform to use (github, gitlab, gitee) |
 | `debug` | `false` | Enable debug mode (skip validation, allow PR creator self-approval) |
@@ -198,9 +228,9 @@ spec:
     # - name: lgtm_review_event
     #   value: "APPROVE"
     #
-    # The merge method to use. Can be one of: merge, squash, rebase (default: squash)
+    # The merge method to use. Can be one of: auto, merge, squash, rebase (default: auto)
     # - name: merge_method
-    #   value: "squash"
+    #   value: "auto"
     #
     # The name used for self-check status (default: pr-manage)
     # - name: self_check_name
