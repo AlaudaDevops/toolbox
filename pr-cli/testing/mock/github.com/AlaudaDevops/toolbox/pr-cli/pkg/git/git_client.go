@@ -179,6 +179,21 @@ func (mr *MockGitClientMockRecorder) DismissApprove(arg0 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DismissApprove", reflect.TypeOf((*MockGitClient)(nil).DismissApprove), arg0)
 }
 
+// GetAvailableMergeMethods mocks base method.
+func (m *MockGitClient) GetAvailableMergeMethods() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAvailableMergeMethods")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAvailableMergeMethods indicates an expected call of GetAvailableMergeMethods.
+func (mr *MockGitClientMockRecorder) GetAvailableMergeMethods() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAvailableMergeMethods", reflect.TypeOf((*MockGitClient)(nil).GetAvailableMergeMethods))
+}
+
 // GetComments mocks base method.
 func (m *MockGitClient) GetComments() ([]git.Comment, error) {
 	m.ctrl.T.Helper()

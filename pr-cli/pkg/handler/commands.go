@@ -32,7 +32,7 @@ func IsBuiltInCommand(command string) bool {
 // ExecuteCommand executes a command with the given arguments
 // This is the unified command execution method used by regular, sub-command, and built-in command flows
 func (h *PRHandler) ExecuteCommand(command string, args []string) error {
-	h.Logger.Infof("Executing command: %s with args: %v", command, args)
+	h.Infof("Executing command: %s with args: %v", command, args)
 
 	// Handle built-in commands (commands starting with __)
 	if IsBuiltInCommand(command) {

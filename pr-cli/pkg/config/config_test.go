@@ -31,7 +31,7 @@ var _ = Describe("Config", func() {
 			Expect(cfg.Platform).To(Equal("github"))
 			Expect(cfg.LGTMThreshold).To(Equal(1))
 			Expect(cfg.LGTMReviewEvent).To(Equal("APPROVE"))
-			Expect(cfg.MergeMethod).To(Equal("squash"))
+			Expect(cfg.MergeMethod).To(Equal("auto"))
 			Expect(cfg.SelfCheckName).To(Equal("pr-cli"))
 			Expect(cfg.LogLevel).To(Equal("info"))
 		})

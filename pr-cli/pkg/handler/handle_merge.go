@@ -19,11 +19,15 @@ package handler
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
+
+// preferredMergeMethods defines the priority order for auto merge method selection
+var preferredMergeMethods = []string{"rebase", "squash", "merge"}
 
 // HandleMerge merges the PR if conditions are met
 func (h *PRHandler) HandleMerge(args []string) error {
@@ -63,7 +67,7 @@ func (h *PRHandler) validateMergePermissions() (string, error) {
 		return "", fmt.Errorf("failed to check user permissions: %w", err)
 	}
 
-	isPRCreator := h.config.CommentSender == h.prSender
+	isPRCreator := strings.EqualFold(h.config.CommentSender, h.prSender)
 	if !hasPermission && !isPRCreator {
 		return userPerm, h.postInsufficientPermissionsMessage(userPerm)
 	}
@@ -78,7 +82,7 @@ func (h *PRHandler) postInsufficientPermissionsMessage(userPerm string) error {
 		h.prSender, strings.Join(h.config.LGTMPermissions, ", "))
 
 	if err := h.client.PostComment(message); err != nil {
-		h.Logger.Errorf("Failed to post permission error comment: %v", err)
+		h.Errorf("Failed to post permission error comment: %v", err)
 		return fmt.Errorf("insufficient permissions")
 	}
 	return &CommentedError{Err: fmt.Errorf("insufficient permissions")}
@@ -105,7 +109,7 @@ func (h *PRHandler) postCheckRunsNotPassingMessage(failedChecks []git.CheckRun) 
 	message := fmt.Sprintf(messages.MergeChecksNotPassingTemplate, statusTable)
 
 	if err := h.client.PostComment(message); err != nil {
-		h.Logger.Errorf("Failed to post check status comment: %v", err)
+		h.Errorf("Failed to post check status comment: %v", err)
 		return fmt.Errorf("checks not passing")
 	}
 	return &CommentedError{Err: fmt.Errorf("checks not passing")}
@@ -126,7 +130,7 @@ func (h *PRHandler) convertToMessageCheckStatuses(failedChecks []git.CheckRun) [
 }
 
 // validateAndProcessLGTMVotes validates LGTM votes and processes admin/write user logic
-func (h *PRHandler) validateAndProcessLGTMVotes(userPerm string) (int, map[string]string, error) {
+func (h *PRHandler) validateAndProcessLGTMVotes(_ string) (int, map[string]string, error) {
 	validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
 	if err != nil {
 		return 0, nil, fmt.Errorf("failed to get LGTM votes: %w", err)
@@ -145,7 +149,7 @@ func (h *PRHandler) postNotEnoughLGTMMessage(validVotes int) error {
 		validVotes, h.config.LGTMThreshold, h.config.LGTMThreshold-validVotes)
 
 	if err := h.client.PostComment(message); err != nil {
-		h.Logger.Errorf("Failed to post LGTM status comment: %v", err)
+		h.Errorf("Failed to post LGTM status comment: %v", err)
 		return fmt.Errorf("not enough LGTM votes")
 	}
 	return &CommentedError{Err: fmt.Errorf("not enough LGTM votes")}
@@ -155,16 +159,60 @@ func (h *PRHandler) postNotEnoughLGTMMessage(validVotes int) error {
 func (h *PRHandler) determineMergeMethod(args []string) string {
 	method := h.config.MergeMethod
 	if len(args) > 0 {
-		if args[0] == "merge" || args[0] == "squash" || args[0] == "rebase" {
+		if args[0] == "merge" || args[0] == "squash" || args[0] == "rebase" || args[0] == "auto" {
 			method = args[0]
 		}
 	}
+
+	// If method is "auto", determine the best available method
+	if method == "auto" {
+		return h.selectAutoMergeMethod()
+	}
+
 	return method
+}
+
+// selectAutoMergeMethod selects the best available merge method automatically
+// Priority: rebase > squash > merge
+func (h *PRHandler) selectAutoMergeMethod() string {
+	availableMethods, err := h.client.GetAvailableMergeMethods()
+	if err != nil {
+		h.Warnf("Failed to get available merge methods, falling back to squash: %v", err)
+		return "squash"
+	}
+
+	h.Debugf("Available merge methods: %v", availableMethods)
+
+	// Check preferred methods in priority order
+	for _, preferred := range preferredMergeMethods {
+		if slices.Contains(availableMethods, preferred) {
+			h.Infof("Auto-selected merge method: %s", preferred)
+			return preferred
+		}
+	}
+
+	// Fallback to the first available method if none of the preferred methods are available
+	if len(availableMethods) > 0 {
+		method := availableMethods[0]
+		h.Infof("Auto-selected fallback merge method: %s", method)
+		return method
+	}
+
+	// Final fallback
+	h.Warn("No available merge methods found, falling back to squash")
+	return "squash"
 }
 
 // executeMerge performs the actual merge operation
 func (h *PRHandler) executeMerge(method string) error {
-	h.Logger.Infof("Merging PR with method: %s", method)
+	h.Infof("Merging PR with method: %s", method)
+
+	// Special validation for rebase merge method
+	if method == "rebase" {
+		if err := h.validateRebaseMerge(); err != nil {
+			return err
+		}
+	}
 
 	if err := h.client.MergePR(method); err != nil {
 		return h.postMergeFailedMessage(err)
@@ -173,12 +221,56 @@ func (h *PRHandler) executeMerge(method string) error {
 	return nil
 }
 
+// validateRebaseMerge checks if PR has only one commit for rebase merge
+func (h *PRHandler) validateRebaseMerge() error {
+	commits, err := h.client.GetCommits()
+	if err != nil {
+		h.Errorf("Failed to get commits for rebase validation: %v", err)
+		// Allow merge to proceed if we can't get commit count
+		return nil
+	}
+
+	if len(commits) > 1 {
+		return h.postMultipleCommitsRebaseMessage(commits)
+	}
+
+	h.Infof("Rebase validation passed: PR has %d commit(s)", len(commits))
+	return nil
+}
+
+// postMultipleCommitsRebaseMessage posts error message when rebase is not allowed due to multiple commits
+func (h *PRHandler) postMultipleCommitsRebaseMessage(commits []git.Commit) error {
+	// Build commits summary table
+	commitsTable := "\n| SHA | Message |\n|-----|----------|\n"
+	for _, commit := range commits {
+		// Truncate commit message to first line only for readability
+		firstLine := strings.Split(commit.Message, "\n")[0]
+		if len(firstLine) > 60 {
+			firstLine = firstLine[:57] + "..."
+		}
+		// Truncate SHA to 7 characters
+		shortSHA := commit.SHA
+		if len(shortSHA) > 7 {
+			shortSHA = shortSHA[:7]
+		}
+		commitsTable += fmt.Sprintf("| `%s` | %s |\n", shortSHA, firstLine)
+	}
+
+	message := fmt.Sprintf(messages.MergeMultipleCommitsRebaseTemplate, len(commits), commitsTable)
+
+	if err := h.client.PostComment(message); err != nil {
+		h.Errorf("Failed to post multiple commits rebase error comment: %v", err)
+		return fmt.Errorf("rebase not allowed: PR has %d commits, only single commit allowed", len(commits))
+	}
+	return &CommentedError{Err: fmt.Errorf("rebase not allowed: PR has %d commits, only single commit allowed", len(commits))}
+}
+
 // postMergeFailedMessage posts error message when merge fails
 func (h *PRHandler) postMergeFailedMessage(mergeErr error) error {
 	message := fmt.Sprintf(messages.MergeFailedTemplate, h.config.PRNum, mergeErr)
 
 	if postErr := h.client.PostComment(message); postErr != nil {
-		h.Logger.Errorf("Failed to post merge error comment: %v", postErr)
+		h.Errorf("Failed to post merge error comment: %v", postErr)
 		return fmt.Errorf("merge failed: %w", mergeErr)
 	}
 	return &CommentedError{Err: mergeErr}
@@ -220,14 +312,14 @@ func (h *PRHandler) checkForCherryPickComments() bool {
 	// Get all comments from the PR
 	comments, err := h.GetCommentsWithCache()
 	if err != nil {
-		h.Logger.Errorf("Failed to get comments for cherry-pick check: %v", err)
+		h.Errorf("Failed to get comments for cherry-pick check: %v", err)
 		return false
 	}
 
 	// Check if any comment contains cherry-pick commands
 	for _, comment := range comments {
 		if cherryPickPattern.MatchString(comment.Body) {
-			h.Logger.Infof("Found cherry-pick comment: %s", comment.Body)
+			h.Infof("Found cherry-pick comment: %s", comment.Body)
 			return true
 		}
 	}
@@ -242,7 +334,7 @@ var (
 // HandlePostMergeCherryPick processes any cherry-pick commands found in PR comments after merge
 // This is a public method that can be called independently for post-merge operations
 func (h *PRHandler) HandlePostMergeCherryPick() error {
-	h.Logger.Info("Checking for cherry-pick commands after merge")
+	h.Info("Checking for cherry-pick commands after merge")
 
 	// First check if PR is closed (merged or closed)
 	prInfo, err := h.client.GetPR()
@@ -251,11 +343,11 @@ func (h *PRHandler) HandlePostMergeCherryPick() error {
 	}
 
 	if prInfo.State == "open" {
-		h.Logger.Info("PR is still open, skipping post-merge cherry-pick operations")
+		h.Info("PR is still open, skipping post-merge cherry-pick operations")
 		return nil
 	}
 
-	h.Logger.Infof("PR is %s, proceeding with cherry-pick operations", prInfo.State)
+	h.Infof("PR is %s, proceeding with cherry-pick operations", prInfo.State)
 
 	// Get all comments from the PR
 	comments, err := h.GetCommentsWithCache()
@@ -271,15 +363,15 @@ func (h *PRHandler) HandlePostMergeCherryPick() error {
 		if len(matches) > 1 {
 			targetBranch := matches[1]
 			cherryPickBranches[targetBranch] = true
-			h.Logger.Infof("Found cherry-pick command for branch: %s", targetBranch)
+			h.Infof("Found cherry-pick command for branch: %s", targetBranch)
 		}
 	}
 
 	// Perform cherry-picks for each target branch
 	for targetBranch := range cherryPickBranches {
-		h.Logger.Infof("Performing cherry-pick to branch: %s", targetBranch)
+		h.Infof("Performing cherry-pick to branch: %s", targetBranch)
 		if err := h.performCherryPick(targetBranch); err != nil {
-			h.Logger.Errorf("Cherry-pick to %s failed: %v", targetBranch, err)
+			h.Errorf("Cherry-pick to %s failed: %v", targetBranch, err)
 			// Continue with other cherry-picks even if one fails
 			continue
 		}

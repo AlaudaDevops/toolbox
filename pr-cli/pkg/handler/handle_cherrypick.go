@@ -41,7 +41,7 @@ func (h *PRHandler) HandleCherrypick(args []string) error {
 	}
 
 	// Allow cherrypick if user has write permission OR is the PR creator
-	isPRCreator := h.config.CommentSender == h.prSender
+	isPRCreator := strings.EqualFold(h.config.CommentSender, h.prSender)
 	if !hasPermission && !isPRCreator {
 		message := fmt.Sprintf(messages.CherryPickInsufficientPermissionsTemplate,
 			h.config.CommentSender, userPerm, strings.Join(h.config.LGTMPermissions, ", "), h.prSender, strings.Join(h.config.LGTMPermissions, ", "))
@@ -83,7 +83,7 @@ func (h *PRHandler) createCherrypickPR(prInfo *git.PullRequest, targetBranch str
 	// 3. Create a new PR from the new branch to the target branch
 
 	// Perform the actual cherry-pick operation
-	h.Logger.Infof("Creating cherrypick for PR %d, state: %s, merged: %t", h.config.PRNum, prInfo.State, prInfo.Merged)
+	h.Infof("Creating cherrypick for PR %d, state: %s, merged: %t", h.config.PRNum, prInfo.State, prInfo.Merged)
 	return h.performCherryPick(targetBranch)
 }
 
@@ -95,24 +95,24 @@ func (h *PRHandler) scheduleCherrypick(_ *git.PullRequest, targetBranch string) 
 
 // performCherryPick executes a cherry-pick operation to the specified branch
 func (h *PRHandler) performCherryPick(targetBranch string) error {
-	h.Logger.Infof("Starting cherry-pick operation to %s", targetBranch)
+	h.Infof("Starting cherry-pick operation to %s", targetBranch)
 
 	// Get the current PR information to get the merged commit
 	prInfo, err := h.client.GetPR()
 	if err != nil {
-		h.Logger.Errorf("Failed to get PR info for cherry-pick: %v", err)
+		h.Errorf("Failed to get PR info for cherry-pick: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to get PR information: %v", err))
 	}
 
 	// Get commits from the PR to cherry-pick
 	commits, err := h.client.GetCommits()
 	if err != nil {
-		h.Logger.Errorf("Failed to get commits for cherry-pick: %v", err)
+		h.Errorf("Failed to get commits for cherry-pick: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to get PR commits: %v", err))
 	}
 
 	if len(commits) == 0 {
-		h.Logger.Errorf("No commits found in PR for cherry-pick")
+		h.Errorf("No commits found in PR for cherry-pick")
 		return h.postCherryPickError(targetBranch, "No commits found in PR")
 	}
 
@@ -132,7 +132,7 @@ func (h *PRHandler) performCherryPick(targetBranch string) error {
 
 // performCherryPickWithGitCLI uses Git CLI for more reliable cherry-pick operations
 func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBranch string, prInfo *git.PullRequest) error {
-	h.Logger.Infof("Using Git CLI for cherry-pick operation to %s with %d commits", targetBranch, len(commits))
+	h.Infof("Using Git CLI for cherry-pick operation to %s with %d commits", targetBranch, len(commits))
 
 	// Use the last commit SHA for branch naming (consistent with API approach)
 	lastCommit := commits[len(commits)-1]
@@ -148,13 +148,13 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 		h.config.PRNum,
 	)
 	if err != nil {
-		h.Logger.Errorf("Failed to create cherrypicker: %v", err)
+		h.Errorf("Failed to create cherrypicker: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to create cherrypicker: %v", err))
 	}
 
 	// Perform the cherry-pick operation for all commits
 	if err = cherryPicker.CherryPickCommits(commits, targetBranch); err != nil {
-		h.Logger.Errorf("Failed to cherry-pick with Git CLI: %v", err)
+		h.Errorf("Failed to cherry-pick with Git CLI: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to cherry-pick with Git CLI: %v", err))
 	}
 
@@ -168,11 +168,11 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 
 	newPR, err := h.client.CreatePR(title, body, branchName, targetBranch)
 	if err != nil {
-		h.Logger.Errorf("Failed to create cherry-pick PR: %v", err)
+		h.Errorf("Failed to create cherry-pick PR: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to create PR: %v", err))
 	}
 
-	h.Logger.Infof("Created cherry-pick PR #%d", newPR.Number)
+	h.Infof("Created cherry-pick PR #%d", newPR.Number)
 
 	// Success message for Git CLI approach
 	message := fmt.Sprintf(messages.CherryPickSuccessTemplate,
@@ -182,7 +182,7 @@ func (h *PRHandler) performCherryPickWithGitCLI(commits []git.Commit, targetBran
 
 // performCherryPickWithAPI uses the original API-based cherry-pick approach
 func (h *PRHandler) performCherryPickWithAPI(commits []git.Commit, targetBranch string, prInfo *git.PullRequest) error {
-	h.Logger.Infof("Using API method for cherry-pick operation to %s", targetBranch)
+	h.Infof("Using API method for cherry-pick operation to %s", targetBranch)
 
 	// Generate a unique branch name for the cherry-pick
 	// Use the last commit SHA for consistency with Git CLI approach
@@ -191,17 +191,17 @@ func (h *PRHandler) performCherryPickWithAPI(commits []git.Commit, targetBranch 
 
 	// Create a new branch from the target branch
 	if err := h.client.CreateBranch(cherryPickBranch, targetBranch); err != nil {
-		h.Logger.Errorf("Failed to create cherry-pick branch: %v", err)
+		h.Errorf("Failed to create cherry-pick branch: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to create branch %s: %v", cherryPickBranch, err))
 	}
 
-	h.Logger.Infof("Created cherry-pick branch: %s", cherryPickBranch)
+	h.Infof("Created cherry-pick branch: %s", cherryPickBranch)
 
 	// Cherry-pick all commits from the PR to the new branch
 	for _, commit := range commits {
-		h.Logger.Infof("Cherry-picking commit %s", commit.SHA)
+		h.Infof("Cherry-picking commit %s", commit.SHA)
 		if err := h.client.CherryPickCommit(commit.SHA, cherryPickBranch); err != nil {
-			h.Logger.Errorf("Failed to cherry-pick commit %s: %v", commit.SHA, err)
+			h.Errorf("Failed to cherry-pick commit %s: %v", commit.SHA, err)
 			return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to cherry-pick commit %s: %v", commit.SHA, err))
 		}
 	}
@@ -213,11 +213,11 @@ func (h *PRHandler) performCherryPickWithAPI(commits []git.Commit, targetBranch 
 
 	newPR, err := h.client.CreatePR(title, body, cherryPickBranch, targetBranch)
 	if err != nil {
-		h.Logger.Errorf("Failed to create cherry-pick PR: %v", err)
+		h.Errorf("Failed to create cherry-pick PR: %v", err)
 		return h.postCherryPickError(targetBranch, fmt.Sprintf("Failed to create PR: %v", err))
 	}
 
-	h.Logger.Infof("Created cherry-pick PR #%d", newPR.Number)
+	h.Infof("Created cherry-pick PR #%d", newPR.Number)
 
 	// Post success message
 	message := fmt.Sprintf(messages.CherryPickSuccessTemplate,

@@ -29,7 +29,7 @@ func (h *PRHandler) HandleUnassign(users []string) error {
 		return fmt.Errorf("no users specified for unassignment")
 	}
 
-	h.Logger.Infof("Unassigning users: %v", users)
+	h.Infof("Unassigning users: %v", users)
 
 	if err := h.client.RemoveReviewers(users); err != nil {
 		return fmt.Errorf("failed to remove reviewers: %w", err)

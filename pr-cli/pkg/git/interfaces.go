@@ -112,6 +112,8 @@ type GitClient interface {
 	MergePR(method string) error
 	// RebasePR updates the PR branch with the base branch
 	RebasePR() error
+	// GetAvailableMergeMethods retrieves the available merge methods for the pull request
+	GetAvailableMergeMethods() ([]string, error)
 
 	// CheckRunsStatus checks if all check runs are successful
 	CheckRunsStatus() (bool, []CheckRun, error)

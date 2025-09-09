@@ -29,14 +29,14 @@ func (h *PRHandler) HandleAssign(users []string) error {
 		return fmt.Errorf("no users specified for assignment")
 	}
 
-	h.Logger.Infof("Assigning users: %v", users)
+	h.Infof("Assigning users: %v", users)
 
 	// Get current reviewers for debugging
 	currentReviewers, err := h.client.GetRequestedReviewers()
 	if err != nil {
-		h.Logger.Warnf("Failed to get current reviewers: %v", err)
+		h.Warnf("Failed to get current reviewers: %v", err)
 	} else {
-		h.Logger.Infof("Current requested reviewers: %v", currentReviewers)
+		h.Infof("Current requested reviewers: %v", currentReviewers)
 	}
 
 	if err = h.client.AssignReviewers(users); err != nil {
@@ -46,9 +46,9 @@ func (h *PRHandler) HandleAssign(users []string) error {
 	// Get updated reviewers for verification
 	updatedReviewers, err := h.client.GetRequestedReviewers()
 	if err != nil {
-		h.Logger.Warnf("Failed to get updated reviewers: %v", err)
+		h.Warnf("Failed to get updated reviewers: %v", err)
 	} else {
-		h.Logger.Infof("Updated requested reviewers: %v", updatedReviewers)
+		h.Infof("Updated requested reviewers: %v", updatedReviewers)
 	}
 
 	// Create friendly message with @username format

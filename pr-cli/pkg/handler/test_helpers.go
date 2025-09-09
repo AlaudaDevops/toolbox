@@ -16,24 +16,19 @@ limitations under the License.
 
 package handler
 
-import (
-	"fmt"
+// Test helper methods to expose private functions for testing
 
-	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
-)
+// ExposedDetermineMergeMethod exposes determineMergeMethod for testing
+func (h *PRHandler) ExposedDetermineMergeMethod(args []string) string {
+	return h.determineMergeMethod(args)
+}
 
-// HandleRebase rebases the PR branch
-func (h *PRHandler) HandleRebase(_ []string) error {
-	h.Info("Rebasing PR")
+// ExposedSelectAutoMergeMethod exposes selectAutoMergeMethod for testing
+func (h *PRHandler) ExposedSelectAutoMergeMethod() string {
+	return h.selectAutoMergeMethod()
+}
 
-	if err := h.client.RebasePR(); err != nil {
-		message := fmt.Sprintf(messages.RebaseFailedTemplate, err)
-		if postErr := h.client.PostComment(message); postErr != nil {
-			h.Errorf("Failed to post rebase error comment: %v", postErr)
-			return fmt.Errorf("rebase failed: %w", err)
-		}
-		return &CommentedError{Err: err}
-	}
-
-	return h.client.PostComment(messages.RebaseSuccessTemplate)
+// ExposedValidateRebaseMerge exposes validateRebaseMerge for testing
+func (h *PRHandler) ExposedValidateRebaseMerge() error {
+	return h.validateRebaseMerge()
 }

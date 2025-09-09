@@ -111,6 +111,10 @@ func (c *Client) RebasePR() error {
 	return fmt.Errorf("GitLab implementation not yet available")
 }
 
+func (c *Client) GetAvailableMergeMethods() ([]string, error) {
+	return nil, fmt.Errorf("GitLab implementation not yet available")
+}
+
 func (c *Client) CheckRunsStatus() (bool, []git.CheckRun, error) {
 	return false, nil, fmt.Errorf("GitLab implementation not yet available")
 }

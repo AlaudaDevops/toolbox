@@ -71,7 +71,7 @@ func NewDefaultConfig() *Config {
 		LGTMThreshold:          1,
 		LGTMPermissions:        []string{"admin", "write"},
 		LGTMReviewEvent:        "APPROVE",
-		MergeMethod:            "squash",
+		MergeMethod:            "auto",
 		SelfCheckName:          "pr-cli",
 		LogLevel:               "info",
 		UseGitCLIForCherryPick: true, // Default to Git CLI method for backward compatibility

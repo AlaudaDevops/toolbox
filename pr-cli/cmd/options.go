@@ -73,7 +73,7 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&p.robotAccountsStr, "robot-accounts", "", "Robot/bot account usernames (comma-separated) for managing bot approval reviews")
 
 	// Merge configuration
-	flags.StringVar(&p.Config.MergeMethod, "merge-method", p.Config.MergeMethod, "Default merge method (merge, squash, rebase)")
+	flags.StringVar(&p.Config.MergeMethod, "merge-method", p.Config.MergeMethod, "Merge method (default: auto, options: auto, merge, squash, rebase)")
 
 	// Check configuration
 	flags.StringVar(&p.Config.SelfCheckName, "self-check-name", p.Config.SelfCheckName, "Name of the tool's own check run to exclude from status checks")
@@ -100,9 +100,9 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to parse command: %w", err)
 	}
 
-	p.Logger.Infof("Processing command: %s with args: %v", command, cmdArgs)
+	p.Infof("Processing command: %s with args: %v", command, cmdArgs)
 	if p.Config.Verbose {
-		p.Logger.Debugf("Processing PR %d, config: %s", p.Config.PRNum, p.Config.DebugString())
+		p.Debugf("Processing PR %d, config: %s", p.Config.PRNum, p.Config.DebugString())
 	}
 
 	// Initialize PR handler
@@ -124,7 +124,10 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 // This includes environment variables with PR_ prefix
 func (p *PROption) readAllFromViper() {
 	// Use viper.Unmarshal to automatically map all values to the config struct
-	viper.Unmarshal(p.Config)
+	if err := viper.Unmarshal(p.Config); err != nil {
+		// Log warning but continue - this shouldn't prevent the application from running
+		p.Warnf("Failed to unmarshal config from viper: %v", err)
+	}
 
 	// Clean up string values by trimming whitespace and newlines
 	p.Config.Platform = strings.TrimSpace(p.Config.Platform)
@@ -262,7 +265,7 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 	// Check if any comment from the comment-sender contains the trigger-comment
 	found := false
 	for _, comment := range comments {
-		if comment.User.Login == p.Config.CommentSender &&
+		if strings.EqualFold(comment.User.Login, p.Config.CommentSender) &&
 			(comment.Body == p.Config.TriggerComment || strings.Contains(comment.Body, p.Config.TriggerComment)) {
 			found = true
 			break
@@ -273,7 +276,7 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 		return fmt.Errorf("comment sender '%s' did not post a comment containing '%s'", p.Config.CommentSender, p.Config.TriggerComment)
 	}
 
-	p.Logger.Infof("Comment sender validation passed: %s posted a comment containing the trigger", p.Config.CommentSender)
+	p.Infof("Comment sender validation passed: %s posted a comment containing the trigger", p.Config.CommentSender)
 	return nil
 }
 
@@ -289,10 +292,10 @@ func (p *PROption) initialize() error {
 
 	// Set log level based on verbose flag
 	if p.Config.Verbose {
-		p.Logger.SetLevel(logrus.DebugLevel)
-		p.Logger.Debug("Verbose logging enabled")
+		p.SetLevel(logrus.DebugLevel)
+		p.Debug("Verbose logging enabled")
 	} else {
-		p.Logger.SetLevel(logrus.InfoLevel)
+		p.SetLevel(logrus.InfoLevel)
 	}
 
 	// Validate configuration
@@ -305,7 +308,7 @@ func (p *PROption) initialize() error {
 
 // executeBuiltInCommand handles execution of built-in commands
 func (p *PROption) executeBuiltInCommand(prHandler *handler.PRHandler, command string, cmdArgs []string) error {
-	p.Logger.Infof("Executing built-in command: %s", command)
+	p.Infof("Executing built-in command: %s", command)
 
 	// Built-in commands skip comment sender validation
 	// Execute built-in command using unified method
@@ -313,7 +316,7 @@ func (p *PROption) executeBuiltInCommand(prHandler *handler.PRHandler, command s
 
 	// Handle error for built-in commands (may not want to post comments for internal commands)
 	if err != nil {
-		p.Logger.Errorf("Built-in command %s failed: %v", command, err)
+		p.Errorf("Built-in command %s failed: %v", command, err)
 		// For built-in commands, we typically don't post error comments to PR
 		// as they are internal system operations
 		return fmt.Errorf("built-in command failed: %w", err)
@@ -324,7 +327,7 @@ func (p *PROption) executeBuiltInCommand(prHandler *handler.PRHandler, command s
 
 // executeRegularCommand handles execution of regular user commands
 func (p *PROption) executeRegularCommand(prHandler *handler.PRHandler, command string, cmdArgs []string) error {
-	p.Logger.Infof("Executing regular command: %s", command)
+	p.Infof("Executing regular command: %s", command)
 
 	// Check if PR is open and get PR information to retrieve the author
 	// Skip status check for commands that can work with closed PRs
@@ -346,7 +349,7 @@ func (p *PROption) executeRegularCommand(prHandler *handler.PRHandler, command s
 
 	// If command execution failed, try to post error as comment
 	if err != nil {
-		p.Logger.Errorf("Command %s failed: %v", command, err)
+		p.Errorf("Command %s failed: %v", command, err)
 		return p.handleCommandError(prHandler, command, err)
 	}
 
@@ -359,7 +362,7 @@ func (p *PROption) handleCommandError(prHandler *handler.PRHandler, command stri
 	var commentedErr *handler.CommentedError
 	if errors.As(err, &commentedErr) {
 		// Comment already posted, just log and return nil to avoid terminal error
-		p.Logger.Infof("Error comment already posted for command: %s", command)
+		p.Infof("Error comment already posted for command: %s", command)
 		return nil
 	}
 
@@ -368,11 +371,11 @@ func (p *PROption) handleCommandError(prHandler *handler.PRHandler, command stri
 	// Try to post error message as PR comment
 	if commentErr := prHandler.PostComment(errorMessage); commentErr != nil {
 		// If we can't post the comment, return the original error plus comment error
-		p.Logger.Errorf("Failed to post error comment: %v", commentErr)
+		p.Errorf("Failed to post error comment: %v", commentErr)
 		return fmt.Errorf("command failed: %w (and failed to post error comment: %v)", err, commentErr)
 	}
 
 	// Successfully posted error as comment, return nil to avoid terminal error
-	p.Logger.Infof("Posted command error as PR comment for command: %s", command)
+	p.Infof("Posted command error as PR comment for command: %s", command)
 	return nil
 }

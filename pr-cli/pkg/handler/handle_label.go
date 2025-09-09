@@ -27,14 +27,14 @@ func (h *PRHandler) HandleLabel(labels []string) error {
 		return fmt.Errorf("no labels specified")
 	}
 
-	h.Logger.Infof("Adding labels: %v", labels)
+	h.Infof("Adding labels: %v", labels)
 
 	// Get current labels for debugging
 	currentLabels, err := h.client.GetLabels()
 	if err != nil {
-		h.Logger.Warnf("Failed to get current labels: %v", err)
+		h.Warnf("Failed to get current labels: %v", err)
 	} else {
-		h.Logger.Infof("Current labels: %v", currentLabels)
+		h.Infof("Current labels: %v", currentLabels)
 	}
 
 	if err = h.client.AddLabels(labels); err != nil {
@@ -44,9 +44,9 @@ func (h *PRHandler) HandleLabel(labels []string) error {
 	// Get updated labels for verification
 	updatedLabels, err := h.client.GetLabels()
 	if err != nil {
-		h.Logger.Warnf("Failed to get updated labels: %v", err)
+		h.Warnf("Failed to get updated labels: %v", err)
 	} else {
-		h.Logger.Infof("Updated labels: %v", updatedLabels)
+		h.Infof("Updated labels: %v", updatedLabels)
 	}
 
 	// Create friendly message

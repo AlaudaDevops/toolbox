@@ -25,12 +25,12 @@ import (
 
 // HandleLGTM processes LGTM votes and approves PR if threshold is met
 func (h *PRHandler) HandleLGTM(_ []string) error {
-	h.Logger.Info("Processing LGTM")
+	h.Info("Processing LGTM")
 
 	// Check if the comment sender is the PR author (not in debug mode)
-	if h.config.CommentSender == h.prSender && !h.config.Debug {
+	if strings.EqualFold(h.config.CommentSender, h.prSender) && !h.config.Debug {
 		// PR author is trying to LGTM their own PR - post informational message with status
-		h.Logger.Infof("PR author %s attempted to LGTM their own PR", h.config.CommentSender)
+		h.Infof("PR author %s attempted to LGTM their own PR", h.config.CommentSender)
 
 		// Get current LGTM status to include in the message
 		validVotes, lgtmUsers, err := h.GetLGTMVotes(h.config.LGTMPermissions, h.config.Debug)
@@ -75,7 +75,7 @@ func (h *PRHandler) HandleLGTM(_ []string) error {
 			return fmt.Errorf("failed to approve PR: %w", err)
 		}
 
-		h.Logger.Infof("✅ PR approved with LGTM votes from user %s (permission: %s)", h.config.CommentSender, userPermission)
+		h.Infof("✅ PR approved with LGTM votes from user %s (permission: %s)", h.config.CommentSender, userPermission)
 		return nil
 	}
 
