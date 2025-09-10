@@ -80,6 +80,7 @@ Quick reference for all available PR comment commands:
 | `/remove-lgtm` | Remove LGTM approval | `[message]` | `/remove-lgtm` |
 | `/merge` | Merge the PR | `[method]` | `/merge` or `/merge squash` |
 | `/ready` | Merge the PR (alias for `/merge`) | `[method]` | `/ready` or `/ready squash` |
+| `/close` | Close the PR without merging | - | `/close` |
 | `/rebase` | Rebase the PR | - | `/rebase` |
 | `/check` | Check PR status or execute multiple commands | `[/cmd1 args... /cmd2 args...]` | `/check` or `/check /assign user1 /merge rebase` |
 | `/batch` | Execute multiple commands in batch mode | `/cmd1 args... [/cmd2 args...]` | `/batch /assign user1 /merge squash` |

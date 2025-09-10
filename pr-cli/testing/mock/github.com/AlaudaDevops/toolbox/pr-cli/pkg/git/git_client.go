@@ -136,6 +136,20 @@ func (mr *MockGitClientMockRecorder) CherryPickCommit(arg0, arg1 interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CherryPickCommit", reflect.TypeOf((*MockGitClient)(nil).CherryPickCommit), arg0, arg1)
 }
 
+// ClosePR mocks base method.
+func (m *MockGitClient) ClosePR() error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClosePR")
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClosePR indicates an expected call of ClosePR.
+func (mr *MockGitClientMockRecorder) ClosePR() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClosePR", reflect.TypeOf((*MockGitClient)(nil).ClosePR))
+}
+
 // CreateBranch mocks base method.
 func (m *MockGitClient) CreateBranch(arg0, arg1 string) error {
 	m.ctrl.T.Helper()

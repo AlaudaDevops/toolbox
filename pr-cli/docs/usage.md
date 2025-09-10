@@ -137,6 +137,26 @@ pr-cli --merge-method rebase --trigger-comment "/merge"
 - All status checks passing
 - PR is in mergeable state
 
+#### `/close`
+
+Close the pull request without merging.
+
+**Syntax:**
+```
+/close
+```
+
+**Example:**
+```bash
+pr-cli --trigger-comment "/close"
+```
+
+**Behavior:**
+- Closes the PR without merging it
+- Checks if PR is already closed and provides appropriate feedback
+- Posts a confirmation comment when successfully closed
+- Cannot be undone through pr-cli (must be reopened manually through the platform)
+
 #### `/rebase`
 
 Rebase the pull request against the target branch.
@@ -202,6 +222,9 @@ pr-cli --trigger-comment "/batch /label bug enhancement /assign reviewer1"
 
 # Complex workflow: assign, label, and merge
 pr-cli --trigger-comment "/batch /assign user1 /label ready /merge rebase"
+
+# Close PR without merging (useful for rejecting changes)
+pr-cli --trigger-comment "/batch /label wontfix /close"
 ```
 
 **Supported Commands:**
@@ -210,6 +233,7 @@ The `/batch` command can execute most PR management commands in sequence:
 - `/unassign` - Remove reviewers
 - `/merge` - Merge the PR
 - `/ready` - Merge the PR (alias)
+- `/close` - Close the PR without merging
 - `/rebase` - Rebase the PR
 - `/label` - Add labels
 - `/unlabel` - Remove labels
@@ -427,6 +451,13 @@ Error: Cannot merge PR. Status checks are failing:
 **Already Merged:**
 ```
 Error: Pull request #123 is already merged
+```
+
+**Already Closed:**
+```
+❌ PR #123 is already closed
+
+Cannot close a PR that is already in closed state.
 ```
 
 ### Recovery Strategies

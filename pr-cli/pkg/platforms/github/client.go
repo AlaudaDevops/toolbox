@@ -715,6 +715,17 @@ func (c *Client) MergePR(method string) error {
 	return err
 }
 
+// ClosePR closes the pull request without merging
+func (c *Client) ClosePR() error {
+	closed := "closed"
+	pullRequest := &github.PullRequest{
+		State: &closed,
+	}
+
+	_, _, err := c.client.PullRequests.Edit(c.ctx, c.owner, c.repo, c.prNum, pullRequest)
+	return err
+}
+
 // RebasePR updates the PR branch with the base branch
 func (c *Client) RebasePR() error {
 	_, _, err := c.client.PullRequests.UpdateBranch(c.ctx, c.owner, c.repo, c.prNum, nil)

@@ -107,6 +107,10 @@ func (c *Client) MergePR(method string) error {
 	return fmt.Errorf("GitLab implementation not yet available")
 }
 
+func (c *Client) ClosePR() error {
+	return fmt.Errorf("GitLab implementation not yet available")
+}
+
 func (c *Client) RebasePR() error {
 	return fmt.Errorf("GitLab implementation not yet available")
 }
