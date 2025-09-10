@@ -1,5 +1,5 @@
 # use curl to download cli
-ARG BUILDER_IMAGE=build-harbor.alauda.cn/ops/photon:5-alauda-202507071048
+ARG BUILDER_IMAGE=build-harbor.alauda.cn/ops/photon:5-alauda-202509101100
 ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202502271510
 FROM ${BUILDER_IMAGE} AS download
 
