@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
@@ -137,7 +138,7 @@ func (p *PROption) readAllFromViper() {
 	p.Config.Owner = strings.TrimSpace(p.Config.Owner)
 	p.Config.Repo = strings.TrimSpace(p.Config.Repo)
 	p.Config.CommentSender = strings.TrimSpace(p.Config.CommentSender)
-	p.Config.TriggerComment = strings.TrimSpace(p.Config.TriggerComment)
+	p.Config.TriggerComment = comment.Normalize(p.Config.TriggerComment)
 	p.Config.LGTMReviewEvent = strings.TrimSpace(p.Config.LGTMReviewEvent)
 	p.Config.MergeMethod = strings.TrimSpace(p.Config.MergeMethod)
 	p.Config.SelfCheckName = strings.TrimSpace(p.Config.SelfCheckName)
@@ -193,20 +194,20 @@ func (p *PROption) parseStringFields() error {
 
 var (
 	// Match pattern: /command [args...] or /__built-in-command [args...]
-	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-pick|cherrypick|assign|merge|ready|unassign|label|unlabel|check|retest|batch)\s*(.*)$`)
+	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-pick|cherrypick|assign|merge|ready|unassign|label|unlabel|check|retest|close|batch)\s*(.*)$`)
 	// Match pattern for built-in commands: /__command [args...]
 	builtInCommandRegexp = regexp.MustCompile(`^/(__[a-z-_]+)\s*(.*)$`)
 )
 
 // parseCommand parses the trigger comment to extract command and arguments
-func (p *PROption) parseCommand(comment string) (string, []string, error) {
-	comment = strings.TrimSpace(comment)
-	if !strings.HasPrefix(comment, "/") {
+func (p *PROption) parseCommand(commentStr string) (string, []string, error) {
+	commentStr = comment.Normalize(commentStr)
+	if !strings.HasPrefix(commentStr, "/") {
 		return "", nil, fmt.Errorf("comment must start with /")
 	}
 
 	// Try to match built-in commands first (/__command)
-	if builtInMatches := builtInCommandRegexp.FindStringSubmatch(comment); len(builtInMatches) >= 2 {
+	if builtInMatches := builtInCommandRegexp.FindStringSubmatch(commentStr); len(builtInMatches) >= 2 {
 		command := builtInMatches[1] // Built-in command with __ prefix already captured
 		argsStr := strings.TrimSpace(builtInMatches[2])
 
@@ -219,7 +220,7 @@ func (p *PROption) parseCommand(comment string) (string, []string, error) {
 	}
 
 	// Try to match regular commands (/command)
-	matches := commentRegexp.FindStringSubmatch(comment)
+	matches := commentRegexp.FindStringSubmatch(commentStr)
 	if len(matches) < 2 {
 		return "", nil, fmt.Errorf("invalid command format")
 	}
@@ -262,18 +263,26 @@ func (p *PROption) validateCommentSender(prHandler *handler.PRHandler) error {
 		return fmt.Errorf("failed to get PR comments: %w", err)
 	}
 
+	// Normalize the trigger comment for comparison
+	normalizedTrigger := comment.Normalize(p.Config.TriggerComment)
+
 	// Check if any comment from the comment-sender contains the trigger-comment
 	found := false
-	for _, comment := range comments {
-		if strings.EqualFold(comment.User.Login, p.Config.CommentSender) &&
-			(comment.Body == p.Config.TriggerComment || strings.Contains(comment.Body, p.Config.TriggerComment)) {
-			found = true
-			break
+	for _, commentObj := range comments {
+		if strings.EqualFold(commentObj.User.Login, p.Config.CommentSender) {
+			// Normalize the comment body for comparison
+			normalizedCommentBody := comment.Normalize(commentObj.Body)
+
+			// Check for exact match or if the normalized trigger is contained in the normalized comment
+			if normalizedCommentBody == normalizedTrigger || strings.Contains(normalizedCommentBody, normalizedTrigger) {
+				found = true
+				break
+			}
 		}
 	}
 
 	if !found {
-		return fmt.Errorf("comment sender '%s' did not post a comment containing '%s'", p.Config.CommentSender, p.Config.TriggerComment)
+		return fmt.Errorf("comment sender '%s' did not post a comment containing '%s'", p.Config.CommentSender, normalizedTrigger)
 	}
 
 	p.Infof("Comment sender validation passed: %s posted a comment containing the trigger", p.Config.CommentSender)
