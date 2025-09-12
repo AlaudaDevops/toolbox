@@ -126,9 +126,9 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/api v0.32.9 // indirect
-	k8s.io/apiextensions-apiserver v0.32.7 // indirect
+	k8s.io/apiextensions-apiserver v0.32.9 // indirect
 	k8s.io/apimachinery v0.32.9 // indirect
-	k8s.io/cli-runtime v0.32.7 // indirect
+	k8s.io/cli-runtime v0.32.9 // indirect
 	k8s.io/client-go v0.32.9 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 // indirect
