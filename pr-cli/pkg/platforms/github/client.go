@@ -23,6 +23,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
 	"github.com/google/go-github/v74/github"
 	"github.com/sirupsen/logrus"
@@ -457,7 +458,7 @@ func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser strin
 
 	for i := len(comments) - 1; i >= 0; i-- {
 		if strings.EqualFold(comments[i].User.Login, ignoreUser) {
-			body := strings.TrimSpace(comments[i].Body)
+			body := comment.Normalize(comments[i].Body)
 			if removeLgtmRegexp.MatchString(body) {
 				c.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
 				return i
@@ -470,9 +471,9 @@ func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser strin
 }
 
 // processLGTMComment processes a single LGTM-related comment
-func (c *Client) processLGTMComment(comment git.Comment, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
-	user := strings.ToLower(comment.User.Login)
-	body := strings.TrimSpace(comment.Body)
+func (c *Client) processLGTMComment(commentObj git.Comment, lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, debugMode bool) {
+	user := strings.ToLower(commentObj.User.Login)
+	body := comment.Normalize(commentObj.Body)
 
 	switch {
 	case removeLgtmRegexp.MatchString(body):
@@ -712,6 +713,17 @@ func (c *Client) MergePR(method string) error {
 	}
 
 	_, _, err := c.client.PullRequests.Merge(c.ctx, c.owner, c.repo, c.prNum, "", options)
+	return err
+}
+
+// ClosePR closes the pull request without merging
+func (c *Client) ClosePR() error {
+	closed := "closed"
+	pullRequest := &github.PullRequest{
+		State: &closed,
+	}
+
+	_, _, err := c.client.PullRequests.Edit(c.ctx, c.owner, c.repo, c.prNum, pullRequest)
 	return err
 }
 

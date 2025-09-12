@@ -58,6 +58,7 @@ func (h *PRHandler) getCommandHandler(command string) CommandHandler {
 		"remove-lgtm": h.HandleRemoveLGTM,
 		"merge":       h.HandleMerge,
 		"ready":       h.HandleMerge, // alias for merge
+		"close":       h.HandleClose,
 		"rebase":      h.HandleRebase,
 		"check":       h.HandleCheck,
 		"batch":       h.HandleBatch,

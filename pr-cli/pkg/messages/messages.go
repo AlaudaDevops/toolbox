@@ -47,6 +47,7 @@ Available commands for managing this Pull Request:
 | **batch** | `+"`/batch /cmd1 args... /cmd2 args...`"+` | Execute multiple commands in batch mode | `+"`/batch /assign user1 /merge squash`"+` |
 | **merge** | `+"`/merge [method]`"+` | Merge the PR after checking permissions, checks, and LGTM status | `+"`/merge squash`"+` |
 | **ready** | `+"`/ready [method]`"+` | Alias for merge command | `+"`/ready`"+` |
+| **close** | `+"`/close`"+` | Close the PR without merging | `+"`/close`"+` |
 | **rebase** | `+"`/rebase`"+` | Rebase the PR branch against base | `+"`/rebase`"+` |
 | **cherrypick** | `+"`/cherrypick <branch>`"+` | Create a cherrypick PR to a different branch | `+"`/cherrypick release-3.9`"+` |
 | **label** | `+"`/label label1 label2 ...`"+` | Add labels to the PR | `+"`/label bug enhancement`"+` |
@@ -274,6 +275,13 @@ Use ` + "`/lgtm`" + ` again to re-approve this PR if needed.`
 const (
 	RebaseFailedTemplate  = `❌ **Rebase failed**: %v`
 	RebaseSuccessTemplate = `✅ **PR rebased successfully** on the base branch.`
+)
+
+// Close Messages
+const (
+	CloseSuccessTemplate = `🔒 **PR #%d has been closed**
+
+The pull request has been successfully closed without merging.`
 )
 
 // Cherry-pick Messages

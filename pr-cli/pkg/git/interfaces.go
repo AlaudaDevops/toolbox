@@ -110,6 +110,8 @@ type GitClient interface {
 
 	// MergePR merges the pull request with the specified method
 	MergePR(method string) error
+	// ClosePR closes the pull request without merging
+	ClosePR() error
 	// RebasePR updates the PR branch with the base branch
 	RebasePR() error
 	// GetAvailableMergeMethods retrieves the available merge methods for the pull request
