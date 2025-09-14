@@ -89,6 +89,19 @@ func (h *PRHandler) createCherrypickPR(prInfo *git.PullRequest, targetBranch str
 
 // scheduleCherrypick schedules a cherrypick for when the PR merges
 func (h *PRHandler) scheduleCherrypick(_ *git.PullRequest, targetBranch string) error {
+	// First check if the target branch exists
+	exists, err := h.client.BranchExists(targetBranch)
+	if err != nil {
+		h.Errorf("Failed to check if branch %s exists: %v", targetBranch, err)
+		// Don't fail the operation, just log the error and proceed
+		// This maintains backward compatibility
+		h.Warnf("Branch existence check failed, proceeding anyway")
+	} else if !exists {
+		// Branch doesn't exist, return error message
+		message := fmt.Sprintf(messages.CherryPickBranchNotFoundTemplate, targetBranch)
+		return h.client.PostComment(message)
+	}
+
 	message := fmt.Sprintf(messages.CherryPickScheduledTemplate, targetBranch)
 	return h.client.PostComment(message)
 }

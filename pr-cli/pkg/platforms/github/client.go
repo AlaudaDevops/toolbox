@@ -1262,3 +1262,17 @@ func (c *Client) applyCommitChanges(targetTree, parentTree, commitTree *github.T
 
 	return resultEntries, nil
 }
+
+// BranchExists checks if a branch exists in the repository
+func (c *Client) BranchExists(branchName string) (bool, error) {
+	_, _, err := c.client.Git.GetRef(c.ctx, c.owner, c.repo, "heads/"+branchName)
+	if err != nil {
+		// Check if it's a 404 error (branch not found)
+		if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return false, nil
+		}
+		// For other errors, return the error
+		return false, fmt.Errorf("failed to check branch existence: %w", err)
+	}
+	return true, nil
+}

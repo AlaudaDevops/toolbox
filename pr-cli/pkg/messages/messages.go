@@ -350,6 +350,19 @@ Successfully cherry-picked changes from PR #%d to branch ` + "`%s`" + `.
 * Latest commit SHA: ` + "`%s`" + ``
 
 	CherryPickScheduledTemplate = `✅ We will cherry-pick this PR to the branch ` + "`%s`" + ` upon merge.`
+
+	CherryPickBranchNotFoundTemplate = `❌ **Cherry Pick Failed**
+
+Target branch ` + "`%s`" + ` does not exist in this repository.
+
+**Please ensure:**
+- The branch name is spelled correctly
+- The branch exists in the remote repository
+- You have access to view the branch
+
+**Usage:** ` + "`/cherrypick <existing-branch>`" + `
+
+**Example:** ` + "`/cherrypick release/v1.0`" + ``
 )
 
 // LGTM Status Messages

@@ -150,3 +150,7 @@ func (c *Client) CreatePR(title, body, head, base string) (*git.PullRequest, err
 func (c *Client) CherryPickCommit(commitSHA, targetBranch string) error {
 	return fmt.Errorf("GitLab implementation not yet available")
 }
+
+func (c *Client) BranchExists(branchName string) (bool, error) {
+	return false, fmt.Errorf("GitLab implementation not yet available")
+}
