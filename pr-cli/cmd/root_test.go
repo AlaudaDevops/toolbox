@@ -92,6 +92,71 @@ func TestParseCommand(t *testing.T) {
 			wantArgs:    nil,
 			wantErr:     false,
 		},
+		// Test whitespace handling cases
+		{
+			name:        "command with multiple spaces before args",
+			comment:     "/assign   user1 user2",
+			wantCommand: "assign",
+			wantArgs:    []string{"user1", "user2"},
+			wantErr:     false,
+		},
+		{
+			name:        "command with trailing spaces no args",
+			comment:     "/help   ",
+			wantCommand: "help",
+			wantArgs:    nil,
+			wantErr:     false,
+		},
+		{
+			name:        "command with trailing spaces and args",
+			comment:     "/label bug   ",
+			wantCommand: "label",
+			wantArgs:    []string{"bug"},
+			wantErr:     false,
+		},
+		{
+			name:        "command with tab separator",
+			comment:     "/assign\tuser1",
+			wantCommand: "assign",
+			wantArgs:    []string{"user1"},
+			wantErr:     false,
+		},
+		{
+			name:        "command with mixed whitespace",
+			comment:     "/label \t urgent   high-priority  ",
+			wantCommand: "label",
+			wantArgs:    []string{"urgent", "high-priority"},
+			wantErr:     false,
+		},
+		// Test cherry-pick variants specifically
+		{
+			name:        "cherry-pick with hyphen",
+			comment:     "/cherry-pick feature-branch",
+			wantCommand: "cherry-pick",
+			wantArgs:    []string{"feature-branch"},
+			wantErr:     false,
+		},
+		{
+			name:        "cherrypick without hyphen",
+			comment:     "/cherrypick feature-branch",
+			wantCommand: "cherrypick",
+			wantArgs:    []string{"feature-branch"},
+			wantErr:     false,
+		},
+		{
+			name:        "cherry-pick with no args",
+			comment:     "/cherry-pick",
+			wantCommand: "cherry-pick",
+			wantArgs:    nil,
+			wantErr:     false,
+		},
+		{
+			name:        "cherry-pick with trailing spaces",
+			comment:     "/cherry-pick   ",
+			wantCommand: "cherry-pick",
+			wantArgs:    nil,
+			wantErr:     false,
+		},
 	}
 
 	// Create a PROption instance for testing
@@ -99,16 +164,19 @@ func TestParseCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotCommand, gotArgs, err := prOption.parseCommand(tt.comment)
+			parsedCmd, err := prOption.parseCommand(tt.comment)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("parseCommand() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if gotCommand != tt.wantCommand {
-				t.Errorf("parseCommand() gotCommand = %v, want %v", gotCommand, tt.wantCommand)
+			if err != nil {
+				return // skip validation when error is expected
 			}
-			if !reflect.DeepEqual(gotArgs, tt.wantArgs) {
-				t.Errorf("parseCommand() gotArgs = %v, want %v", gotArgs, tt.wantArgs)
+			if parsedCmd.Command != tt.wantCommand {
+				t.Errorf("parseCommand() gotCommand = %v, want %v", parsedCmd.Command, tt.wantCommand)
+			}
+			if !reflect.DeepEqual(parsedCmd.Args, tt.wantArgs) {
+				t.Errorf("parseCommand() gotArgs = %v, want %v", parsedCmd.Args, tt.wantArgs)
 			}
 		})
 	}

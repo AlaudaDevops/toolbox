@@ -46,7 +46,7 @@ go install github.com/AlaudaDevops/toolbox/pr-cli@latest
 ### Basic Usage
 
 ```bash
-# Process a comment command
+# Process a single command
 pr-cli --platform github \
        --repo-owner owner \
        --repo-name repo \
@@ -54,6 +54,16 @@ pr-cli --platform github \
        --comment-sender user \
        --token $GITHUB_TOKEN \
        --trigger-comment "/assign user1 user2"
+
+# Process multiple commands in one comment
+pr-cli --platform github \
+       --repo-owner owner \
+       --repo-name repo \
+       --pr-num 123 \
+       --comment-sender user \
+       --token $GITHUB_TOKEN \
+       --trigger-comment "/lgtm
+/ready squash"
 ```
 
 ### Environment Variables
@@ -90,6 +100,38 @@ Quick reference for all available PR comment commands:
 | `/cherrypick` | Cherry-pick to branches (alias) | `branch1 branch2 ...` | `/cherrypick release/v1.0` |
 | `/retest` | Trigger retest of failed checks | - | `/retest` |
 | `/help` | Show available commands | - | `/help` |
+
+### Multi-line Commands
+
+You can execute multiple commands in a single comment by placing each command on a separate line. This is particularly useful for common workflows:
+
+```
+/assign alice bob
+/lgtm
+/ready
+```
+
+**Multi-line Command Features:**
+- **Line-based execution**: Each line starting with `/` is treated as a separate command
+- **Command validation**: Each command is validated individually with proper permission checks
+- **Error handling**: If any command fails, you'll see detailed results for all executed commands
+- **Backward compatibility**: Existing single-line and `/batch` commands continue to work as before
+
+**Example Multi-line Comments:**
+```
+# Review workflow
+/assign reviewer1 reviewer2
+/lgtm Looks good to me!
+/ready squash
+
+# Label and merge
+/label enhancement
+/merge rebase
+
+# Quick approval
+/lgtm
+/ready
+```
 
 > 📘 **Need More Details?** For complete command syntax, configuration options, and troubleshooting, see the **[CLI Reference](docs/usage.md)**. For Pipeline integration, see **[Pipeline Integration](pipeline/README.md)**.
 

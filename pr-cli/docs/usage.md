@@ -32,7 +32,58 @@ This is the complete command-line reference for PR CLI. For a quick overview, se
 
 This section provides detailed syntax and behavior for each command. For a quick command overview, see the [main README](../README.md#supported-commands).
 
-> 💡 **Pro Tip**: Most commands can be combined using the `/check` command. See the [`/check` section](#check) for details.
+> 💡 **Pro Tip**: Most commands can be combined using the `/check` command or multi-line comments. See the [`/check` section](#check) and [Multi-line Commands](#multi-line-commands) for details.
+
+### Multi-line Commands
+
+You can execute multiple commands in a single comment by placing each command on a separate line. This approach is ideal for common workflows and provides cleaner, more readable comments than inline batch commands.
+
+**Syntax:**
+```
+/command1 [args...]
+/command2 [args...]
+/command3 [args...]
+```
+
+**Examples:**
+```bash
+# Review workflow
+pr-cli --trigger-comment "/assign reviewer1 reviewer2
+/lgtm Looks good to me!
+/ready squash"
+
+# Label and merge workflow
+pr-cli --trigger-comment "/label enhancement ready
+/merge rebase"
+
+# Quick approval
+pr-cli --trigger-comment "/lgtm
+/ready"
+```
+
+**Multi-line Command Features:**
+
+1. **Line-based Processing**: Each line starting with `/` is treated as a separate command
+2. **Individual Validation**: Each command is validated separately with proper permission checks
+3. **Sequential Execution**: Commands execute in the order they appear
+4. **Detailed Results**: Results for each command are shown in the response
+5. **Error Handling**: If a command fails, execution continues with remaining commands
+6. **Comment Flexibility**: Non-command text (lines not starting with `/`) is ignored
+
+**Supported Commands:**
+Multi-line comments support all PR management commands except:
+- Built-in commands (starting with `/__`)
+- LGTM commands (`/lgtm`, `/remove-lgtm`) are NOT supported in multi-line execution
+- Recursive batch calls (`/batch` within multi-line) are not allowed
+
+**Processing Rules:**
+- Empty lines are ignored
+- Comments and text between commands are ignored
+- Only lines starting with `/` are processed as commands
+- Commands are executed with the same permissions as single-command execution
+- All commands must pass individual validation checks
+
+> 💡 **Multi-line vs Batch**: Multi-line comments (`/cmd1\n/cmd2`) provide better readability compared to inline batch commands (`/batch /cmd1 /cmd2`), especially for complex workflows with multiple steps.
 
 ### Comment Commands
 
@@ -378,7 +429,13 @@ export PR_LGTM_THRESHOLD=2
 export PR_LGTM_PERMISSIONS=admin,write
 export PR_MERGE_METHOD=squash
 
+# Single command
 pr-cli --pr-num 123 --comment-sender alice --trigger-comment "/lgtm"
+
+# Multi-line commands
+pr-cli --pr-num 123 --comment-sender alice --trigger-comment "/assign reviewer1 reviewer2
+/label enhancement
+/merge squash"
 ```
 
 ### GitLab Configuration
@@ -392,7 +449,12 @@ export PR_REPO_NAME=myproject
 export PR_DEBUG=true
 export PR_SELF_CHECK_NAME=pr-cli
 
+# Single command
 pr-cli --pr-num 456 --comment-sender bob --trigger-comment "/merge"
+
+# Multi-line workflow
+pr-cli --pr-num 456 --comment-sender bob --trigger-comment "/assign team-lead
+/ready"
 ```
 
 ## LGTM System

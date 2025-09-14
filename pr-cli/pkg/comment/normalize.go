@@ -47,3 +47,90 @@ func Normalize(comment string) string {
 
 	return comment
 }
+
+// IsMultiLineCommand checks if a comment contains multiple command lines
+func IsMultiLineCommand(comment string) bool {
+	commands := SplitCommandLines(comment)
+	return len(commands) > 1
+}
+
+// SplitCommandLines splits a multi-line comment into individual command lines
+func SplitCommandLines(comment string) []string {
+	var commands []string
+
+	// Normalize line endings - convert \r\n and \r to \n
+	comment = strings.ReplaceAll(comment, "\r\n", "\n")
+	comment = strings.ReplaceAll(comment, "\r", "\n")
+
+	lines := strings.Split(strings.TrimSpace(comment), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines or non-command lines
+		if line == "" || !strings.HasPrefix(line, "/") {
+			continue
+		}
+		// Preprocess special commands before adding to the list
+		line = PreprocessSpecialCommands(line)
+		commands = append(commands, line)
+	}
+
+	return commands
+}
+
+// SplitRawCommandLines splits a multi-line comment into individual command lines without preprocessing
+func SplitRawCommandLines(comment string) []string {
+	var commands []string
+
+	// Normalize line endings - convert \r\n and \r to \n
+	comment = strings.ReplaceAll(comment, "\r\n", "\n")
+	comment = strings.ReplaceAll(comment, "\r", "\n")
+
+	lines := strings.Split(strings.TrimSpace(comment), "\n")
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip empty lines or non-command lines
+		if line == "" || !strings.HasPrefix(line, "/") {
+			continue
+		}
+		// Do NOT preprocess special commands - keep original form
+		commands = append(commands, line)
+	}
+
+	return commands
+}
+
+// processSpecialCommandTransformation handles the core logic for special command transformations
+func processSpecialCommandTransformation(command, args string) (string, string) {
+	// Handle special case: lgtm cancel -> remove-lgtm
+	if command == "lgtm" && args == "cancel" {
+		return "remove-lgtm", ""
+	}
+	// Add other special command transformations here as needed
+	return command, args
+}
+
+// PreprocessSpecialCommands handles special command transformations for complete command strings
+func PreprocessSpecialCommands(commandStr string) string {
+	if !strings.HasPrefix(commandStr, "/") {
+		return commandStr
+	}
+
+	// Split into command and args
+	parts := strings.SplitN(commandStr[1:], " ", 2)
+	command := parts[0]
+	var args string
+	if len(parts) > 1 {
+		args = strings.TrimSpace(parts[1])
+	}
+
+	// Transform using core logic
+	newCommand, newArgs := processSpecialCommandTransformation(command, args)
+
+	// Reconstruct command string
+	if newArgs == "" {
+		return "/" + newCommand
+	}
+	return "/" + newCommand + " " + newArgs
+}

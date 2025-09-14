@@ -45,8 +45,8 @@ func TestNormalizeComment(t *testing.T) {
 			expected: "/ready",
 		},
 		{
-			name:     "command with actual newline",
-			input:    "/ready\n",
+			name:     "command with escaped carriage return and newline at end",
+			input:    "/ready\\r\\n",
 			expected: "/ready",
 		},
 		{
@@ -151,7 +151,7 @@ func TestParseCommandWithNormalization(t *testing.T) {
 			// First normalize the comment
 			normalizedComment := comment.Normalize(tt.comment)
 
-			cmd, args, err := option.parseCommand(normalizedComment)
+			parsedCmd, err := option.parseCommand(normalizedComment)
 
 			if tt.expectError {
 				if err == nil {
@@ -165,16 +165,21 @@ func TestParseCommandWithNormalization(t *testing.T) {
 				return
 			}
 
-			if cmd != tt.expectedCmd {
-				t.Errorf("parseCommand(%q) cmd = %q, want %q", tt.comment, cmd, tt.expectedCmd)
-			}
-
-			if len(args) != len(tt.expectedArgs) {
-				t.Errorf("parseCommand(%q) args length = %d, want %d", tt.comment, len(args), len(tt.expectedArgs))
+			if parsedCmd == nil {
+				t.Errorf("parseCommand(%q) returned nil parsedCmd without error", tt.comment)
 				return
 			}
 
-			for i, arg := range args {
+			if parsedCmd.Command != tt.expectedCmd {
+				t.Errorf("parseCommand(%q) cmd = %q, want %q", tt.comment, parsedCmd.Command, tt.expectedCmd)
+			}
+
+			if len(parsedCmd.Args) != len(tt.expectedArgs) {
+				t.Errorf("parseCommand(%q) args length = %d, want %d", tt.comment, len(parsedCmd.Args), len(tt.expectedArgs))
+				return
+			}
+
+			for i, arg := range parsedCmd.Args {
 				if arg != tt.expectedArgs[i] {
 					t.Errorf("parseCommand(%q) args[%d] = %q, want %q", tt.comment, i, arg, tt.expectedArgs[i])
 				}
