@@ -18,10 +18,11 @@ package handler
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/cherrypick"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/messages"
 )
@@ -317,19 +318,21 @@ func (h *PRHandler) checkForCherryPickComments() bool {
 	}
 
 	// Check if any comment contains cherry-pick commands
-	for _, comment := range comments {
-		if cherryPickPattern.MatchString(comment.Body) {
-			h.Infof("Found cherry-pick comment: %s", comment.Body)
-			return true
+	for _, commentObj := range comments {
+		// Split multi-line comments into individual command lines
+		commandLines := comment.SplitCommandLines(commentObj.Body)
+
+		// Check each command line for cherry-pick commands
+		for _, cmdLine := range commandLines {
+			if cherrypick.CherryPickPattern.MatchString(cmdLine) {
+				h.Infof("Found cherry-pick command: %s", cmdLine)
+				return true
+			}
 		}
 	}
 
 	return false
 }
-
-var (
-	cherryPickPattern = regexp.MustCompile(`^/cherry-?pick\s+(\S+)`)
-)
 
 // HandlePostMergeCherryPick processes any cherry-pick commands found in PR comments after merge
 // This is a public method that can be called independently for post-merge operations
@@ -358,12 +361,18 @@ func (h *PRHandler) HandlePostMergeCherryPick() error {
 	// Find all cherry-pick commands
 	cherryPickBranches := make(map[string]bool)
 
-	for _, comment := range comments {
-		matches := cherryPickPattern.FindStringSubmatch(comment.Body)
-		if len(matches) > 1 {
-			targetBranch := matches[1]
-			cherryPickBranches[targetBranch] = true
-			h.Infof("Found cherry-pick command for branch: %s", targetBranch)
+	for _, commentObj := range comments {
+		// Split multi-line comments into individual command lines
+		commandLines := comment.SplitCommandLines(commentObj.Body)
+
+		// Check each command line for cherry-pick commands
+		for _, cmdLine := range commandLines {
+			matches := cherrypick.CherryPickPattern.FindStringSubmatch(cmdLine)
+			if len(matches) > 1 {
+				targetBranch := matches[1]
+				cherryPickBranches[targetBranch] = true
+				h.Infof("Found cherry-pick command for branch: %s", targetBranch)
+			}
 		}
 	}
 
