@@ -21,6 +21,12 @@ import (
 	"strings"
 )
 
+// Built-in command constants
+const (
+	// PostMergeCherryPickCommand is the built-in command for post-merge cherry-pick operations
+	PostMergeCherryPickCommand = "__post-merge-cherry-pick"
+)
+
 // CommandHandler defines the interface for command handlers
 type CommandHandler func(args []string) error
 
@@ -75,7 +81,7 @@ func (h *PRHandler) getCommandHandler(command string) CommandHandler {
 // executeBuiltInCommand handles execution of built-in commands (commands starting with __)
 func (h *PRHandler) executeBuiltInCommand(command string, _ []string) error {
 	switch command {
-	case "__post-merge-cherry-pick":
+	case PostMergeCherryPickCommand:
 		return h.HandlePostMergeCherryPick()
 	default:
 		return fmt.Errorf("unknown built-in command: %s", command)

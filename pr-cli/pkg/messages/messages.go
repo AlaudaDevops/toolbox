@@ -199,7 +199,7 @@ This PR contains **%d commits**. Rebase merge is only allowed for PRs with a sin
 
 **Options:**
 - Use ` + "`/merge squash`" + ` to squash all commits into one before merging
-- Use ` + "`/merge merge`" + ` to create a merge commit  
+- Use ` + "`/merge merge`" + ` to create a merge commit
 - Squash your commits locally to a single commit and push
 
 **Current commits:**
@@ -325,7 +325,7 @@ Failed to cherry-pick changes from PR #%d to branch ` + "`%s`" + `:
 
 *Possible causes:*
 * **🔀 Merge conflicts** - Changes conflict with target branch
-* **🍴 Fork PR** - Commits may not be available in target repository  
+* **🍴 Fork PR** - Commits may not be available in target repository
 * **🔒 Branch protection rules** - Target branch has restrictions
 * **📁 Binary file conflicts** - Binary files cannot be auto-merged
 * **🔗 Missing dependencies** - Required commits not present in target branch
@@ -350,6 +350,19 @@ Successfully cherry-picked changes from PR #%d to branch ` + "`%s`" + `.
 * Latest commit SHA: ` + "`%s`" + ``
 
 	CherryPickScheduledTemplate = `✅ We will cherry-pick this PR to the branch ` + "`%s`" + ` upon merge.`
+
+	CherryPickBranchNotFoundTemplate = `❌ **Cherry Pick Failed**
+
+Target branch ` + "`%s`" + ` does not exist in this repository.
+
+**Please ensure:**
+- The branch name is spelled correctly
+- The branch exists in the remote repository
+- You have access to view the branch
+
+**Usage:** ` + "`/cherrypick <existing-branch>`" + `
+
+**Example:** ` + "`/cherrypick release/v1.0`" + ``
 )
 
 // LGTM Status Messages

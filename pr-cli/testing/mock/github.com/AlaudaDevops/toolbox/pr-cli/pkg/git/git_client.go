@@ -76,6 +76,21 @@ func (mr *MockGitClientMockRecorder) AssignReviewers(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssignReviewers", reflect.TypeOf((*MockGitClient)(nil).AssignReviewers), arg0)
 }
 
+// BranchExists mocks base method.
+func (m *MockGitClient) BranchExists(arg0 string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BranchExists", arg0)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// BranchExists indicates an expected call of BranchExists.
+func (mr *MockGitClientMockRecorder) BranchExists(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BranchExists", reflect.TypeOf((*MockGitClient)(nil).BranchExists), arg0)
+}
+
 // CheckPRStatus mocks base method.
 func (m *MockGitClient) CheckPRStatus(arg0 string) error {
 	m.ctrl.T.Helper()

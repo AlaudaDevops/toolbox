@@ -19,22 +19,15 @@ package github
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/lgtm"
 	"github.com/google/go-github/v74/github"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
-)
-
-// Pre-compiled regular expressions for LGTM commands to avoid repeated compilation
-var (
-	lgtmRegexp       = regexp.MustCompile(`^/lgtm\b`)
-	removeLgtmRegexp = regexp.MustCompile(`^/remove-lgtm\b`)
-	lgtmCancelRegexp = regexp.MustCompile(`^/lgtm cancel\b`)
 )
 
 // Client implements the GitClient interface for GitHub
@@ -459,7 +452,7 @@ func (c *Client) findIgnoreCommentIndex(comments []git.Comment, ignoreUser strin
 	for i := len(comments) - 1; i >= 0; i-- {
 		if strings.EqualFold(comments[i].User.Login, ignoreUser) {
 			body := comment.Normalize(comments[i].Body)
-			if removeLgtmRegexp.MatchString(body) {
+			if lgtm.RemoveLGTMRegexp.MatchString(body) {
 				c.Debugf("Ignoring /remove-lgtm comment from user: %s at index %d", ignoreUser, i)
 				return i
 			}
@@ -476,11 +469,11 @@ func (c *Client) processLGTMComment(commentObj git.Comment, lgtmUsers map[string
 	body := comment.Normalize(commentObj.Body)
 
 	switch {
-	case removeLgtmRegexp.MatchString(body):
+	case lgtm.RemoveLGTMRegexp.MatchString(body):
 		c.handleRemoveLGTM(user, lgtmUsers, userLatestReviews)
-	case lgtmCancelRegexp.MatchString(body):
+	case lgtm.LGTMCancelRegexp.MatchString(body):
 		c.handleLGTMCancel(user, lgtmUsers, userLatestReviews)
-	case lgtmRegexp.MatchString(body):
+	case lgtm.LGTMRegexp.MatchString(body):
 		c.handleLGTM(user, lgtmUsers, userLatestReviews, debugMode)
 	}
 }
@@ -1261,4 +1254,18 @@ func (c *Client) applyCommitChanges(targetTree, parentTree, commitTree *github.T
 	}
 
 	return resultEntries, nil
+}
+
+// BranchExists checks if a branch exists in the repository
+func (c *Client) BranchExists(branchName string) (bool, error) {
+	_, _, err := c.client.Git.GetRef(c.ctx, c.owner, c.repo, "heads/"+branchName)
+	if err != nil {
+		// Check if it's a 404 error (branch not found)
+		if strings.Contains(err.Error(), "404") || strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return false, nil
+		}
+		// For other errors, return the error
+		return false, fmt.Errorf("failed to check branch existence: %w", err)
+	}
+	return true, nil
 }

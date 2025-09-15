@@ -178,7 +178,7 @@ metadata:
   name: pr-manage
   annotations:
     pipelinesascode.tekton.dev/pipeline: "https://raw.githubusercontent.com/AlaudaDevops/toolbox/main/pr-cli/pipeline/pr-manage.yaml"
-    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check|retest|batch)([ \\t].*)?$"
+    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-?pick|assign|merge|ready|unassign|label|unlabel|check|retest|close|batch)($|\\s.*)"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   pipelineRef:
@@ -246,7 +246,7 @@ spec:
     #
     # The platform to use, can be one of: github, gitlab, gitee (default: github)
     # - name: platform
-    #  value: "github"
+    #   value: "github"
     #
     # The robot accounts for managing bot approval reviews.
     # - name: robot_accounts

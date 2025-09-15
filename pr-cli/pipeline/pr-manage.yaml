@@ -3,7 +3,7 @@ kind: Pipeline
 metadata:
   name: pr-manage
   annotations:
-    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-pick|assign|merge|ready|unassign|label|unlabel|check|retest|close|batch)([ \\t].*)?$"
+    pipelinesascode.tekton.dev/on-comment: "^/(help|rebase|lgtm|remove-lgtm|cherry-?pick|assign|merge|ready|unassign|label|unlabel|check|retest|close|batch)($|\\s.*)"
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
   params:
@@ -16,7 +16,7 @@ spec:
     - name: git_auth_secret_key
       default: git-provider-token
     - name: image
-      default: registry.alauda.cn:60070/devops/toolbox/pr-cli:latest
+      default: "registry.alauda.cn:60070/devops/toolbox/pr-cli:latest"
     - name: lgtm_permissions
       # Allow read permission users to trigger lgtm in internal repositories
       default: admin,write,read

@@ -135,6 +135,8 @@ type GitClient interface {
 	CreatePR(title, body, head, base string) (*PullRequest, error)
 	// CherryPickCommit cherry-picks a commit to a branch
 	CherryPickCommit(commitSHA, targetBranch string) error
+	// BranchExists checks if a branch exists in the repository
+	BranchExists(branchName string) (bool, error)
 }
 
 // Config holds the configuration for creating a Git client
