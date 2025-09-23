@@ -3,7 +3,7 @@ module github.com/AlaudaDevops/toolbox/plugin-releaser
 go 1.25.1
 
 require (
-	github.com/andygrunwald/go-jira v1.16.0
+	github.com/andygrunwald/go-jira v1.16.1
 	github.com/ankitpokhrel/jira-cli v1.5.2
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
