@@ -1,5 +1,5 @@
-github.com/andygrunwald/go-jira v1.16.0 h1:PU7C7Fkk5L96JvPc6vDVIrd99vdPnYudHu4ju2c2ikQ=
-github.com/andygrunwald/go-jira v1.16.0/go.mod h1:UQH4IBVxIYWbgagc0LF/k9FRs9xjIiQ8hIcC6HfLwFU=
+github.com/andygrunwald/go-jira v1.16.1 h1:WoQEar5XoDRAibOgKzTFELlPNlKAtnfWr296R9zdFLA=
+github.com/andygrunwald/go-jira v1.16.1/go.mod h1:UQH4IBVxIYWbgagc0LF/k9FRs9xjIiQ8hIcC6HfLwFU=
 github.com/ankitpokhrel/jira-cli v1.5.2 h1:T2hevpu+fSss7DcSBha2y8MWNsqqdYsrsKY8HACwrNA=
 github.com/ankitpokhrel/jira-cli v1.5.2/go.mod h1:DKK6guAz7oi1k2cWjTG+06GmRLIeFoFUb+OIgfY0j/8=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=

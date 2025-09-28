@@ -14,8 +14,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Microsoft/hcsshim v0.12.9 h1:2zJy5KA+l0loz1HzEGqyNnjd3fyZA31ZBCGKacp6lLg=
 github.com/Microsoft/hcsshim v0.12.9/go.mod h1:fJ0gkFAna6ukt0bLdKB8djt4XIJhF/vEPuoIWYVvZ8Y=
-github.com/andygrunwald/go-jira v1.16.0 h1:PU7C7Fkk5L96JvPc6vDVIrd99vdPnYudHu4ju2c2ikQ=
-github.com/andygrunwald/go-jira v1.16.0/go.mod h1:UQH4IBVxIYWbgagc0LF/k9FRs9xjIiQ8hIcC6HfLwFU=
+github.com/andygrunwald/go-jira v1.16.1 h1:WoQEar5XoDRAibOgKzTFELlPNlKAtnfWr296R9zdFLA=
+github.com/andygrunwald/go-jira v1.16.1/go.mod h1:UQH4IBVxIYWbgagc0LF/k9FRs9xjIiQ8hIcC6HfLwFU=
 github.com/ankitpokhrel/jira-cli v1.5.2 h1:T2hevpu+fSss7DcSBha2y8MWNsqqdYsrsKY8HACwrNA=
 github.com/ankitpokhrel/jira-cli v1.5.2/go.mod h1:DKK6guAz7oi1k2cWjTG+06GmRLIeFoFUb+OIgfY0j/8=
 github.com/antlr4-go/antlr/v4 v4.13.1 h1:SqQKkuVZ+zWkMMNkjy5FZe5mr5WURWnlpmOuzYWrPrQ=

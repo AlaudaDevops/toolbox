@@ -4,7 +4,7 @@ go 1.25.1
 
 require (
 	github.com/AlaudaDevops/pkg v0.13.1-0.20250411092507-24e8b46d5269
-	github.com/andygrunwald/go-jira v1.16.0
+	github.com/andygrunwald/go-jira v1.16.1
 	github.com/ankitpokhrel/jira-cli v1.5.2
 	github.com/distribution/reference v0.6.0
 	github.com/onsi/gomega v1.36.3
