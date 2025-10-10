@@ -208,6 +208,21 @@ func (mr *MockGitClientMockRecorder) DismissApprove(arg0 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DismissApprove", reflect.TypeOf((*MockGitClient)(nil).DismissApprove), arg0)
 }
 
+// FindIssue mocks base method.
+func (m *MockGitClient) FindIssue(arg0 git.IssueSearchOptions) (*git.Issue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindIssue", arg0)
+	ret0, _ := ret[0].(*git.Issue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindIssue indicates an expected call of FindIssue.
+func (mr *MockGitClientMockRecorder) FindIssue(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindIssue", reflect.TypeOf((*MockGitClient)(nil).FindIssue), arg0)
+}
+
 // GetAvailableMergeMethods mocks base method.
 func (m *MockGitClient) GetAvailableMergeMethods() ([]string, error) {
 	m.ctrl.T.Helper()
@@ -251,6 +266,21 @@ func (m *MockGitClient) GetCommits() ([]git.Commit, error) {
 func (mr *MockGitClientMockRecorder) GetCommits() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCommits", reflect.TypeOf((*MockGitClient)(nil).GetCommits))
+}
+
+// GetIssue mocks base method.
+func (m *MockGitClient) GetIssue(arg0 int) (*git.Issue, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetIssue", arg0)
+	ret0, _ := ret[0].(*git.Issue)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetIssue indicates an expected call of GetIssue.
+func (mr *MockGitClientMockRecorder) GetIssue(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetIssue", reflect.TypeOf((*MockGitClient)(nil).GetIssue), arg0)
 }
 
 // GetLGTMVotes mocks base method.
@@ -417,4 +447,32 @@ func (m *MockGitClient) RemoveReviewers(arg0 []string) error {
 func (mr *MockGitClientMockRecorder) RemoveReviewers(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemoveReviewers", reflect.TypeOf((*MockGitClient)(nil).RemoveReviewers), arg0)
+}
+
+// UpdateIssueBody mocks base method.
+func (m *MockGitClient) UpdateIssueBody(arg0 int, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateIssueBody", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateIssueBody indicates an expected call of UpdateIssueBody.
+func (mr *MockGitClientMockRecorder) UpdateIssueBody(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateIssueBody", reflect.TypeOf((*MockGitClient)(nil).UpdateIssueBody), arg0, arg1)
+}
+
+// UpdatePRBody mocks base method.
+func (m *MockGitClient) UpdatePRBody(arg0 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdatePRBody", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdatePRBody indicates an expected call of UpdatePRBody.
+func (mr *MockGitClientMockRecorder) UpdatePRBody(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePRBody", reflect.TypeOf((*MockGitClient)(nil).UpdatePRBody), arg0)
 }

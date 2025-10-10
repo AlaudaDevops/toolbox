@@ -1,0 +1,8 @@
+description: Filters requiring a specific label presence.
+
+options:
+  title: Dependency Dashboard
+  author: alaudaa-renovate
+  state: open
+  labels:
+    - dependencies

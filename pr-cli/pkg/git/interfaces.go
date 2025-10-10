@@ -25,6 +25,8 @@ type PullRequest struct {
 	State  string    // Pull request state (open, closed)
 	Merged bool      // Whether the PR was merged (only meaningful when State is "closed")
 	Author string    // Pull request author username
+	Body   string    // Pull request body/description
+	URL    string    // Web URL to the pull request
 	Head   Reference // Head reference (source branch)
 	Base   Reference // Base reference (target branch)
 }
@@ -49,8 +51,30 @@ type Review struct {
 	SubmittedAt string // Review submission time (ISO 8601 format)
 }
 
+// Issue represents a repository issue
+type Issue struct {
+	Number    int    // Issue number
+	Title     string // Issue title
+	State     string // Issue state (open, closed)
+	Author    string // Issue author username
+	Body      string // Issue body/description
+	URL       string // Web URL to the issue
+	CreatedAt string // Issue creation time (ISO 8601 format)
+}
+
+// IssueSearchOptions defines filters for locating issues
+type IssueSearchOptions struct {
+	Title  string   // Exact or quoted title match
+	Author string   // Issue author username
+	State  string   // Desired issue state (open, closed, all)
+	Labels []string // Labels the issue must contain
+	Sort   string   // Sort field (created, updated)
+	Order  string   // Sort order (asc, desc)
+}
+
 // Comment represents a comment on a pull request
 type Comment struct {
+	ID   int64  // Unique comment identifier
 	User User   // Comment author information
 	Body string // Comment text content
 	URL  string // URL to the comment
@@ -58,10 +82,12 @@ type Comment struct {
 
 // CheckRun represents a CI/CD check run
 type CheckRun struct {
-	Name       string // Check run name
-	Status     string // Check run status: queued, in_progress, completed
-	Conclusion string // Check run conclusion: success, failure, neutral, cancelled, skipped, timed_out, action_required
-	URL        string // URL to the check run details
+	Name         string // Check run name
+	Status       string // Check run status: queued, in_progress, completed
+	Conclusion   string // Check run conclusion: success, failure, neutral, cancelled, skipped, timed_out, action_required
+	URL          string // URL to the check run details
+	AppSlug      string // App slug that created this check (e.g., "github-actions")
+	CheckSuiteID int64  // Check suite ID (for GitHub Actions)
 }
 
 // Commit represents a git commit
@@ -82,8 +108,16 @@ type GitClient interface {
 
 	// PostComment posts a comment to the pull request
 	PostComment(message string) error
+	// UpdatePRBody updates the pull request description/body
+	UpdatePRBody(body string) error
 	// GetComments retrieves all comments from the pull request
 	GetComments() ([]Comment, error)
+	// GetIssue retrieves an issue by number
+	GetIssue(issueNumber int) (*Issue, error)
+	// UpdateIssueBody updates the specified issue body/description
+	UpdateIssueBody(issueNumber int, body string) error
+	// FindIssue locates a single issue matching the provided options
+	FindIssue(opts IssueSearchOptions) (*Issue, error)
 
 	// GetReviews retrieves all reviews from the pull request
 	GetReviews() ([]Review, error)

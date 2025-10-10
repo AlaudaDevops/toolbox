@@ -1,0 +1,5 @@
+# 期望结果：所有 checkbox 均已选中
+output: |
+  - [x] todo item
+  - [x] completed item
+  - [x] another task

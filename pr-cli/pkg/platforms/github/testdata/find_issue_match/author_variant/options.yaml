@@ -1,0 +1,6 @@
+description: Filters using author alias without bot suffix.
+
+options:
+  title: Dependency Dashboard
+  author: alaudaa-renovate
+  state: open

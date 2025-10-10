@@ -1,0 +1,5 @@
+# Golden: issue body with all checkboxes toggled
+updated_body: |
+  - [x] sync module A
+  - [x] sync module B
+  - [x] sync module C

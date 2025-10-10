@@ -18,9 +18,11 @@ package github
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
@@ -117,6 +119,8 @@ func (c *Client) GetPR() (*git.PullRequest, error) {
 		State:  pr.GetState(),
 		Merged: pr.GetMerged(),
 		Author: pr.GetUser().GetLogin(),
+		Body:   pr.GetBody(),
+		URL:    pr.GetHTMLURL(),
 		Head: git.Reference{
 			Branch: pr.GetHead().GetRef(),
 			SHA:    pr.GetHead().GetSHA(),
@@ -152,6 +156,274 @@ func (c *Client) PostComment(message string) error {
 	return err
 }
 
+// GetIssue retrieves an issue by number
+func (c *Client) GetIssue(issueNumber int) (*git.Issue, error) {
+	issue, _, err := c.client.Issues.Get(c.ctx, c.owner, c.repo, issueNumber)
+	if err != nil {
+		return nil, err
+	}
+	return convertGitHubIssue(issue), nil
+}
+
+// UpdateIssueBody updates an issue body/description
+func (c *Client) UpdateIssueBody(issueNumber int, body string) error {
+	request := &github.IssueRequest{
+		Body: github.Ptr(body),
+	}
+	_, _, err := c.client.Issues.Edit(c.ctx, c.owner, c.repo, issueNumber, request)
+	return err
+}
+
+const (
+	defaultListPerPage  = 50
+	maxIssueListPages   = 10
+	defaultIssueState   = "open"
+	defaultIssueSort    = "created"
+	defaultIssueOrder   = "asc"
+	fallbackErrorPrefix = "github list fallback"
+)
+
+// FindIssue locates an issue using search options
+func (c *Client) FindIssue(opts git.IssueSearchOptions) (*git.Issue, error) {
+	issue, searchErr := c.findIssueUsingSearch(opts)
+	if searchErr == nil {
+		return issue, nil
+	}
+
+	c.Debugf("issue search fallback triggered: %v", searchErr)
+
+	listIssue, listErr := c.findIssueUsingList(opts)
+	if listErr == nil {
+		return listIssue, nil
+	}
+
+	if searchErr == nil {
+		return nil, listErr
+	}
+
+	return nil, errors.Join(searchErr, listErr)
+}
+
+func (c *Client) findIssueUsingSearch(opts git.IssueSearchOptions) (*git.Issue, error) {
+	queryParts := []string{
+		fmt.Sprintf("repo:%s/%s", c.owner, c.repo),
+		"type:issue",
+	}
+	if opts.State != "" {
+		queryParts = append(queryParts, fmt.Sprintf("state:%s", opts.State))
+	}
+	// Note: We intentionally skip author in the search query to avoid GitHub API errors with bot accounts.
+	// Bot usernames like "renovate[bot]" cannot be searched directly using "author:renovate" as it results
+	// in a 422 error (user not found). Instead, we search without author filter and then apply author
+	// filtering on the results using normalizeLogin(), which handles bot username variations correctly.
+	if opts.Title != "" {
+		queryParts = append(queryParts, fmt.Sprintf("in:title \"%s\"", opts.Title))
+	}
+	for _, label := range opts.Labels {
+		label = strings.TrimSpace(label)
+		if label == "" {
+			continue
+		}
+		queryParts = append(queryParts, fmt.Sprintf("label:\"%s\"", label))
+	}
+
+	query := strings.Join(queryParts, " ")
+	searchOptions := &github.SearchOptions{
+		ListOptions: github.ListOptions{PerPage: 10},
+	}
+	if opts.Sort != "" {
+		searchOptions.Sort = opts.Sort
+	}
+	if opts.Order != "" {
+		searchOptions.Order = opts.Order
+	}
+
+	c.Debugf("searching issues query=%q sort=%s order=%s per_page=%d", query, searchOptions.Sort, searchOptions.Order, searchOptions.PerPage)
+
+	results, _, err := c.client.Search.Issues(c.ctx, query, searchOptions)
+	if err != nil {
+		return nil, err
+	}
+	if results.GetTotal() == 0 || len(results.Issues) == 0 {
+		return nil, fmt.Errorf("issue not found for query: %s", query)
+	}
+
+	c.Debugf("search results total=%d returned=%d", results.GetTotal(), len(results.Issues))
+
+	// Filter results by all criteria (title, author, labels, state).
+	// This is especially important for author filtering, as issueMatchesFilters() uses normalizeLogin()
+	// which correctly handles bot account name variations (e.g., "renovate" matches "renovate[bot]").
+	for _, issue := range results.Issues {
+		if !issueMatchesFilters(issue, opts) {
+			continue
+		}
+		match := convertGitHubIssue(issue)
+		if match != nil {
+			c.Debugf("search matched issue #%d title=%q author=%q", match.Number, match.Title, match.Author)
+		}
+		return match, nil
+	}
+
+	return nil, fmt.Errorf("issue not found matching filters: title=%q author=%q", opts.Title, opts.Author)
+}
+
+func (c *Client) findIssueUsingList(opts git.IssueSearchOptions) (*git.Issue, error) {
+	listOpts := &github.IssueListByRepoOptions{
+		State:     firstNonEmpty(opts.State, defaultIssueState),
+		Sort:      firstNonEmpty(opts.Sort, defaultIssueSort),
+		Direction: normalizeOrder(opts.Order),
+		ListOptions: github.ListOptions{
+			PerPage: defaultListPerPage,
+			Page:    1,
+		},
+	}
+
+	if len(opts.Labels) > 0 {
+		listOpts.Labels = append([]string{}, opts.Labels...)
+	}
+
+	c.Debugf("listing issues fallback title=%q author=%q state=%q labels=%v sort=%s order=%s", opts.Title, opts.Author, listOpts.State, listOpts.Labels, listOpts.Sort, listOpts.Direction)
+
+	totalInspected := 0
+	for page := 1; page <= maxIssueListPages; page++ {
+		listOpts.ListOptions.Page = page
+		issues, resp, err := c.client.Issues.ListByRepo(c.ctx, c.owner, c.repo, listOpts)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", fallbackErrorPrefix, err)
+		}
+		totalInspected += len(issues)
+		nextPage := 0
+		if resp != nil {
+			nextPage = resp.NextPage
+		}
+		c.Debugf("list fallback page=%d count=%d next_page=%d", page, len(issues), nextPage)
+
+		for _, issue := range issues {
+			if issueMatchesFilters(issue, opts) {
+				match := convertGitHubIssue(issue)
+				if match != nil {
+					c.Debugf("list fallback matched issue #%d title=%q author=%q", match.Number, match.Title, match.Author)
+				}
+				return match, nil
+			}
+		}
+
+		if resp == nil || resp.NextPage == 0 {
+			break
+		}
+	}
+
+	c.Debugf("list fallback completed inspected=%d max_pages=%d", totalInspected, maxIssueListPages)
+	return nil, fmt.Errorf("%s: issue not found for filters title=%q author=%q", fallbackErrorPrefix, opts.Title, opts.Author)
+}
+
+func normalizeLogin(login string) string {
+	normalized := strings.TrimSpace(strings.ToLower(login))
+	if normalized == "" {
+		return ""
+	}
+	normalized = strings.TrimSuffix(normalized, "[bot]")
+	normalized = strings.TrimSuffix(normalized, "-bot")
+	return strings.TrimSpace(normalized)
+}
+
+func issueMatchesFilters(issue *github.Issue, opts git.IssueSearchOptions) bool {
+	if issue == nil {
+		return false
+	}
+	if issue.IsPullRequest() {
+		return false
+	}
+
+	if opts.Title != "" {
+		title := strings.TrimSpace(issue.GetTitle())
+		if title == "" {
+			return false
+		}
+		actualTitle := strings.ToLower(title)
+		targetTitle := strings.ToLower(strings.TrimSpace(opts.Title))
+		if targetTitle == "" {
+			return false
+		}
+		if !strings.Contains(actualTitle, targetTitle) {
+			return false
+		}
+	}
+
+	if strings.TrimSpace(opts.Author) != "" {
+		expectedAuthor := normalizeLogin(opts.Author)
+		if expectedAuthor == "" {
+			return false
+		}
+
+		actualAuthor := ""
+		if issue.GetUser() != nil {
+			actualAuthor = normalizeLogin(issue.GetUser().GetLogin())
+		}
+		if actualAuthor != expectedAuthor {
+			return false
+		}
+	}
+
+	if len(opts.Labels) > 0 {
+		labelSet := make(map[string]struct{}, len(issue.Labels))
+		for _, label := range issue.Labels {
+			labelName := strings.ToLower(strings.TrimSpace(label.GetName()))
+			if labelName == "" {
+				continue
+			}
+			labelSet[labelName] = struct{}{}
+		}
+
+		for _, required := range opts.Labels {
+			requiredName := strings.ToLower(strings.TrimSpace(required))
+			if requiredName == "" {
+				continue
+			}
+			if _, ok := labelSet[requiredName]; !ok {
+				return false
+			}
+		}
+	}
+
+	if opts.State != "" {
+		if !strings.EqualFold(issue.GetState(), opts.State) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
+}
+
+func normalizeOrder(value string) string {
+	order := strings.ToLower(strings.TrimSpace(value))
+	if order == "" {
+		return defaultIssueOrder
+	}
+	if order != "asc" && order != "desc" {
+		return defaultIssueOrder
+	}
+	return order
+}
+
+// UpdatePRBody updates the pull request body/description
+func (c *Client) UpdatePRBody(body string) error {
+	request := &github.IssueRequest{
+		Body: github.Ptr(body),
+	}
+	_, _, err := c.client.Issues.Edit(c.ctx, c.owner, c.repo, c.prNum, request)
+	return err
+}
+
 // GetComments retrieves all comments from the pull request with pagination
 func (c *Client) GetComments() ([]git.Comment, error) {
 	var allComments []*github.IssueComment
@@ -177,6 +449,7 @@ func (c *Client) GetComments() ([]git.Comment, error) {
 	result := make([]git.Comment, len(allComments))
 	for i, comment := range allComments {
 		result[i] = git.Comment{
+			ID: comment.GetID(),
 			User: git.User{
 				Login: comment.GetUser().GetLogin(),
 			},
@@ -186,6 +459,29 @@ func (c *Client) GetComments() ([]git.Comment, error) {
 	}
 
 	return result, nil
+}
+
+func convertGitHubIssue(issue *github.Issue) *git.Issue {
+	if issue == nil {
+		return nil
+	}
+	author := ""
+	if issue.GetUser() != nil {
+		author = issue.GetUser().GetLogin()
+	}
+	createdAt := ""
+	if created := issue.GetCreatedAt(); !created.IsZero() {
+		createdAt = created.Format(time.RFC3339)
+	}
+	return &git.Issue{
+		Number:    issue.GetNumber(),
+		Title:     issue.GetTitle(),
+		State:     issue.GetState(),
+		Author:    author,
+		Body:      issue.GetBody(),
+		URL:       issue.GetHTMLURL(),
+		CreatedAt: createdAt,
+	}
 }
 
 // GetReviews retrieves all reviews from the pull request with pagination
@@ -868,6 +1164,14 @@ func (c *Client) convertToGitCheckRun(check *github.CheckRun) git.CheckRun {
 		result.Conclusion = check.GetConclusion()
 	}
 
+	// Set app slug and check suite ID for GitHub Actions identification
+	if check.App != nil {
+		result.AppSlug = check.App.GetSlug()
+	}
+	if check.CheckSuite != nil {
+		result.CheckSuiteID = check.CheckSuite.GetID()
+	}
+
 	return result
 }
 
@@ -1029,6 +1333,8 @@ func (c *Client) CreatePR(title, body, head, base string) (*git.PullRequest, err
 		State:  pr.GetState(),
 		Merged: pr.GetMerged(),
 		Author: pr.GetUser().GetLogin(),
+		Body:   pr.GetBody(),
+		URL:    pr.GetHTMLURL(),
 		Head: git.Reference{
 			Branch: pr.GetHead().GetRef(),
 			SHA:    pr.GetHead().GetSHA(),
@@ -1268,4 +1574,57 @@ func (c *Client) BranchExists(branchName string) (bool, error) {
 		return false, fmt.Errorf("failed to check branch existence: %w", err)
 	}
 	return true, nil
+}
+
+// GetWorkflowRunIDsFromCheckSuite retrieves workflow run IDs from a check suite
+// Returns a slice of workflow run IDs associated with the check suite
+func (c *Client) GetWorkflowRunIDsFromCheckSuite(checkSuiteID int64) ([]int64, error) {
+	c.Debugf("Getting workflow runs for check suite ID: %d", checkSuiteID)
+
+	// Get the check suite to retrieve the head SHA
+	checkSuite, _, err := c.client.Checks.GetCheckSuite(c.ctx, c.owner, c.repo, checkSuiteID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get check suite %d: %w", checkSuiteID, err)
+	}
+
+	headSHA := checkSuite.GetHeadSHA()
+	c.Debugf("Check suite head SHA: %s", headSHA)
+
+	// List workflow runs for the head SHA
+	opts := &github.ListWorkflowRunsOptions{
+		HeadSHA: headSHA,
+	}
+
+	runs, _, err := c.client.Actions.ListRepositoryWorkflowRuns(c.ctx, c.owner, c.repo, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow runs for SHA %s: %w", headSHA, err)
+	}
+
+	if len(runs.WorkflowRuns) == 0 {
+		c.Warnf("No workflow runs found for check suite %d (SHA: %s)", checkSuiteID, headSHA)
+		return nil, nil
+	}
+
+	// Collect workflow run IDs
+	var runIDs []int64
+	for _, run := range runs.WorkflowRuns {
+		runIDs = append(runIDs, run.GetID())
+		c.Debugf("Found workflow run: ID=%d, Name=%s, Status=%s, Conclusion=%s",
+			run.GetID(), run.GetName(), run.GetStatus(), run.GetConclusion())
+	}
+
+	return runIDs, nil
+}
+
+// RerunWorkflowRunFailedJobs reruns failed jobs in a workflow run
+func (c *Client) RerunWorkflowRunFailedJobs(runID int64) error {
+	c.Debugf("Rerunning failed jobs for workflow run ID: %d", runID)
+
+	_, err := c.client.Actions.RerunFailedJobsByID(c.ctx, c.owner, c.repo, runID)
+	if err != nil {
+		return fmt.Errorf("failed to rerun failed jobs for workflow run %d: %w", runID, err)
+	}
+
+	c.Infof("Successfully triggered rerun of failed jobs for workflow run ID: %d", runID)
+	return nil
 }

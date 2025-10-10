@@ -53,6 +53,8 @@ Available commands for managing this Pull Request:
 | **label** | `+"`/label label1 label2 ...`"+` | Add labels to the PR | `+"`/label bug enhancement`"+` |
 | **unlabel** | `+"`/unlabel label1 label2 ...`"+` | Remove labels from the PR | `+"`/unlabel bug`"+` |
 | **retest** | `+"`/retest`"+` | Trigger retest of failed checks | `+"`/retest`"+` |
+| **checkbox** | `+"`/checkbox`"+` | Check unchecked boxes in the PR description | `+"`/checkbox`"+` |
+| **checkbox-issue** | `+"`/checkbox-issue [issue]`"+` | Check unchecked boxes in the specified issue or default Dependency Dashboard issue | `+"`/checkbox-issue 123`"+` |
 | **help** | `+"`/help`"+` | Display this help message | `+"`/help`"+` |
 
 ### 👍 LGTM Commands
@@ -159,6 +161,34 @@ Command: ` + "`%s`" + `
 Error: %s
 
 Please check the command usage or contact support if the issue persists.`
+
+	CheckboxDescriptionNotFoundTemplate = `❌ **Checkbox Update Failed**
+
+Could not locate a pull request description with unchecked checkboxes.`
+
+	CheckboxAlreadyCheckedTemplate = `ℹ️ **No Unchecked Checkboxes Found**
+
+The targeted content%s already has all checkboxes checked.`
+
+	CheckboxUpdateSuccessTemplate = `✅ **Checkboxes Updated**
+
+@%s has checked all checkboxes in %s.`
+
+	CheckboxIssueNotFoundTemplate = `❌ **Checkbox Update Failed**
+
+No matching issue was found for checkbox processing.`
+
+	CheckboxIssueBodyMissingTemplate = `❌ **Checkbox Update Failed**
+
+Could not update the content%s because the issue description is empty.`
+
+	CheckboxIssueInvalidNumberTemplate = `❌ **Checkbox Update Failed**
+
+Issue identifier ` + "`%s`" + ` is invalid. Please provide a numeric issue number.`
+
+	CheckboxIssueInvalidOptionTemplate = `❌ **Checkbox Update Failed**
+
+Unable to parse issue option ` + "`%s`" + `. Use an issue number or --title/--author parameters.`
 )
 
 // Merge Messages

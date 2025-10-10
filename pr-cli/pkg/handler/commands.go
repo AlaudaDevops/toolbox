@@ -57,22 +57,24 @@ func (h *PRHandler) ExecuteCommand(command string, args []string) error {
 // getCommandHandler returns the handler function for a given command
 func (h *PRHandler) getCommandHandler(command string) CommandHandler {
 	commandRegistry := map[string]CommandHandler{
-		"help":        h.HandleHelp,
-		"assign":      h.HandleAssign,
-		"unassign":    h.HandleUnassign,
-		"lgtm":        h.HandleLGTM,
-		"remove-lgtm": h.HandleRemoveLGTM,
-		"merge":       h.HandleMerge,
-		"ready":       h.HandleMerge, // alias for merge
-		"close":       h.HandleClose,
-		"rebase":      h.HandleRebase,
-		"check":       h.HandleCheck,
-		"batch":       h.HandleBatch,
-		"cherry-pick": h.HandleCherrypick,
-		"cherrypick":  h.HandleCherrypick, // alias for cherry-pick
-		"label":       h.HandleLabel,
-		"unlabel":     h.HandleUnlabel,
-		"retest":      h.HandleRetest,
+		"help":           h.HandleHelp,
+		"assign":         h.HandleAssign,
+		"unassign":       h.HandleUnassign,
+		"lgtm":           h.HandleLGTM,
+		"remove-lgtm":    h.HandleRemoveLGTM,
+		"merge":          h.HandleMerge,
+		"ready":          h.HandleMerge, // alias for merge
+		"close":          h.HandleClose,
+		"rebase":         h.HandleRebase,
+		"check":          h.HandleCheck,
+		"batch":          h.HandleBatch,
+		"cherry-pick":    h.HandleCherrypick,
+		"cherrypick":     h.HandleCherrypick, // alias for cherry-pick
+		"label":          h.HandleLabel,
+		"unlabel":        h.HandleUnlabel,
+		"retest":         h.HandleRetest,
+		"checkbox":       h.HandleCheckbox,
+		"checkbox-issue": h.HandleCheckboxIssue,
 	}
 
 	return commandRegistry[command]

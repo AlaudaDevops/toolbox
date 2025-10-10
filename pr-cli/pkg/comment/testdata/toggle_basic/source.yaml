@@ -1,0 +1,5 @@
+# 测试数据：基础 checkbox 转换
+input: |
+  - [ ] todo item
+  - [x] completed item
+  - [ ] another task

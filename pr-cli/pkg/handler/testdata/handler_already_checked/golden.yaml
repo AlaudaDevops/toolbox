@@ -1,0 +1,4 @@
+# Golden: unchanged placeholder body when everything is already checked
+updated_body: |
+  * [x] ready
+  * [x] verified

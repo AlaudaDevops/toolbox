@@ -1,0 +1,4 @@
+# Golden: default issue body with toggled checkboxes
+updated_body: |
+  - [x] upgrade toolkit
+  - [x] verify integration

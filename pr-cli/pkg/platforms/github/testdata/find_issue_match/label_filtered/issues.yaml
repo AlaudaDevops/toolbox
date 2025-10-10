@@ -1,0 +1,20 @@
+description: Dataset covering label mismatches for filter validation.
+
+issues:
+  - number: 4101
+    title: Dependency Dashboard
+    author: alaudaa-renovate
+    state: open
+    labels:
+      - renovate
+    body: |
+      - [ ] Sync modules
+  - number: 4102
+    title: Dependency Dashboard
+    author: alaudaa-renovate
+    state: open
+    labels:
+      - renovate
+      - dependencies
+    body: |
+      - [ ] Refresh stacks

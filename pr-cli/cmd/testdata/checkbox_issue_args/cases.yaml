@@ -1,0 +1,17 @@
+# cases describing how `/checkbox-issue` arguments should be parsed when quotes are present.
+cases:
+  - description: handles quoted flags for title and author
+    comment: /checkbox-issue --title "Security Dashboard" --author "team bot"
+    command: checkbox-issue
+    args:
+      - --title
+      - Security Dashboard
+      - --author
+      - team bot
+
+  - description: handles equals style quoting for title and author
+    comment: /checkbox-issue --title="Security Dashboard" --author="team bot"
+    command: checkbox-issue
+    args:
+      - --title=Security Dashboard
+      - --author=team bot

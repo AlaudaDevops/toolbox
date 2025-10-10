@@ -1,0 +1,11 @@
+# Fixture: PR description with unchecked checkboxes
+pr:
+  body: |
+    ### Renovate updates
+    - [ ] sync module A
+    - [ ] sync module B
+  url: https://example.com/pr/13
+comments:
+  - id: 301
+    url: https://example.com/comment/301
+    body: "This comment should not change"

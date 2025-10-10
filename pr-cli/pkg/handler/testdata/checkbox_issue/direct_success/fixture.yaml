@@ -1,0 +1,11 @@
+# Fixture: direct issue target with unchecked checkboxes
+issue:
+  number: 110
+  title: Dependency Dashboard
+  state: open
+  author: alaudaa-renovate
+  body: |
+    - [ ] sync module A
+    - [x] sync module B
+    - [ ] sync module C
+  url: https://example.com/issues/110

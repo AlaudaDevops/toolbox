@@ -1,0 +1,5 @@
+# Golden: PR description checkboxes should be toggled
+updated_body: |
+  ### Renovate updates
+  - [x] sync module A
+  - [x] sync module B

@@ -1,0 +1,5 @@
+description: Expected bot alias to map back to renovate author.
+
+expected:
+  found: true
+  number: 5101

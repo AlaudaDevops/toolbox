@@ -1,0 +1,7 @@
+# Fixture: PR description already checked and no extra comments
+pr:
+  body: |
+    - [x] automation ready
+    - [x] regression verified
+  url: https://example.com/pr/13
+comments: []
