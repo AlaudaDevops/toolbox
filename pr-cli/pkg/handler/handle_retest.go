@@ -57,14 +57,75 @@ func (h *PRHandler) postAllChecksPassingMessage() error {
 }
 
 // retestFailedPipelines processes failed checks and retests eligible pipelines
+// It distinguishes between PAC pipelines and GitHub Actions, and retests them accordingly
 func (h *PRHandler) retestFailedPipelines(failedChecks []git.CheckRun) error {
-	retestablePipelines, skippedPipelines := h.filterRetestablePipelines(failedChecks)
+	// Classify failed checks into PAC pipelines and GitHub Actions
+	pacPipelines, githubActions, skippedPipelines := h.classifyFailedChecks(failedChecks)
 
-	if len(retestablePipelines) == 0 {
+	// Track if we retested anything
+	retriedAny := false
+
+	// Retest PAC pipelines
+	if len(pacPipelines) > 0 {
+		if err := h.retestPipelines(pacPipelines); err != nil {
+			return err
+		}
+		retriedAny = true
+	}
+
+	// Retest GitHub Actions
+	if len(githubActions) > 0 {
+		if err := h.retestGitHubActions(githubActions); err != nil {
+			h.Warnf("Failed to retest some GitHub Actions: %v", err)
+			// Don't return error, continue to post summary
+		}
+		retriedAny = true
+	}
+
+	// If nothing was retested, post a message
+	if !retriedAny {
 		return h.postNoRetestablePipelinesMessage(skippedPipelines)
 	}
 
-	return h.retestPipelines(retestablePipelines)
+	return nil
+}
+
+// classifyFailedChecks classifies failed checks into PAC pipelines, GitHub Actions, and skipped checks
+func (h *PRHandler) classifyFailedChecks(failedChecks []git.CheckRun) ([]string, []git.CheckRun, []string) {
+	var pacPipelines []string
+	var githubActions []git.CheckRun
+	var skippedPipelines []string
+
+	for _, check := range failedChecks {
+		// Skip self-check
+		if h.shouldSkipSelfCheck(check.Name) {
+			continue
+		}
+
+		// Only process retestable checks
+		if !h.isRetestableCheck(check) {
+			continue
+		}
+
+		// Classify based on AppSlug
+		if check.AppSlug == "github-actions" {
+			// This is a GitHub Actions workflow
+			githubActions = append(githubActions, check)
+			h.Debugf("Classified as GitHub Action: %s (CheckSuiteID: %d)", check.Name, check.CheckSuiteID)
+		} else {
+			// This is a PAC pipeline or other check
+			pipelineName := extractPipelineName(check.Name)
+			if pipelineName != "" {
+				pacPipelines = append(pacPipelines, pipelineName)
+				h.Debugf("Classified as PAC pipeline: %s", pipelineName)
+			} else {
+				skippedPipelines = append(skippedPipelines, check.Name)
+				h.Debugf("Skipped check (cannot extract pipeline name): %s", check.Name)
+			}
+		}
+	}
+
+	return pacPipelines, githubActions, skippedPipelines
 }
 
 // filterRetestablePipelines filters failed checks to find pipelines that can be retested
@@ -193,4 +254,78 @@ func extractPipelineName(checkName string) string {
 
 	// Return the full name if it looks like a pipeline
 	return name
+}
+
+// retestGitHubActions retests GitHub Actions workflows by rerunning failed jobs
+func (h *PRHandler) retestGitHubActions(actions []git.CheckRun) error {
+	// Import the github package for type assertion
+	githubClient, ok := h.client.(interface {
+		GetWorkflowRunIDsFromCheckSuite(int64) ([]int64, error)
+		RerunWorkflowRunFailedJobs(int64) error
+	})
+
+	if !ok {
+		h.Warnf("Client does not support GitHub Actions rerun (not a GitHub client)")
+		return nil // Not an error, just skip GitHub Actions retest
+	}
+
+	// Collect unique workflow run IDs and their names
+	workflowRunMap := make(map[int64]string) // runID -> workflow name
+
+	for _, action := range actions {
+		if action.CheckSuiteID == 0 {
+			h.Warnf("Skipping GitHub Action %s: no check suite ID", action.Name)
+			continue
+		}
+
+		// Get workflow run IDs from check suite
+		runIDs, err := githubClient.GetWorkflowRunIDsFromCheckSuite(action.CheckSuiteID)
+		if err != nil {
+			h.Warnf("Failed to get workflow runs for %s (check suite %d): %v", action.Name, action.CheckSuiteID, err)
+			continue
+		}
+
+		// Store the workflow run IDs with the action name
+		for _, runID := range runIDs {
+			if _, exists := workflowRunMap[runID]; !exists {
+				workflowRunMap[runID] = action.Name
+			}
+		}
+	}
+
+	if len(workflowRunMap) == 0 {
+		h.Infof("No GitHub Actions workflow runs found to retest")
+		return nil
+	}
+
+	// Rerun failed jobs for each unique workflow run
+	var retriedWorkflows []string
+	var failedWorkflows []string
+
+	for runID, workflowName := range workflowRunMap {
+		h.Infof("Retrying GitHub Action workflow: %s (run ID: %d)", workflowName, runID)
+
+		if err := githubClient.RerunWorkflowRunFailedJobs(runID); err != nil {
+			h.Errorf("Failed to rerun GitHub Action %s (run ID: %d): %v", workflowName, runID, err)
+			failedWorkflows = append(failedWorkflows, workflowName)
+		} else {
+			retriedWorkflows = append(retriedWorkflows, workflowName)
+		}
+	}
+
+	// Post a summary comment
+	if len(retriedWorkflows) > 0 {
+		message := fmt.Sprintf("🔄 **Retested GitHub Actions**\n\nTriggered retests for:\n• %s",
+			strings.Join(retriedWorkflows, "\n• "))
+		if err := h.client.PostComment(message); err != nil {
+			h.Warnf("Failed to post GitHub Actions retest comment: %v", err)
+		}
+	}
+
+	// Return error if any workflows failed to retest
+	if len(failedWorkflows) > 0 {
+		return fmt.Errorf("failed to retest some GitHub Actions: %v", failedWorkflows)
+	}
+
+	return nil
 }

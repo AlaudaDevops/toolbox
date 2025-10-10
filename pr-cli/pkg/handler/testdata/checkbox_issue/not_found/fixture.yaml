@@ -1,0 +1,8 @@
+# Fixture: issue search expected to miss
+issue:
+  number: 0
+  title: Dependency Dashboard
+  state: open
+  author: alaudaa-renovate
+  body: ""
+  url: ""

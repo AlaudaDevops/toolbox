@@ -1,0 +1,10 @@
+# Fixture: issue already fully checked
+issue:
+  number: 310
+  title: Dependency Dashboard
+  state: open
+  author: alaudaa-renovate
+  body: |
+    - [x] synced everything
+    - [x] cleanup complete
+  url: https://example.com/issues/310

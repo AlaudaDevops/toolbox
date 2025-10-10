@@ -1,0 +1,4 @@
+# 期望结果：保持原样
+output: |
+  - [x] done 1
+  - [x] done 2

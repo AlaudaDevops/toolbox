@@ -1,0 +1,4 @@
+# 测试数据：无未勾选 checkbox
+input: |
+  - [x] done 1
+  - [x] done 2

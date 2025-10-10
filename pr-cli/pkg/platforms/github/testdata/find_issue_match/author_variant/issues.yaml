@@ -1,0 +1,19 @@
+description: Dataset ensuring sanitize of bot suffixed logins.
+
+issues:
+  - number: 5101
+    title: Dependency Dashboard
+    author: alaudaa-renovate[bot]
+    state: open
+    labels:
+      - renovate
+    body: |
+      - [ ] Align releases
+  - number: 5102
+    title: Dependency Dashboard
+    author: release-bot
+    state: open
+    labels:
+      - renovate
+    body: |
+      - [ ] Update release notes

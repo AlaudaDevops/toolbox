@@ -63,6 +63,22 @@ func (c *Client) PostComment(message string) error {
 	return fmt.Errorf("GitLab implementation not yet available")
 }
 
+func (c *Client) GetIssue(issueNumber int) (*git.Issue, error) {
+	return nil, fmt.Errorf("GitLab implementation not yet available")
+}
+
+func (c *Client) UpdateIssueBody(issueNumber int, body string) error {
+	return fmt.Errorf("GitLab implementation not yet available")
+}
+
+func (c *Client) FindIssue(opts git.IssueSearchOptions) (*git.Issue, error) {
+	return nil, fmt.Errorf("GitLab implementation not yet available")
+}
+
+func (c *Client) UpdatePRBody(body string) error {
+	return fmt.Errorf("GitLab implementation not yet available")
+}
+
 func (c *Client) GetComments() ([]git.Comment, error) {
 	return nil, fmt.Errorf("GitLab implementation not yet available")
 }

@@ -1,0 +1,5 @@
+description: Expected match referencing the canonical dependency dashboard issue.
+
+expected:
+  found: true
+  number: 2101

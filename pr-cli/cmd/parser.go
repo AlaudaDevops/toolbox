@@ -22,11 +22,12 @@ import (
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
+	"github.com/google/shlex"
 )
 
 var (
 	// Match pattern: /command [args...] or /__built-in-command [args...]
-	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-?pick|assign|merge|ready|unassign|label|unlabel|check|retest|close|batch)($|\s.*)`)
+	commentRegexp = regexp.MustCompile(`^/(help|rebase|lgtm|remove-lgtm|cherry-?pick|assign|merge|ready|unassign|label|unlabel|check|retest|close|batch|checkbox|checkbox-issue)($|\s.*)`)
 	// Match pattern for built-in commands: /__command [args...]
 	builtInCommandRegexp = regexp.MustCompile(`^/(__[a-z-_]+)\s*(.*)$`)
 )
@@ -54,9 +55,9 @@ func (p *PROption) parseCommand(commentStr string) (*ParsedCommand, error) {
 		command := builtInMatches[1] // Built-in command with __ prefix already captured
 		argsStr := strings.TrimSpace(builtInMatches[2])
 
-		var args []string
-		if argsStr != "" {
-			args = strings.Fields(argsStr)
+		args, err := splitArgs(argsStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid command arguments: %w", err)
 		}
 
 		return &ParsedCommand{
@@ -84,9 +85,9 @@ func (p *PROption) parseCommand(commentStr string) (*ParsedCommand, error) {
 	command := matches[1]
 	argsStr := strings.TrimSpace(matches[2])
 
-	var args []string
-	if argsStr != "" {
-		args = strings.Fields(argsStr)
+	args, err := splitArgs(argsStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid command arguments: %w", err)
 	}
 
 	return &ParsedCommand{
@@ -94,4 +95,11 @@ func (p *PROption) parseCommand(commentStr string) (*ParsedCommand, error) {
 		Command: command,
 		Args:    args,
 	}, nil
+}
+
+func splitArgs(argsStr string) ([]string, error) {
+	if strings.TrimSpace(argsStr) == "" {
+		return nil, nil
+	}
+	return shlex.Split(argsStr)
 }

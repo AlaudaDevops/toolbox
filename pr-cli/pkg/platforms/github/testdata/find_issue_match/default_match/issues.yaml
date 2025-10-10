@@ -1,0 +1,24 @@
+description: Core dataset for dependency dashboard issue matching.
+
+issues:
+  - number: 2101
+    title: Dependency Dashboard
+    author: alaudaa-renovate
+    state: open
+    labels:
+      - renovate
+      - dashboard
+    body: |
+      ### Checklist
+      - [ ] Update charts
+      - [x] Refresh indexes
+  - number: 2102
+    title: Dependency Dashboard Follow Up
+    author: alaudaa-renovate
+    state: open
+    labels:
+      - renovate
+      - backlog
+    body: |
+      ### Follow up
+      - [ ] Track remaining updates

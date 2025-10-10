@@ -1,0 +1,8 @@
+# Fixture: issue missing description body
+issue:
+  number: 402
+  title: Dependency Dashboard
+  state: open
+  author: alaudaa-renovate
+  body: ""
+  url: https://example.com/issues/402

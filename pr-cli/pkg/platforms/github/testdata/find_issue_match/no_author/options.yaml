@@ -1,0 +1,5 @@
+description: Filters that only match by title and state.
+
+options:
+  title: Dependency Dashboard
+  state: open

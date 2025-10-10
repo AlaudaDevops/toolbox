@@ -1,0 +1,6 @@
+# Fixture: Missing PR description for checkbox handler
+pr:
+  body: ""
+  url: https://example.com/pr/42
+
+comments: []

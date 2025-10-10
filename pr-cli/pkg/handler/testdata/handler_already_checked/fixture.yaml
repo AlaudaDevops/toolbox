@@ -1,0 +1,11 @@
+# Fixture: PR description already fully checked
+pr:
+  body: |
+    - [x] checklist completed
+  url: https://example.com/pr/13
+comments:
+  - id: 201
+    url: https://example.com/comment/201
+    body: |
+      * [x] ready
+      * [x] verified

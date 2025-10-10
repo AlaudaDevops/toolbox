@@ -96,6 +96,8 @@ Quick reference for all available PR comment commands:
 | `/batch` | Execute multiple commands in batch mode | `/cmd1 args... [/cmd2 args...]` | `/batch /assign user1 /merge squash` |
 | `/label` | Add labels to PR | `label1 label2 ...` | `/label bug enhancement` |
 | `/unlabel` | Remove labels from PR | `label1 label2 ...` | `/unlabel bug` |
+| `/checkbox` | Check unchecked boxes in the PR description | - | `/checkbox` |
+| `/checkbox-issue` | Check unchecked boxes in a specific or default dependency dashboard issue | `[issue] [--title ...] [--author ...]` | `/checkbox-issue 42` |
 | `/cherry-pick` | Cherry-pick to branches | `branch1 branch2 ...` | `/cherry-pick release/v1.0` |
 | `/cherrypick` | Cherry-pick to branches (alias) | `branch1 branch2 ...` | `/cherrypick release/v1.0` |
 | `/retest` | Trigger retest of failed checks | - | `/retest` |
@@ -134,6 +136,10 @@ You can execute multiple commands in a single comment by placing each command on
 ```
 
 > 📘 **Need More Details?** For complete command syntax, configuration options, and troubleshooting, see the **[CLI Reference](docs/usage.md)**. For Pipeline integration, see **[Pipeline Integration](pipeline/README.md)**.
+
+### Checkbox Issue Command
+
+Use `/checkbox-issue` to toggle unchecked boxes inside a standalone issue. You can pass an explicit issue number or rely on the default search for the open `Dependency Dashboard` created by `alaudaa-renovate`. Optional `--title` and `--author` flags customize the search criteria, for example `/checkbox-issue --title "Security Dashboard" --author team-bot`.
 
 ### Built-in Commands
 

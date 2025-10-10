@@ -332,6 +332,35 @@ Remove labels from the pull request.
 pr-cli --trigger-comment "/unlabel bug"
 ```
 
+#### `/checkbox`
+
+Check unchecked checkboxes in the pull request description.
+
+**Syntax:**
+```
+/checkbox
+```
+
+**Behavior:**
+- Updates the pull request description by toggling each `- [ ]` entry to `- [x]`
+- Posts a confirmation comment when at least one checkbox is updated
+- Posts an informational comment if the pull request description has no unchecked checkboxes
+
+#### `/checkbox-issue`
+
+Check unchecked checkboxes in a repository issue. By default it targets the first open issue titled `Dependency Dashboard` created by `alaudaa-renovate`.
+
+**Syntax:**
+```
+/checkbox-issue [issue-number] [--title <title>] [--author <author>]
+```
+
+**Behavior:**
+- With an issue number, toggles checkboxes directly in that issue description
+- Without a number, searches for an open issue matching the provided (or default) title/author
+- Posts a confirmation comment when at least one checkbox is updated
+- Posts an informational comment if the issue has no unchecked checkboxes or cannot be found
+
 #### `/cherrypick`
 
 Cherry-pick the pull request to other branches.

@@ -1,0 +1,10 @@
+# Fixture: default search issue with unchecked boxes
+issue:
+  number: 205
+  title: Dependency Dashboard
+  state: open
+  author: alaudaa-renovate
+  body: |
+    - [ ] upgrade toolkit
+    - [ ] verify integration
+  url: https://example.com/issues/205

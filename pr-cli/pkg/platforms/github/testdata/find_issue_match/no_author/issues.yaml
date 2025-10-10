@@ -1,0 +1,20 @@
+description: Dataset for searches that omit the author filter.
+
+issues:
+  - number: 3101
+    title: Dependency Dashboard
+    author: alaudaa-renovate
+    state: open
+    labels:
+      - renovate
+      - dashboard
+    body: |
+      - [ ] Align dependencies
+  - number: 3102
+    title: Dependency Dashboard
+    author: other-bot
+    state: open
+    labels:
+      - renovate
+    body: |
+      - [ ] Review updates

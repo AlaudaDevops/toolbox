@@ -1,0 +1,5 @@
+description: Expected match when label filters exclude partial matches.
+
+expected:
+  found: true
+  number: 4102

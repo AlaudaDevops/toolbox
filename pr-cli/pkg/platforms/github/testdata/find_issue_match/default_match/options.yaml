@@ -1,0 +1,6 @@
+description: Default search filters for dependency dashboard authored by renovate bot.
+
+options:
+  title: Dependency Dashboard
+  author: alaudaa-renovate
+  state: open

@@ -28,7 +28,7 @@ RUN if [ -z "$BUILD_DATE" ]; then export BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%
 
 RUN ./pr-cli version
 
-FROM build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202502271510
+FROM build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202510091100
 
 RUN apk add --no-cache \
     bash \

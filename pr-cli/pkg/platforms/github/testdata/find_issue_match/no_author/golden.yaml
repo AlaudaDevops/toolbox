@@ -1,0 +1,5 @@
+description: Expected match without specifying an author filter.
+
+expected:
+  found: true
+  number: 3101
