@@ -1,6 +1,6 @@
 module github.com/alaudadevops/toolbox/kube-bench-report
 
-go 1.25.2
+go 1.25.3
 
 require github.com/spf13/cobra v1.8.1
 
