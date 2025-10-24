@@ -149,6 +149,9 @@ func (h *PRHandler) GetCommentsWithCache() ([]git.Comment, error) {
 
 	h.commentsCache = comments
 	h.Debugf("Cached comments (%d comments)", len(h.commentsCache))
+	for i := range comments {
+		h.Debugf("Comment %d by %d %+v: %s", i+1, comments[i].ID, comments[i].User, comments[i].Body)
+	}
 	return comments, nil
 }
 
