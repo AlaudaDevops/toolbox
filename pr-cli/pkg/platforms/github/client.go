@@ -677,15 +677,19 @@ func (c *Client) processReviewVotes(lgtmUsers map[string]string) (map[string]*gi
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reviews: %w", err)
 	}
-
-	userLatestReviews := c.findLatestReviews(reviews)
-	c.addApprovedReviews(lgtmUsers, userLatestReviews)
+	userLatestReviews := c.findLatestActionableReviews(reviews)
+	for i := range userLatestReviews {
+		review := userLatestReviews[i]
+		c.Logger.Debugf("Latest actionable review for %s: state=%s submitted_at=%s", review.User.Login, review.State, review.SubmittedAt)
+	}
+	userApprovedReviews := c.findEffectiveApprovals(reviews)
+	c.addApprovedReviews(lgtmUsers, userLatestReviews, userApprovedReviews)
 
 	return userLatestReviews, nil
 }
 
-// findLatestReviews finds the latest review for each user
-func (c *Client) findLatestReviews(reviews []git.Review) map[string]*git.Review {
+// findLatestActionableReviews finds the latest review with actionable state for each user
+func (c *Client) findLatestActionableReviews(reviews []git.Review) map[string]*git.Review {
 	userLatestReviews := make(map[string]*git.Review)
 
 	for i := range reviews {
@@ -693,6 +697,11 @@ func (c *Client) findLatestReviews(reviews []git.Review) map[string]*git.Review 
 		user := strings.ToLower(review.User.Login)
 
 		if strings.EqualFold(user, c.prSender) { // Skip self-approvals
+			continue
+		}
+
+		if !isActionableReviewState(review.State) {
+			c.Debugf("Skipping non-actionable review from user: %s (state: %s)", user, review.State)
 			continue
 		}
 
@@ -704,14 +713,65 @@ func (c *Client) findLatestReviews(reviews []git.Review) map[string]*git.Review 
 	return userLatestReviews
 }
 
+func isActionableReviewState(state string) bool {
+	switch strings.ToUpper(state) {
+	case "APPROVED", "CHANGES_REQUESTED", "REQUEST_CHANGES", "DISMISSED":
+		return true
+	default:
+		return false
+	}
+}
+
 // addApprovedReviews adds users who have approved via reviews
-func (c *Client) addApprovedReviews(lgtmUsers map[string]string, userLatestReviews map[string]*git.Review) {
+func (c *Client) addApprovedReviews(lgtmUsers map[string]string, userLatestReviews map[string]*git.Review, userApprovedReviews map[string]*git.Review) {
 	for user, latestReview := range userLatestReviews {
-		if latestReview.State == "APPROVED" {
+		if approval, approved := userApprovedReviews[user]; approved {
 			lgtmUsers[user] = ""
-			c.Debugf("Found APPROVED from user: %s (latest review)", user)
+			if approval == latestReview {
+				c.Debugf("Found APPROVED from user: %s (latest review)", user)
+			} else {
+				c.Debugf("Found APPROVED from user: %s (retained approval submitted_at=%s despite latest state: %s)", user, approval.SubmittedAt, latestReview.State)
+			}
+			continue
+		}
+		c.Debugf("Ignoring latest review from user: %s (state: %s)", user, latestReview.State)
+	}
+}
+
+// findEffectiveApprovals determines the latest non-revoked approval for each user
+func (c *Client) findEffectiveApprovals(reviews []git.Review) map[string]*git.Review {
+	latestApprovals := make(map[string]*git.Review)
+	latestRevocations := make(map[string]*git.Review)
+
+	for i := range reviews {
+		review := &reviews[i]
+		user := strings.ToLower(review.User.Login)
+
+		if strings.EqualFold(user, c.prSender) {
+			continue
+		}
+
+		switch {
+		case strings.EqualFold(review.State, "APPROVED"):
+			if existing, exists := latestApprovals[user]; !exists || review.SubmittedAt > existing.SubmittedAt {
+				latestApprovals[user] = review
+			}
+		case strings.EqualFold(review.State, "CHANGES_REQUESTED"), strings.EqualFold(review.State, "REQUEST_CHANGES"), strings.EqualFold(review.State, "DISMISSED"):
+			if existing, exists := latestRevocations[user]; !exists || review.SubmittedAt > existing.SubmittedAt {
+				latestRevocations[user] = review
+			}
 		}
 	}
+
+	effectiveApprovals := make(map[string]*git.Review)
+	for user, approval := range latestApprovals {
+		if revocation, revoked := latestRevocations[user]; revoked && revocation.SubmittedAt >= approval.SubmittedAt {
+			continue
+		}
+		effectiveApprovals[user] = approval
+	}
+
+	return effectiveApprovals
 }
 
 // processCommentVotesWithComments processes LGTM commands from provided or fetched comments

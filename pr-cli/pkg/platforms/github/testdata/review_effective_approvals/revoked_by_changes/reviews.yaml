@@ -1,0 +1,15 @@
+description: remove approval when changes are requested after the approval
+pr_sender: author
+reviews:
+
+  - user: reviewer-a
+    state: APPROVED
+    submitted_at: 2025-10-24T09:00:00Z
+
+  - user: reviewer-a
+    state: COMMENTED
+    submitted_at: 2025-10-24T09:05:00Z
+
+  - user: reviewer-a
+    state: CHANGES_REQUESTED
+    submitted_at: 2025-10-24T09:10:00Z

@@ -1,0 +1,11 @@
+description: remove approval when it is dismissed after submission
+pr_sender: author
+reviews:
+
+  - user: reviewer-c
+    state: APPROVED
+    submitted_at: 2025-10-24T07:00:00Z
+
+  - user: reviewer-c
+    state: DISMISSED
+    submitted_at: 2025-10-24T07:05:00Z
