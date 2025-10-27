@@ -1,0 +1,15 @@
+description: restore approval when a new approval is submitted after requested changes
+pr_sender: author
+reviews:
+
+  - user: reviewer-b
+    state: APPROVED
+    submitted_at: 2025-10-24T08:00:00Z
+
+  - user: reviewer-b
+    state: CHANGES_REQUESTED
+    submitted_at: 2025-10-24T08:10:00Z
+
+  - user: reviewer-b
+    state: APPROVED
+    submitted_at: 2025-10-24T08:20:00Z

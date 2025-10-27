@@ -1,0 +1,11 @@
+description: retain approval when only a comment follows the approval
+pr_sender: author
+reviews:
+
+  - user: kycheng
+    state: APPROVED
+    submitted_at: 2025-10-24T09:16:07Z
+
+  - user: kycheng
+    state: COMMENTED
+    submitted_at: 2025-10-24T09:20:38Z
