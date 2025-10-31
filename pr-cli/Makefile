@@ -170,3 +170,77 @@ docker-build:
 	@echo "Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
 	docker build $(DOCKER_BUILD_ARGS) -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 	@echo "Docker image built successfully: $(DOCKER_IMAGE):$(DOCKER_TAG)"
+
+## docker-push: Push Docker image
+.PHONY: docker-push
+docker-push: docker-build
+	@echo "Pushing Docker image $(DOCKER_IMAGE):$(DOCKER_TAG)..."
+	docker push $(DOCKER_IMAGE):$(DOCKER_TAG)
+
+# Kubernetes deployment variables
+KUSTOMIZE_DIR=deploy
+ENVIRONMENT?=development
+
+## k8s-build: Build Kubernetes manifests for an environment
+.PHONY: k8s-build
+k8s-build:
+	@echo "Building Kubernetes manifests for $(ENVIRONMENT)..."
+	@command -v kustomize >/dev/null 2>&1 && kustomize build $(KUSTOMIZE_DIR)/overlays/$(ENVIRONMENT) || kubectl kustomize $(KUSTOMIZE_DIR)/overlays/$(ENVIRONMENT)
+
+## k8s-deploy: Deploy to Kubernetes
+.PHONY: k8s-deploy
+k8s-deploy:
+	@echo "Deploying to $(ENVIRONMENT)..."
+	@./$(KUSTOMIZE_DIR)/scripts/deploy.sh $(ENVIRONMENT)
+
+## k8s-deploy-dev: Deploy to development environment
+.PHONY: k8s-deploy-dev
+k8s-deploy-dev:
+	@$(MAKE) k8s-deploy ENVIRONMENT=development
+
+## k8s-deploy-staging: Deploy to staging environment
+.PHONY: k8s-deploy-staging
+k8s-deploy-staging:
+	@$(MAKE) k8s-deploy ENVIRONMENT=staging
+
+## k8s-deploy-prod: Deploy to production environment
+.PHONY: k8s-deploy-prod
+k8s-deploy-prod:
+	@$(MAKE) k8s-deploy ENVIRONMENT=production
+
+## k8s-dry-run: Show manifests without applying
+.PHONY: k8s-dry-run
+k8s-dry-run:
+	@echo "Dry run for $(ENVIRONMENT)..."
+	@DRY_RUN=true ./$(KUSTOMIZE_DIR)/scripts/deploy.sh $(ENVIRONMENT)
+
+## k8s-delete: Delete deployment from Kubernetes
+.PHONY: k8s-delete
+k8s-delete:
+	@echo "Deleting deployment from $(ENVIRONMENT)..."
+	kubectl delete -k $(KUSTOMIZE_DIR)/overlays/$(ENVIRONMENT)
+
+## k8s-status: Check deployment status
+.PHONY: k8s-status
+k8s-status:
+	@echo "Checking deployment status for $(ENVIRONMENT)..."
+	@case $(ENVIRONMENT) in \
+		development) NAMESPACE=pr-cli-dev ;; \
+		staging) NAMESPACE=pr-cli-staging ;; \
+		production) NAMESPACE=pr-cli ;; \
+		*) NAMESPACE=pr-cli-dev ;; \
+	esac; \
+	echo "Namespace: $$NAMESPACE"; \
+	kubectl get all -n $$NAMESPACE -l app.kubernetes.io/name=pr-cli
+
+## k8s-logs: View logs from deployment
+.PHONY: k8s-logs
+k8s-logs:
+	@echo "Viewing logs for $(ENVIRONMENT)..."
+	@case $(ENVIRONMENT) in \
+		development) NAMESPACE=pr-cli-dev ;; \
+		staging) NAMESPACE=pr-cli-staging ;; \
+		production) NAMESPACE=pr-cli ;; \
+		*) NAMESPACE=pr-cli-dev ;; \
+	esac; \
+	kubectl logs -n $$NAMESPACE -l app.kubernetes.io/name=pr-cli --tail=100 -f

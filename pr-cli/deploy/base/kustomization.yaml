@@ -1,0 +1,52 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pr-cli
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+  - secret.yaml
+  # - servicemonitor.yaml
+  - networkpolicy.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: pr-cli
+      app.kubernetes.io/component: webhook-service
+      app.kubernetes.io/part-of: pr-automation
+
+configMapGenerator:
+  - name: pr-cli-config
+    behavior: merge
+    literals:
+      - LISTEN_ADDR=:8080
+      - WEBHOOK_PATH=/webhook
+      - HEALTH_PATH=/health
+      - METRICS_PATH=/metrics
+      - ASYNC_PROCESSING=true
+      - WORKER_COUNT=10
+      - QUEUE_SIZE=100
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS=100
+      - REQUIRE_SIGNATURE=true
+      - PR_PLATFORM=github
+      - PR_LGTM_THRESHOLD=1
+      - PR_MERGE_METHOD=auto
+      - PR_VERBOSE=false
+
+secretGenerator:
+  - name: pr-cli-secrets
+    behavior: merge
+    # These should be overridden in overlays with actual values
+    literals:
+      - WEBHOOK_SECRET=changeme
+      - PR_TOKEN=changeme
+
+images:
+  - name: pr-cli
+    newName: pr-cli
+    newTag: latest

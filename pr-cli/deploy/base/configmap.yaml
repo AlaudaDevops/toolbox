@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pr-cli-config
+data:
+  # Server Configuration
+  LISTEN_ADDR: ":8080"
+  WEBHOOK_PATH: "/webhook"
+  HEALTH_PATH: "/health"
+  METRICS_PATH: "/metrics"
+  
+  # Processing Configuration
+  ASYNC_PROCESSING: "true"
+  WORKER_COUNT: "10"
+  QUEUE_SIZE: "100"
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS: "100"
+  
+  # Security
+  REQUIRE_SIGNATURE: "true"
+  
+  # PR CLI Configuration
+  PR_PLATFORM: "github"
+  PR_LGTM_THRESHOLD: "1"
+  PR_MERGE_METHOD: "auto"
+  PR_VERBOSE: "false"
+
