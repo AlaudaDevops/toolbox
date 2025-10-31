@@ -1,0 +1,16 @@
+# 📋 GitHub PR Report
+
+**Org:** {{.organization}} | **Min Days:** {{.min_days_open}} | **Total Old PRs:** {{.total_old_prs}}
+
+{{if gt .total_old_prs 0.0}}
+{{range $i, $pr := .pull_requests}}{{if lt $i 10.0}}
+### [#{{$pr.number}}]({{$pr.url}}) {{$pr.title}}
+`{{$pr.repository}}` | @{{$pr.author}}{{if $pr.draft}} 🚧{{end}} | {{$pr.days_open}} days
+{{if $pr.assignees}}**Assignees:** {{range $j, $assignee := $pr.assignees}}{{if $j}}, {{end}}@{{$assignee}}{{end}}{{end}}
+{{end}}{{end}}
+{{if gt .total_old_prs 10.0}}
+*...and {{sub .total_old_prs 10.0}} more PRs*
+{{end}}
+{{else}}
+✅ **No old PRs found**
+{{end}}

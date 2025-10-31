@@ -1,0 +1,16 @@
+# 📋 GitLab MR Report
+
+**Group:** {{.group}} | **Min Days:** {{.min_days_open}} | **Total Old MRs:** {{.total_old_mrs}}
+
+{{if gt .total_old_mrs 0.0}}
+{{range $i, $mr := .merge_requests}}{{if lt $i 10.0}}
+### [!{{$mr.iid}}]({{$mr.web_url}}) {{$mr.title}}
+`{{$mr.project}}` | @{{$mr.author}}{{if $mr.draft}} 🚧{{end}} | {{$mr.days_open}} days{{if $mr.pipeline_status}} | {{if eq $mr.pipeline_status "success"}}✅{{else if eq $mr.pipeline_status "failed"}}❌{{else if eq $mr.pipeline_status "running"}}🔄{{else}}⚠️{{end}}{{end}}
+{{if $mr.assignees}}**Assignees:** {{range $j, $assignee := $mr.assignees}}{{if $j}}, {{end}}@{{$assignee}}{{end}}{{end}}
+{{end}}{{end}}
+{{if gt .total_old_mrs 10.0}}
+*...and {{sub .total_old_mrs 10.0}} more MRs*
+{{end}}
+{{else}}
+✅ **No old MRs found**
+{{end}}
