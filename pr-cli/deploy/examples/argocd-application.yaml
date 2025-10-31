@@ -1,0 +1,92 @@
+# Example: ArgoCD Application for GitOps deployment
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pr-cli-webhook-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AlaudaDevops/toolbox
+    targetRevision: main
+    path: pr-cli/deploy/overlays/development
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pr-cli-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pr-cli-webhook-staging
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AlaudaDevops/toolbox
+    targetRevision: main
+    path: pr-cli/deploy/overlays/staging
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pr-cli-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pr-cli-webhook-prod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/AlaudaDevops/toolbox
+    targetRevision: main
+    path: pr-cli/deploy/overlays/production
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pr-cli
+  syncPolicy:
+    # Manual sync for production - require approval
+    automated: null
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+

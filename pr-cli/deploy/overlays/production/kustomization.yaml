@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: pr-cli
+
+namePrefix: prod-
+
+labels:
+  - pairs:
+      environment: production
+
+resources:
+  - ../../base
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+
+replicas:
+  - name: pr-cli-webhook
+    count: 3
+
+configMapGenerator:
+  - name: pr-cli-config
+    behavior: merge
+    literals:
+      - WORKER_COUNT=20
+      - QUEUE_SIZE=200
+      - RATE_LIMIT_REQUESTS=200
+
+patches:
+  - path: deployment-patch.yaml
+
+images:
+  - name: pr-cli
+    newName: pr-cli
+    newTag: v1.0.0
+
