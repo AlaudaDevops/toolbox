@@ -166,6 +166,35 @@ The tool provides clear error messages for common issues:
 - Network connectivity issues
 - Permission errors
 
+## WeChat Work Integration
+
+Send PR/MR reports directly to WeChat Work (企业微信) webhooks. See [WECOM_INTEGRATION.md](WECOM_INTEGRATION.md) for detailed documentation.
+
+### Quick Start
+
+```bash
+# Test the templates
+./scripts/test-wecom.sh
+
+# Send GitHub PR report to WeChat Work
+./scripts/send-to-wecom.sh github example-output.json "$WECOM_WEBHOOK_URL"
+
+# Send GitLab MR report to WeChat Work
+./scripts/send-to-wecom.sh gitlab example-gitlab-output.json "$WECOM_WEBHOOK_URL"
+```
+
+### Integration with PR Watcher
+
+```bash
+# Watch PRs and send report to WeChat Work
+pr-watcher watch-prs --org myorg --days 7 --output /tmp/prs.json
+./scripts/send-to-wecom.sh github /tmp/prs.json "$WECOM_WEBHOOK_URL"
+
+# Watch MRs and send report to WeChat Work
+pr-watcher watch-mrs --group mygroup --days 7 --output /tmp/mrs.json
+./scripts/send-to-wecom.sh gitlab /tmp/mrs.json "$WECOM_WEBHOOK_URL"
+```
+
 ## Contributing
 
 1. Fork the repository
