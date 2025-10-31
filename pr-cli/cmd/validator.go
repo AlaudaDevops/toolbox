@@ -92,7 +92,8 @@ func (p *PROption) initialize() error {
 
 	// Validate configuration
 	if err := p.Config.Validate(); err != nil {
-		return fmt.Errorf("configuration validation failed: %w", err)
+		return err
+		// // return fmt.Errorf("configuration validation failed: %w", err)
 	}
 
 	return nil
