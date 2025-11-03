@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/executor"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
 )
 
@@ -45,32 +46,22 @@ func (p *PROption) executeMultiCommand(prHandler *handler.PRHandler, commandLine
 
 // parseMultiCommandLines parses multiple command lines into SubCommand structs
 func (p *PROption) parseMultiCommandLines(commandLines []string) ([]handler.SubCommand, error) {
-	var subCommands []handler.SubCommand
+	// Use the shared executor package for parsing
+	subCommands, err := executor.ParseMultiCommandLines(commandLines)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, cmdLine := range commandLines {
-		parsedCmd, err := p.parseCommand(cmdLine)
-		if err != nil {
-			p.Errorf("Failed to parse command line '%s': %v", cmdLine, err)
-			continue
-		}
-
-		// Skip nested multi-command recursion
-		if parsedCmd.Type == MultiCommand {
-			p.Warnf("Ignoring nested multi-command in line: %s", cmdLine)
-			continue
-		}
-
-		subCommands = append(subCommands, handler.SubCommand{
-			Command: parsedCmd.Command,
-			Args:    parsedCmd.Args,
+	// Convert executor.SubCommand to handler.SubCommand
+	var handlerSubCommands []handler.SubCommand
+	for _, subCmd := range subCommands {
+		handlerSubCommands = append(handlerSubCommands, handler.SubCommand{
+			Command: subCmd.Command,
+			Args:    subCmd.Args,
 		})
 	}
 
-	if len(subCommands) == 0 {
-		return nil, fmt.Errorf("no valid commands found in multi-line comment")
-	}
-
-	return subCommands, nil
+	return handlerSubCommands, nil
 }
 
 // validateMultiCommandExecution validates permissions and PR status for multi-command execution
@@ -127,7 +118,12 @@ func (p *PROption) handleMultiCommandExecution(prHandler *handler.PRHandler, sub
 
 // processMultiCommand executes a single command in multi-command context
 func (p *PROption) processMultiCommand(prHandler *handler.PRHandler, subCmd handler.SubCommand) string {
-	cmdDisplay := p.getCommandDisplayName(subCmd)
+	// Convert handler.SubCommand to executor.SubCommand for display name
+	execSubCmd := executor.SubCommand{
+		Command: subCmd.Command,
+		Args:    subCmd.Args,
+	}
+	cmdDisplay := executor.GetCommandDisplayName(execSubCmd)
 
 	// Execute the command
 	if err := prHandler.ExecuteCommand(subCmd.Command, subCmd.Args); err != nil {
@@ -136,14 +132,6 @@ func (p *PROption) processMultiCommand(prHandler *handler.PRHandler, subCmd hand
 	}
 
 	return fmt.Sprintf("✅ Command `%s` executed successfully", cmdDisplay)
-}
-
-// getCommandDisplayName returns the display name for a command including its arguments
-func (p *PROption) getCommandDisplayName(subCmd handler.SubCommand) string {
-	if len(subCmd.Args) == 0 {
-		return fmt.Sprintf("/%s", subCmd.Command)
-	}
-	return fmt.Sprintf("/%s %s", subCmd.Command, strings.Join(subCmd.Args, " "))
 }
 
 // validateCommentSenderForMultiCommand validates comment sender for multi-command execution
