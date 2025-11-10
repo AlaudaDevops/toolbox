@@ -279,7 +279,7 @@ func (h *RoadmapHandler) UpdateEpicMilestone(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("Failed to update epic milestone", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": fmt.Sprint("Failed to update epic milestone: %s", err),
+			"error": fmt.Sprintf("Failed to update epic milestone: %s", err),
 		})
 		return
 	}
