@@ -349,6 +349,8 @@ func (c *Client) CreateEpic(ctx context.Context, req models.CreateEpicRequest) (
 		issue.Fields.Priority = &jira.Priority{Name: req.Priority}
 	}
 
+	c.logger.Sugar().Debugw("Creating epic issue", "issue", issue, "paylod", req)
+
 	createdIssue, resp, err := c.inner.Issue.CreateWithContext(ctx, issue)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create epic: %s", c.handleError(resp, err))

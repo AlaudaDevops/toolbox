@@ -82,7 +82,7 @@ type CreateMilestoneRequest struct {
 // CreateEpicRequest represents the request to create a new epic
 type CreateEpicRequest struct {
 	Name        string `json:"name" binding:"required"`
-	Component   string `json:"component" binding:"required"`
+	Component   string `json:"component"`
 	Version     string `json:"version"`
 	MilestoneID string `json:"milestone_id" binding:"required"`
 	Priority    string `json:"priority"`

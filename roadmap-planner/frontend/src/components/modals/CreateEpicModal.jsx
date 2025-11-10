@@ -109,7 +109,10 @@ const CreateEpicModal = ({ milestone, onClose }) => {
                 <FilterableSelect
                   id="component"
                   value={field.value || ''}
-                  onChange={field.onChange}
+                  onChange={(selectedOption) => {
+                    console.debug("component changed?", selectedOption);
+                    field.onChange(selectedOption?.value || '');
+                  }}
                   options={availableComponents}
                   placeholder="Search and select a component..."
                   className={errors.component ? 'error' : ''}
@@ -148,7 +151,10 @@ const CreateEpicModal = ({ milestone, onClose }) => {
                 <FilterableSelect
                   id="version"
                   value={field.value || ''}
-                  onChange={field.onChange}
+                  onChange={(selectedOption) => {
+                    console.debug("version changed?", selectedOption);
+                    field.onChange(selectedOption?.value || '');
+                  }}
                   options={availableVersions}
                   placeholder="Search and select a version..."
                   className={errors.version ? 'error' : ''}
