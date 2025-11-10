@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/executor"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
 )
 
@@ -131,10 +132,8 @@ func TestParseMultiCommandLines(t *testing.T) {
 	}
 }
 
-// TestGetCommandDisplayName tests the getCommandDisplayName function
+// TestGetCommandDisplayName tests the GetCommandDisplayName function
 func TestGetCommandDisplayName(t *testing.T) {
-	option := NewPROption()
-
 	tests := []struct {
 		name     string
 		subCmd   handler.SubCommand
@@ -169,9 +168,14 @@ func TestGetCommandDisplayName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := option.getCommandDisplayName(tt.subCmd)
+			// Convert handler.SubCommand to executor.SubCommand
+			execSubCmd := executor.SubCommand{
+				Command: tt.subCmd.Command,
+				Args:    tt.subCmd.Args,
+			}
+			result := executor.GetCommandDisplayName(execSubCmd)
 			if result != tt.expected {
-				t.Errorf("getCommandDisplayName() = %s, want %s", result, tt.expected)
+				t.Errorf("GetCommandDisplayName() = %s, want %s", result, tt.expected)
 			}
 		})
 	}

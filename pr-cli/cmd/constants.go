@@ -16,45 +16,20 @@ limitations under the License.
 
 package cmd
 
-import "fmt"
+import "github.com/AlaudaDevops/toolbox/pr-cli/pkg/executor"
 
-// CommandType represents the type of parsed command
-type CommandType int
+// Re-export types from executor package for backward compatibility
+type CommandType = executor.CommandType
+type ParsedCommand = executor.ParsedCommand
 
 const (
-	// SingleCommand represents a regular single command
-	SingleCommand CommandType = iota
-	// MultiCommand represents multiple commands in a single comment
-	MultiCommand
-	// BuiltInCommand represents a built-in system command
-	BuiltInCommand
+	SingleCommand  = executor.SingleCommand
+	MultiCommand   = executor.MultiCommand
+	BuiltInCommand = executor.BuiltInCommand
 )
-
-// String returns the string representation of CommandType
-func (ct CommandType) String() string {
-	switch ct {
-	case SingleCommand:
-		return "SingleCommand"
-	case MultiCommand:
-		return "MultiCommand"
-	case BuiltInCommand:
-		return "BuiltInCommand"
-	default:
-		return fmt.Sprintf("Unknown(%d)", int(ct))
-	}
-}
 
 // Error message constants for consistency
 const (
-	ErrUnsupportedCommandType = "unsupported command type: %s"
-	ErrUnknownCommandType     = "unknown command type: %s"
+	ErrUnsupportedCommandType = executor.ErrUnsupportedCommandType
+	ErrUnknownCommandType     = executor.ErrUnknownCommandType
 )
-
-// ParsedCommand encapsulates a parsed command with its type and data
-type ParsedCommand struct {
-	Type            CommandType
-	Command         string
-	Args            []string
-	CommandLines    []string // Used only for MultiCommand type (processed)
-	RawCommandLines []string // Used only for MultiCommand type (original, unprocessed)
-}

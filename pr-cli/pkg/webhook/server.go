@@ -25,6 +25,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/executor"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -159,24 +160,34 @@ func (s *Server) processWebhookSync(event *WebhookEvent) error {
 	// Create PR handler
 	prHandler, err := handler.NewPRHandler(s.logger, cfg)
 	if err != nil {
+		CommandExecutionTotal.WithLabelValues(event.Platform, "unknown", "error").Inc()
 		return fmt.Errorf("failed to create PR handler: %w", err)
 	}
 
-	// Parse and execute command
-	command, args := parseSimpleCommand(cfg.TriggerComment)
-	if command == "" {
-		return fmt.Errorf("failed to parse command from: %s", cfg.TriggerComment)
+	// Parse command using shared executor
+	parsedCmd, err := executor.ParseCommand(cfg.TriggerComment)
+	if err != nil {
+		s.logger.Errorf("Failed to parse command from %q: %v", cfg.TriggerComment, err)
+		CommandExecutionTotal.WithLabelValues(event.Platform, "unknown", "error").Inc()
+		return fmt.Errorf("failed to parse command: %w", err)
 	}
 
-	// Execute the command
-	if err := prHandler.ExecuteCommand(command, args); err != nil {
-		CommandExecutionTotal.WithLabelValues(event.Platform, command, "error").Inc()
-		return fmt.Errorf("failed to execute command: %w", err)
+	switch parsedCmd.Type {
+		case executor.SingleCommand, executor.BuiltInCommand:
+			if err = prHandler.ExecuteCommand(parsedCmd.Command, parsedCmd.Args); err != nil {
+				CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "error").Inc()
+				return fmt.Errorf("failed to execute command %s with args %v: %w", parsedCmd.Command, parsedCmd.Args, err)
+			}
+			CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "success").Inc()
+			WebhookProcessingDuration.WithLabelValues(event.Platform, parsedCmd.Command).Observe(time.Since(startTime).Seconds())
+		case executor.MultiCommand:
+			// TODO: Implement multicommand executor
+			//CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "success").Inc()
+			// WebhookProcessingDuration.WithLabelValues(event.Platform, parsedCmd.Command).Observe(time.Since(startTime).Seconds())
+		default:
+			s.logger.Warnf("Unknown command type: %s", parsedCmd.Type)
+			CommandExecutionTotal.WithLabelValues(event.Platform, "unknown", "error").Inc()
 	}
-
-	CommandExecutionTotal.WithLabelValues(event.Platform, command, "success").Inc()
-	WebhookProcessingDuration.WithLabelValues(event.Platform, command).Observe(time.Since(startTime).Seconds())
-
 	return nil
 }
 
