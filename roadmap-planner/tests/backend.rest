@@ -5,10 +5,10 @@
 @baseUrl = http://localhost:8080
 # @jiraUsername = {{jiraUsername}}
 # @jiraPassword = {{jiraPassword}}
-# @jiraBaseUrl = {{$jiraBaseUrl}}
-# @jiraProject = {{$jiraProject}}
+# @jiraBaseUrl = {{jiraBaseUrl}}
+# @jiraProject = {{jiraProject}}
 # @assigneeId = {{$shared assigneeId}}
-# @issueKey =
+@issueKey = DEVOPS-41822
 
 ### Health Check
 GET {{baseUrl}}/health

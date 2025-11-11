@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/middleware"
@@ -136,7 +137,7 @@ func (h *RoadmapHandler) GetEpics(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("Failed to fetch epics", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to fetch epics",
+			"error": fmt.Sprintf("Failed to fetch epics: %s", err),
 		})
 		return
 	}
@@ -159,7 +160,7 @@ func (h *RoadmapHandler) CreateMilestone(c *gin.Context) {
 	var req models.CreateMilestoneRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error": fmt.Sprintf("Invalid request format: %s", err),
 		})
 		return
 	}
@@ -231,7 +232,7 @@ func (h *RoadmapHandler) CreateEpic(c *gin.Context) {
 	var req models.CreateEpicRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error": fmt.Sprintf("Invalid request format: %s", err),
 		})
 		return
 	}
@@ -269,7 +270,7 @@ func (h *RoadmapHandler) UpdateEpicMilestone(c *gin.Context) {
 	var req models.UpdateEpicMilestoneRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error": fmt.Sprintf("Invalid request format: %s", err),
 		})
 		return
 	}
@@ -278,7 +279,7 @@ func (h *RoadmapHandler) UpdateEpicMilestone(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("Failed to update epic milestone", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update epic milestone",
+			"error": fmt.Sprintf("Failed to update epic milestone: %s", err),
 		})
 		return
 	}
@@ -309,7 +310,7 @@ func (h *RoadmapHandler) UpdateEpic(c *gin.Context) {
 	var req models.UpdateEpicRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error": fmt.Sprintf("Invalid request format: %s", err),
 		})
 		return
 	}
@@ -318,7 +319,7 @@ func (h *RoadmapHandler) UpdateEpic(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("Failed to update epic", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update epic",
+			"error": fmt.Sprintf("Failed to update epic: %s", err),
 		})
 		return
 	}

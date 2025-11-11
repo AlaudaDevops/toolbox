@@ -22,6 +22,7 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
   });
 
   const onSubmit = async (data) => {
+    console.debug("submitting", data)
     // Don't submit if the milestone hasn't changed
     if (data.milestone_id === epic.milestone_id) {
       onClose();
@@ -106,9 +107,12 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
                 <FilterableSelect
                   id="milestone_id"
                   value={field.value}
-                  onChange={field.onChange}
+                  onChange={(selectedOption) => {
+                    console.debug("milestone changed?", selectedOption);
+                    field.onChange(selectedOption?.value || '');
+                  }}
                   options={availableMilestones}
-                  placeholder="Search and select a milestone..."
+                  placeholder="Select a milestone..."
                   className={errors.milestone_id ? 'error' : ''}
                   error={!!errors.milestone_id}
                   disabled={isSubmitting}
@@ -117,7 +121,6 @@ const EpicMoveModal = ({ epic, currentMilestone, availableMilestones, onClose })
                   }
                   getOptionValue={(milestone) => milestone.id}
                   filterFunction={(milestone, searchTerm) => {
-                    console.log("mileston and search term", milestone, searchTerm);
                     const search = searchTerm.toLowerCase();
                     return (
                       milestone.data.name.toLowerCase().includes(search) ||
