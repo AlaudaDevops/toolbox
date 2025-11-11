@@ -24,6 +24,12 @@ const AssigneeSelect = ({
 
     setIsLoading(true);
     try {
+
+      const selectedUser = {
+        value: value ? value.name : "",
+        label: value? `${value.display_name} (${value.email_address})`: "",
+        user: value || null
+      }
       const result = await getAssignableUsers(issueKey, query);
       if (result.success) {
         const userOptions = (result.data || []).map(user => ({
@@ -31,9 +37,16 @@ const AssigneeSelect = ({
           label: `${user.display_name} (${user.email_address})`,
           user: user
         }));
+        if (selectedUser.value && !userOptions.find(user => user.value === selectedUser.value)) {
+          userOptions.unshift(selectedUser);
+        }
         setUsers(userOptions);
       } else {
-        setUsers([]);
+        if (selectedUser.value) {
+          setUsers([selectedUser]);
+        } else {
+          setUsers([]);
+        }
       }
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -41,7 +54,7 @@ const AssigneeSelect = ({
     } finally {
       setIsLoading(false);
     }
-  }, [issueKey, getAssignableUsers]);
+  }, [issueKey, getAssignableUsers, value]);
 
   // Load initial users on mount
   useEffect(() => {
