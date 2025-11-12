@@ -19,7 +19,6 @@ package webhook
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
@@ -75,8 +74,6 @@ func (w *Worker) start(ctx context.Context) {
 
 // processJob processes a single webhook job
 func (w *Worker) processJob(ctx context.Context, job *WebhookJob) {
-	startTime := time.Now()
-
 	logger := w.logger.WithFields(logrus.Fields{
 		"worker":   w.id,
 		"platform": job.Event.Platform,
@@ -107,95 +104,38 @@ func (w *Worker) processJob(ctx context.Context, job *WebhookJob) {
 		return
 	}
 
-	// Execute based on command type
-	switch parsedCmd.Type {
-	case executor.SingleCommand, executor.BuiltInCommand:
-		w.executeSingleCommand(logger, prHandler, job.Event.Platform, parsedCmd, startTime)
-	case executor.MultiCommand:
-		w.executeMultiCommand(logger, prHandler, job.Event.Platform, parsedCmd, startTime)
-	default:
-		logger.Errorf("Unknown command type: %s", parsedCmd.Type)
-		CommandExecutionTotal.WithLabelValues(job.Event.Platform, "unknown", "error").Inc()
-	}
+	// Use unified executor
+	w.executeWithUnifiedExecutor(logger, prHandler, job.Event.Platform, cfg, parsedCmd)
 }
 
-// executeSingleCommand executes a single command
-func (w *Worker) executeSingleCommand(logger *logrus.Entry, prHandler *handler.PRHandler, platform string, parsedCmd *executor.ParsedCommand, startTime time.Time) {
-	command := parsedCmd.Command
-	args := parsedCmd.Args
+// executeWithUnifiedExecutor executes commands using the unified executor
+func (w *Worker) executeWithUnifiedExecutor(logger *logrus.Entry, prHandler *handler.PRHandler, platform string, cfg *config.Config, parsedCmd *executor.ParsedCommand) {
+	// Create execution config for webhook mode
+	execConfig := executor.NewWebhookExecutionConfig()
 
-	// Execute command
-	if err := prHandler.ExecuteCommand(command, args); err != nil {
-		logger.Errorf("Failed to execute command: %v", err)
-		CommandExecutionTotal.WithLabelValues(platform, command, "error").Inc()
-		WebhookProcessingDuration.WithLabelValues(platform, command).Observe(time.Since(startTime).Seconds())
-		return
+	// Create execution context
+	execContext := &executor.ExecutionContext{
+		PRHandler:       prHandler,
+		Logger:          logger.Logger,
+		Config:          execConfig,
+		MetricsRecorder: NewWebhookMetricsRecorder(),
+		Platform:        platform,
+		CommentSender:   cfg.CommentSender,
+		TriggerComment:  cfg.TriggerComment,
 	}
 
-	logger.Info("Successfully processed webhook job")
-	CommandExecutionTotal.WithLabelValues(platform, command, "success").Inc()
-	WebhookProcessingDuration.WithLabelValues(platform, command).Observe(time.Since(startTime).Seconds())
-}
+	// Create and execute with unified executor
+	cmdExecutor := executor.NewCommandExecutor(execContext)
+	result, err := cmdExecutor.Execute(parsedCmd)
 
-// executeMultiCommand executes multiple commands
-func (w *Worker) executeMultiCommand(logger *logrus.Entry, prHandler *handler.PRHandler, platform string, parsedCmd *executor.ParsedCommand, startTime time.Time) {
-	logger.Infof("Executing multi-command with %d commands", len(parsedCmd.CommandLines))
-
-	// Parse command lines into sub-commands
-	subCommands, err := executor.ParseMultiCommandLines(parsedCmd.CommandLines)
 	if err != nil {
-		logger.Errorf("Failed to parse multi-command lines: %v", err)
-		CommandExecutionTotal.WithLabelValues(platform, "multi", "error").Inc()
+		logger.Errorf("Command execution failed: %v", err)
 		return
 	}
 
-	// Execute each sub-command and collect results
-	var results []string
-	var hasErrors bool
-
-	for _, subCmd := range subCommands {
-		result := w.processSubCommand(logger, prHandler, platform, subCmd)
-		results = append(results, result)
-
-		// Check if this command failed
-		if strings.HasPrefix(result, "❌") {
-			hasErrors = true
-		}
+	if result.Success {
+		logger.Info("Successfully processed webhook job")
+	} else {
+		logger.Warn("Webhook job completed with errors")
 	}
-
-	// Post summary comment
-	header := "**Multi-Command Execution Results:**"
-	if hasErrors {
-		header = fmt.Sprintf("%s (⚠️ Some commands failed)", header)
-	}
-
-	summary := fmt.Sprintf("%s\n\n%s", header, strings.Join(results, "\n"))
-	if err := prHandler.PostComment(summary); err != nil {
-		logger.Errorf("Failed to post multi-command summary: %v", err)
-	}
-
-	// Record metrics
-	status := "success"
-	if hasErrors {
-		status = "partial_error"
-	}
-	CommandExecutionTotal.WithLabelValues(platform, "multi", status).Inc()
-	WebhookProcessingDuration.WithLabelValues(platform, "multi").Observe(time.Since(startTime).Seconds())
-
-	logger.Info("Successfully processed multi-command webhook job")
-}
-
-// processSubCommand executes a single sub-command in multi-command context
-func (w *Worker) processSubCommand(logger *logrus.Entry, prHandler *handler.PRHandler, platform string, subCmd executor.SubCommand) string {
-	cmdDisplay := executor.GetCommandDisplayName(subCmd)
-
-	// Execute the command
-	if err := prHandler.ExecuteCommand(subCmd.Command, subCmd.Args); err != nil {
-		logger.Errorf("Multi-command '%s' failed: %v", subCmd.Command, err)
-		CommandExecutionTotal.WithLabelValues(platform, subCmd.Command, "error").Inc()
-		return fmt.Sprintf("❌ Command `%s` failed: %v", cmdDisplay, err)
-	}
-
-	CommandExecutionTotal.WithLabelValues(platform, subCmd.Command, "success").Inc()
-	return fmt.Sprintf("✅ Command `%s` executed successfully", cmdDisplay)
 }

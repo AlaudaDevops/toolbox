@@ -22,6 +22,7 @@ import (
 )
 
 // SubCommand represents a parsed sub-command with its arguments
+// Note: This is kept separate from executor.SubCommand to avoid circular dependencies
 type SubCommand struct {
 	Command string
 	Args    []string
