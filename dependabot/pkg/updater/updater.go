@@ -151,7 +151,7 @@ func sortVulnerabilities(vulns []types.Vulnerability) []types.Vulnerability {
 	})
 
 	for _, vuln := range sortedVulns {
-		logrus.Debugf(vuln.String())
+		logrus.Debug(vuln.String())
 	}
 
 	return sortedVulns

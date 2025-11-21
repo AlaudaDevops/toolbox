@@ -17,6 +17,7 @@ limitations under the License.
 package updater
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,6 +153,140 @@ func TestBaseUpdater_LogSuccessfulCommand_AppendMode(t *testing.T) {
 
 	// Check that both commands are appended after the header
 	expectedContent := CommandOutputHeader + "first command\nsecond command\n"
+	if string(content) != expectedContent {
+		t.Errorf("File content = %q, want %q", string(content), expectedContent)
+	}
+}
+
+func TestBaseUpdater_LogComment(t *testing.T) {
+	tests := []struct {
+		name            string
+		comment         string
+		wantContent     string
+	}{
+		{
+			name:        "comment with hash prefix",
+			comment:     "# This is a comment",
+			wantContent: "# This is a comment\n",
+		},
+		{
+			name:        "comment without hash prefix",
+			comment:     "This is a comment",
+			wantContent: "# This is a comment\n",
+		},
+		{
+			name:        "empty comment",
+			comment:     "",
+			wantContent: "# \n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tempDir := t.TempDir()
+			outputFile := "commands.log"
+			updater := NewBaseUpdater(tempDir, outputFile)
+
+			err := updater.LogComment(tt.comment)
+			if err != nil {
+				t.Errorf("LogComment() error = %v", err)
+				return
+			}
+
+			// Read file and verify
+			outputPath := filepath.Join(tempDir, outputFile)
+			content, err := os.ReadFile(outputPath)
+			if err != nil {
+				t.Fatalf("Failed to read output file: %v", err)
+			}
+
+			expectedContent := CommandOutputHeader + tt.wantContent
+			if string(content) != expectedContent {
+				t.Errorf("File content = %q, want %q", string(content), expectedContent)
+			}
+		})
+	}
+}
+
+func TestBaseUpdater_LogFailedCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	outputFile := "commands.log"
+	updater := NewBaseUpdater(tempDir, outputFile)
+
+	testErr := fmt.Errorf("version conflict")
+	err := updater.LogFailedCommand("go get pkg@v1.0.0", testErr)
+	if err != nil {
+		t.Fatalf("LogFailedCommand() error = %v", err)
+	}
+
+	// Read file and verify
+	outputPath := filepath.Join(tempDir, outputFile)
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+
+	expectedContent := CommandOutputHeader +
+		"# FAILED: go get pkg@v1.0.0\n" +
+		"# Error: version conflict\n"
+
+	if string(content) != expectedContent {
+		t.Errorf("File content = %q, want %q", string(content), expectedContent)
+	}
+}
+
+func TestBaseUpdater_LogBlankLine(t *testing.T) {
+	tempDir := t.TempDir()
+	outputFile := "commands.log"
+	updater := NewBaseUpdater(tempDir, outputFile)
+
+	err := updater.LogBlankLine()
+	if err != nil {
+		t.Fatalf("LogBlankLine() error = %v", err)
+	}
+
+	// Read file and verify
+	outputPath := filepath.Join(tempDir, outputFile)
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+
+	expectedContent := CommandOutputHeader + "\n"
+	if string(content) != expectedContent {
+		t.Errorf("File content = %q, want %q", string(content), expectedContent)
+	}
+}
+
+func TestBaseUpdater_MixedLogging(t *testing.T) {
+	tempDir := t.TempDir()
+	outputFile := "commands.log"
+	updater := NewBaseUpdater(tempDir, outputFile)
+
+	// Simulate a realistic logging scenario
+	_ = updater.LogComment("Starting updates")
+	_ = updater.LogSuccessfulCommand("go get pkg1@v1.0.0")
+	_ = updater.LogBlankLine()
+	_ = updater.LogComment("Batch update failed, retrying individually")
+	_ = updater.LogSuccessfulCommand("go get pkg2@v2.0.0")
+	_ = updater.LogFailedCommand("go get pkg3@v3.0.0", fmt.Errorf("version conflict"))
+
+	// Read file and verify structure
+	outputPath := filepath.Join(tempDir, outputFile)
+	content, err := os.ReadFile(outputPath)
+	if err != nil {
+		t.Fatalf("Failed to read output file: %v", err)
+	}
+
+	expectedContent := CommandOutputHeader +
+		"# Starting updates\n" +
+		"go get pkg1@v1.0.0\n" +
+		"\n" +
+		"# Batch update failed, retrying individually\n" +
+		"go get pkg2@v2.0.0\n" +
+		"# FAILED: go get pkg3@v3.0.0\n" +
+		"# Error: version conflict\n"
+
 	if string(content) != expectedContent {
 		t.Errorf("File content = %q, want %q", string(content), expectedContent)
 	}

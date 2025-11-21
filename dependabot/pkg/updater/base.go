@@ -92,7 +92,51 @@ func (b *BaseUpdater) LogSuccessfulCommand(command string) error {
 		return nil
 	}
 
+	if err := b.appendToFile(command + "\n"); err != nil {
+		return err
+	}
+
+	logrus.Debugf("Logged successful command [%s] to: %s", command, filepath.Join(b.projectPath, b.commandOutputFile))
+	return nil
+}
+
+// LogComment logs a comment line to the output file
+func (b *BaseUpdater) LogComment(comment string) error {
+	if b.commandOutputFile == "" {
+		return nil
+	}
+
+	// Ensure comment starts with #
+	if len(comment) == 0 || comment[0] != '#' {
+		comment = "# " + comment
+	}
+
+	return b.appendToFile(comment + "\n")
+}
+
+// LogFailedCommand logs a failed command as a comment with error details
+func (b *BaseUpdater) LogFailedCommand(command string, err error) error {
+	if b.commandOutputFile == "" {
+		return nil
+	}
+
+	failureLog := fmt.Sprintf("# FAILED: %s\n# Error: %v\n", command, err)
+	return b.appendToFile(failureLog)
+}
+
+// LogBlankLine adds a blank line to the output file for readability
+func (b *BaseUpdater) LogBlankLine() error {
+	if b.commandOutputFile == "" {
+		return nil
+	}
+
+	return b.appendToFile("\n")
+}
+
+// appendToFile is a helper to append content to the output file
+func (b *BaseUpdater) appendToFile(content string) error {
 	outputFilePath := filepath.Join(b.projectPath, b.commandOutputFile)
+
 	// Create output directory if it doesn't exist
 	outputDir := filepath.Dir(outputFilePath)
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
@@ -107,10 +151,9 @@ func (b *BaseUpdater) LogSuccessfulCommand(command string) error {
 	defer file.Close()
 
 	// Write to file
-	if _, err := file.WriteString(command + "\n"); err != nil {
+	if _, err := file.WriteString(content); err != nil {
 		return fmt.Errorf("failed to write to output file: %w", err)
 	}
 
-	logrus.Debugf("Logged successful command [%s] to: %s", command, outputFilePath)
 	return nil
 }
