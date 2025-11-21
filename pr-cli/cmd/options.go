@@ -23,6 +23,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/executor"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -109,19 +110,8 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize PR handler: %w", err)
 	}
 
-	// Handle commands based on their type
-	switch parsedCmd.Type {
-	case BuiltInCommand:
-		return p.executeBuiltInCommand(prHandler, parsedCmd.Command, parsedCmd.Args)
-	case SingleCommand:
-		p.Infof("Executing %s: %s", parsedCmd.Type, parsedCmd.Command)
-		return p.executeSingleCommand(prHandler, parsedCmd.Command, parsedCmd.Args)
-	case MultiCommand:
-		p.Infof("Executing %s (%d commands)", parsedCmd.Type, len(parsedCmd.CommandLines))
-		return p.executeMultiCommand(prHandler, parsedCmd.CommandLines, parsedCmd.RawCommandLines)
-	default:
-		return fmt.Errorf(ErrUnknownCommandType, parsedCmd.Type)
-	}
+	// Use unified executor
+	return p.executeWithUnifiedExecutor(prHandler, parsedCmd)
 }
 
 // readAllFromViper reads all configuration values from viper
@@ -190,6 +180,38 @@ func (p *PROption) parseStringFields() error {
 		if len(accounts) > 0 {
 			p.Config.RobotAccounts = accounts
 		}
+	}
+
+	return nil
+}
+
+// executeWithUnifiedExecutor executes commands using the unified executor layer
+func (p *PROption) executeWithUnifiedExecutor(prHandler *handler.PRHandler, parsedCmd *ParsedCommand) error {
+	// Create execution config
+	execConfig := executor.NewCLIExecutionConfig(p.Config.Debug)
+
+	// Create execution context
+	execContext := &executor.ExecutionContext{
+		PRHandler:       prHandler,
+		Logger:          p.Logger,
+		Config:          execConfig,
+		MetricsRecorder: &executor.NoOpMetricsRecorder{},
+		Platform:        p.Config.Platform,
+		CommentSender:   p.Config.CommentSender,
+		TriggerComment:  p.Config.TriggerComment,
+	}
+
+	// Create executor
+	cmdExecutor := executor.NewCommandExecutor(execContext)
+
+	// Execute command
+	result, err := cmdExecutor.Execute(parsedCmd)
+	if err != nil {
+		return err
+	}
+
+	if !result.Success {
+		return fmt.Errorf("command execution failed")
 	}
 
 	return nil
