@@ -66,6 +66,13 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 		return nil, nil
 	}
 
+	logrus.Info("Cleaning Go module cache before running updates...")
+	if err := g.cleanGoModuleCache(); err != nil {
+		logrus.Warnf("Failed to clean Go module cache: %v", err)
+	} else {
+		logrus.Debug("Go module cache cleaned successfully")
+	}
+
 	// Aggregate vulnerabilities by directory and package
 	updatesByDir := g.aggregateVulnerabilities(vulnerabilities)
 
@@ -122,9 +129,9 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 		for _, update := range updates {
 			fixResult := types.VulnFixResult{
 				Vulnerability: types.Vulnerability{
-					PackageDir:     update.PackageDir,
-					PackageName:    update.PackageName,
-					FixedVersion:   update.FixedVersion,
+					PackageDir:       update.PackageDir,
+					PackageName:      update.PackageName,
+					FixedVersion:     update.FixedVersion,
 					VulnerabilityIDs: []string{}, // Will be populated from original vulnerabilities
 				},
 				Success: updateSuccess,
@@ -429,6 +436,19 @@ func (g *GoUpdater) runGoModVendor(goModDir string) error {
 	// Log successful command to output file if configured
 	if err := g.LogSuccessfulCommand("go mod vendor"); err != nil {
 		logrus.Warnf("Failed to log successful command: %v", err)
+	}
+
+	return nil
+}
+
+// cleanGoModuleCache clears the Go module cache to control disk usage during bulk updates
+func (g *GoUpdater) cleanGoModuleCache() error {
+	cmd := exec.Command("go", "clean", "-modcache")
+	cmd.Env = os.Environ()
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("go clean -modcache failed: %w, output: %s", err, string(output))
 	}
 
 	return nil
