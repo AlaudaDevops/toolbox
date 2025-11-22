@@ -19,7 +19,7 @@ COPY frontend/ ./
 # Build the frontend
 RUN npm run build
 
-ARG GO_IMAGE=golang:1.25.3-alpine
+ARG GO_IMAGE=golang:1.25.4-alpine
 # Stage 2: Build backend
 FROM ${GO_IMAGE} AS backend-builder
 
