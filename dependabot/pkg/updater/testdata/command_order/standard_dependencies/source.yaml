@@ -1,0 +1,10 @@
+description: "Standard dependencies rely on alphabetical ordering"
+
+packages:
+  - packageName: "github.com/golang-jwt/jwt/v4"
+    fixedVersion: "v4.5.2"
+    useLatest: false
+
+  - packageName: "github.com/go-jose/go-jose/v3"
+    fixedVersion: "v3.0.4"
+    useLatest: false
