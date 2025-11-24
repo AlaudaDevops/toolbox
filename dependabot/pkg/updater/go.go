@@ -18,10 +18,15 @@ limitations under the License.
 package updater
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
@@ -52,10 +57,11 @@ func NewGoUpdater(projectPath string, goConfig *config.GoUpdaterConfig) *GoUpdat
 
 // packageUpdate represents a package that needs to be updated
 type packageUpdate struct {
-	PackageName  string
-	FixedVersion string
-	UseLatest    bool
-	PackageDir   string
+	PackageName     string
+	FixedVersion    string
+	UseLatest       bool
+	PackageDir      string
+	ResolvedVersion string
 }
 
 // UpdatePackages updates vulnerable Go packages to their fixed versions
@@ -79,18 +85,27 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 	result := types.VulnFixResults{}
 	failedErrors := make([]error, 0)
 	tidyDirs := make(map[string]bool)
+	latestVersionCache := make(map[string]string)
 
 	// Process each directory separately (for mono repo support)
 	for goModDir, updates := range updatesByDir {
 		logrus.Debugf("Processing directory: %s with %d package updates", goModDir, len(updates))
 
+		sortedUpdates := sortPackageUpdates(updates)
+		for i := range sortedUpdates {
+			if g.isGolangStdExtension(sortedUpdates[i].PackageName) {
+				sortedUpdates[i].UseLatest = true
+			}
+		}
+
+		resolvedUpdates := g.resolvePackageVersions(goModDir, sortedUpdates, latestVersionCache)
+
 		// Group packages: golang.org/x/* vs others
 		golangXPackages := []packageUpdate{}
 		normalPackages := []packageUpdate{}
 
-		for _, update := range updates {
-			if g.isGolangStdExtension(update.PackageName) {
-				update.UseLatest = true
+		for _, update := range resolvedUpdates {
+			if update.UseLatest {
 				golangXPackages = append(golangXPackages, update)
 			} else {
 				normalPackages = append(normalPackages, update)
@@ -99,6 +114,7 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 
 		// Execute batch updates
 		updateSuccess := true
+		failureReason := ""
 
 		// First, update normal packages with fixed versions
 		if len(normalPackages) > 0 {
@@ -107,6 +123,7 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 				logrus.Warnf("Failed to update normal packages: %v", err)
 				updateSuccess = false
 				failedErrors = append(failedErrors, err)
+				failureReason = "batch update failed"
 			}
 		}
 
@@ -117,6 +134,9 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 				logrus.Warnf("Failed to update golang.org/x/* packages: %v", err)
 				updateSuccess = false
 				failedErrors = append(failedErrors, err)
+				if failureReason == "" {
+					failureReason = "batch update failed"
+				}
 			}
 		}
 
@@ -125,22 +145,7 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 			tidyDirs[goModDir] = true
 		}
 
-		// Create fix results for all vulnerabilities in this directory
-		for _, update := range updates {
-			fixResult := types.VulnFixResult{
-				Vulnerability: types.Vulnerability{
-					PackageDir:       update.PackageDir,
-					PackageName:      update.PackageName,
-					FixedVersion:     update.FixedVersion,
-					VulnerabilityIDs: []string{}, // Will be populated from original vulnerabilities
-				},
-				Success: updateSuccess,
-			}
-			if !updateSuccess {
-				fixResult.Error = "batch update failed"
-			}
-			result = append(result, fixResult)
-		}
+		g.appendResults(&result, updates, updateSuccess, failureReason)
 	}
 
 	// Run go mod tidy for all affected directories
@@ -173,6 +178,33 @@ func (g *GoUpdater) UpdatePackages(vulnerabilities []types.Vulnerability) (types
 	}
 
 	return result, nil
+}
+
+func (g *GoUpdater) appendResults(result *types.VulnFixResults, updates []packageUpdate, success bool, failureReason string) {
+	if updates == nil {
+		return
+	}
+
+	for _, update := range updates {
+		fixResult := types.VulnFixResult{
+			Vulnerability: types.Vulnerability{
+				PackageDir:       update.PackageDir,
+				PackageName:      update.PackageName,
+				FixedVersion:     update.FixedVersion,
+				VulnerabilityIDs: []string{},
+			},
+			Success: success,
+		}
+		if !success {
+			if failureReason != "" {
+				fixResult.Error = failureReason
+			} else {
+				fixResult.Error = "batch update failed"
+			}
+		}
+
+		*result = append(*result, fixResult)
+	}
 }
 
 // GetLanguageType returns the language type this updater handles
@@ -247,6 +279,8 @@ func (g *GoUpdater) executeBatchGoGet(goModDir string, updates []packageUpdate) 
 	if len(updates) == 0 {
 		return nil
 	}
+
+	updates = sortPackageUpdates(updates)
 
 	// Build batch command
 	batchCmd := g.buildBatchCommand(updates)
@@ -350,19 +384,146 @@ func (g *GoUpdater) buildSingleCommand(update packageUpdate) string {
 
 // buildPackageArgs builds the list of package@version arguments
 func (g *GoUpdater) buildPackageArgs(updates []packageUpdate) []string {
-	args := make([]string, 0, len(updates))
-	for _, update := range updates {
+	sortedUpdates := sortPackageUpdates(updates)
+	args := make([]string, 0, len(sortedUpdates))
+	for _, update := range sortedUpdates {
 		args = append(args, g.formatPackageVersion(update))
 	}
 	return args
 }
 
+// sortPackageUpdates returns a new slice sorted by package name and version
+func sortPackageUpdates(updates []packageUpdate) []packageUpdate {
+	if len(updates) <= 1 {
+		return append([]packageUpdate(nil), updates...)
+	}
+
+	sorted := make([]packageUpdate, len(updates))
+	copy(sorted, updates)
+	sort.Slice(sorted, func(i, j int) bool {
+		if sorted[i].PackageName == sorted[j].PackageName {
+			return sorted[i].FixedVersion < sorted[j].FixedVersion
+		}
+		return sorted[i].PackageName < sorted[j].PackageName
+	})
+
+	return sorted
+}
+
+func normalizeVersion(version string) string {
+	trimmed := strings.TrimPrefix(version, "@")
+	trimmed = strings.TrimPrefix(trimmed, "v")
+	return "v" + trimmed
+}
+
+func (g *GoUpdater) resolvePackageVersions(goModDir string, updates []packageUpdate, cache map[string]string) []packageUpdate {
+	resolved := make([]packageUpdate, len(updates))
+	for i, update := range updates {
+		resolved[i] = update
+		if !update.UseLatest {
+			continue
+		}
+
+		version, ok := cache[update.PackageName]
+		if !ok {
+			moduleVersion, err := g.fetchLatestModuleVersion(goModDir, update.PackageName)
+			if err != nil {
+				logrus.Warnf("Failed to resolve latest version for %s using module context: %v", update.PackageName, err)
+				proxyVersion, proxyErr := g.fetchLatestVersionFromProxy(update.PackageName)
+				if proxyErr != nil {
+					logrus.Warnf("Failed to resolve latest version for %s via proxy: %v, falling back to fixed version %s", update.PackageName, proxyErr, update.FixedVersion)
+					cache[update.PackageName] = ""
+					resolved[i].ResolvedVersion = update.FixedVersion
+					continue
+				}
+				cache[update.PackageName] = proxyVersion
+				version = proxyVersion
+			} else {
+				cache[update.PackageName] = moduleVersion
+				version = moduleVersion
+			}
+		}
+
+		if version == "" {
+			// Cache hit for previous failure, use fixed version deterministically
+			resolved[i].ResolvedVersion = update.FixedVersion
+			continue
+		}
+
+		resolved[i].ResolvedVersion = version
+	}
+
+	return resolved
+}
+
+func (g *GoUpdater) fetchLatestModuleVersion(goModDir, packageName string) (string, error) {
+	cmd := exec.Command("go", "list", "-m", "-json", "-mod=mod", fmt.Sprintf("%s@latest", packageName))
+	cmd.Dir = goModDir
+	env := append([]string{}, os.Environ()...)
+	env = append(env, "GO111MODULE=on", "GOWORK=off")
+	cmd.Env = env
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("go list failed: %w, output: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	var moduleInfo struct {
+		Version string `json:"Version"`
+	}
+	if err := json.Unmarshal(output, &moduleInfo); err != nil {
+		return "", fmt.Errorf("parse go list output: %w", err)
+	}
+	if moduleInfo.Version == "" {
+		return "", fmt.Errorf("empty version returned for %s", packageName)
+	}
+
+	return moduleInfo.Version, nil
+}
+
+func (g *GoUpdater) fetchLatestVersionFromProxy(packageName string) (string, error) {
+	endpoint := fmt.Sprintf("https://proxy.golang.org/%s/@latest", escapeModulePath(packageName))
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("proxy request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return "", fmt.Errorf("proxy returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var moduleInfo struct {
+		Version string `json:"Version"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&moduleInfo); err != nil {
+		return "", fmt.Errorf("parse proxy response: %w", err)
+	}
+	if moduleInfo.Version == "" {
+		return "", fmt.Errorf("proxy response missing version")
+	}
+
+	return moduleInfo.Version, nil
+}
+
+func escapeModulePath(modulePath string) string {
+	segments := strings.Split(modulePath, "/")
+	for i, segment := range segments {
+		segments[i] = url.PathEscape(segment)
+	}
+	return strings.Join(segments, "/")
+}
+
 // formatPackageVersion formats a package with its version for go get command
 func (g *GoUpdater) formatPackageVersion(update packageUpdate) string {
+	if update.ResolvedVersion != "" {
+		return fmt.Sprintf("%s@%s", update.PackageName, normalizeVersion(update.ResolvedVersion))
+	}
 	if update.UseLatest {
 		return fmt.Sprintf("%s@latest", update.PackageName)
 	}
-	return fmt.Sprintf("%s@v%s", update.PackageName, strings.TrimPrefix(update.FixedVersion, "v"))
+	return fmt.Sprintf("%s@%s", update.PackageName, normalizeVersion(update.FixedVersion))
 }
 
 // executeSingleGoGet executes go get for a single package

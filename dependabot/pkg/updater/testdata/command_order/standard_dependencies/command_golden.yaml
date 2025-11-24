@@ -1,0 +1,3 @@
+description: "Expected go get command for standard dependencies"
+
+command: "go get github.com/go-jose/go-jose/v3@v3.0.4 github.com/golang-jwt/jwt/v4@v4.5.2"

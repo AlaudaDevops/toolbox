@@ -1,0 +1,5 @@
+description: "Expected go get arguments for standard dependencies"
+
+args:
+  - "github.com/go-jose/go-jose/v3@v3.0.4"
+  - "github.com/golang-jwt/jwt/v4@v4.5.2"
