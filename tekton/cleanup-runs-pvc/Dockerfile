@@ -4,7 +4,7 @@ ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202510091100
 FROM ${BUILDER_IMAGE} AS download
 
 # renovate: datasource=github-releases depName=kubectl packageName=AlaudaDevops/kubernetes
-ARG KUBECTL_VERSION=v1.33.5-alauda-5
+ARG KUBECTL_VERSION=v1.33.5-alauda-6
 
 RUN set -eux; \
     if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then \
