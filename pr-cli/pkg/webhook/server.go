@@ -152,8 +152,6 @@ func (s *Server) startWorkers(ctx context.Context) {
 
 // processWebhookSync processes a webhook synchronously
 func (s *Server) processWebhookSync(event *WebhookEvent) error {
-	startTime := time.Now()
-
 	// Convert webhook event to config
 	cfg := event.ToConfig(s.config.BaseConfig)
 
@@ -172,22 +170,40 @@ func (s *Server) processWebhookSync(event *WebhookEvent) error {
 		return fmt.Errorf("failed to parse command: %w", err)
 	}
 
-	switch parsedCmd.Type {
-		case executor.SingleCommand, executor.BuiltInCommand:
-			if err = prHandler.ExecuteCommand(parsedCmd.Command, parsedCmd.Args); err != nil {
-				CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "error").Inc()
-				return fmt.Errorf("failed to execute command %s with args %v: %w", parsedCmd.Command, parsedCmd.Args, err)
-			}
-			CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "success").Inc()
-			WebhookProcessingDuration.WithLabelValues(event.Platform, parsedCmd.Command).Observe(time.Since(startTime).Seconds())
-		case executor.MultiCommand:
-			// TODO: Implement multicommand executor
-			//CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "success").Inc()
-			// WebhookProcessingDuration.WithLabelValues(event.Platform, parsedCmd.Command).Observe(time.Since(startTime).Seconds())
-		default:
-			s.logger.Warnf("Unknown command type: %s", parsedCmd.Type)
-			CommandExecutionTotal.WithLabelValues(event.Platform, "unknown", "error").Inc()
+	// Use unified executor - now supports multi-command!
+	return s.executeWithUnifiedExecutor(prHandler, event.Platform, cfg, parsedCmd)
+}
+
+// executeWithUnifiedExecutor executes commands using the unified executor for sync mode
+func (s *Server) executeWithUnifiedExecutor(prHandler *handler.PRHandler, platform string, cfg *config.Config, parsedCmd *executor.ParsedCommand) error {
+	// Create execution config for webhook mode
+	execConfig := executor.NewWebhookExecutionConfig()
+
+	// Create execution context
+	execContext := &executor.ExecutionContext{
+		PRHandler:       prHandler,
+		Logger:          s.logger,
+		Config:          execConfig,
+		MetricsRecorder: NewWebhookMetricsRecorder(),
+		Platform:        platform,
+		CommentSender:   cfg.CommentSender,
+		TriggerComment:  cfg.TriggerComment,
 	}
+
+	// Create and execute with unified executor
+	cmdExecutor := executor.NewCommandExecutor(execContext)
+	result, err := cmdExecutor.Execute(parsedCmd)
+
+	if err != nil {
+		s.logger.Errorf("Command execution failed: %v", err)
+		return err
+	}
+
+	if !result.Success {
+		return fmt.Errorf("command execution completed with errors")
+	}
+
+	s.logger.Info("Successfully processed webhook synchronously")
 	return nil
 }
 
