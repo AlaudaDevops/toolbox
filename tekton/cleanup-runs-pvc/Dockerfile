@@ -1,6 +1,6 @@
 # use curl to download cli
-ARG BUILDER_IMAGE=build-harbor.alauda.cn/ops/photon:5-alauda-202511031100
-ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.3-alauda-202510091100
+ARG BUILDER_IMAGE=build-harbor.alauda.cn/ops/photon:5-alauda-202511251100
+ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.5-alauda-202512020944
 FROM ${BUILDER_IMAGE} AS download
 
 # renovate: datasource=github-releases depName=kubectl packageName=AlaudaDevops/kubernetes
