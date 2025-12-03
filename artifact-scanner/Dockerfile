@@ -1,4 +1,4 @@
-ARG BUILDER_IMAGE=build-harbor.alauda.cn/devops/nonroot/builder-go:latest@sha256:121028f46dc9c51ad1ade23e72a28ce82f15c1c2a75eeb3be7aaf2772b455203
+ARG BUILDER_IMAGE=build-harbor.alauda.cn/devops/nonroot/builder-go:latest@sha256:116009fc6f39cfa317c8cbd4b3c88e0800fe18f4f789a9c774011fb1c4c69a9a
 ARG BASE_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.5-alauda-202512020944
 
 FROM ${BUILDER_IMAGE} AS builder
