@@ -102,9 +102,8 @@ func (v *Validator) validateCommentSender() error {
 		return fmt.Errorf("failed to get PR comments: %w", err)
 	}
 
-	// Get trigger comment from context (stored in CommentSender field for now)
-	// This will be refactored to use a proper TriggerComment field
-	triggerComment := v.context.CommentSender
+	// Get trigger comment from context
+	triggerComment := v.context.TriggerComment
 	if triggerComment == "" {
 		return fmt.Errorf("trigger comment not provided")
 	}

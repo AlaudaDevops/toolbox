@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
+	"github.com/sirupsen/logrus"
 )
 
 // MockPRHandler is a mock implementation of PRHandler for testing
@@ -151,6 +152,11 @@ func (m *MockLogger) Printf(format string, args ...interface{}) {
 	// Not used in current implementation
 }
 
+// Print logs a message
+func (m *MockLogger) Print(args ...interface{}) {
+	// Not used in current implementation
+}
+
 // Debug logs a debug message
 func (m *MockLogger) Debug(args ...interface{}) {
 	// Not used in current implementation
@@ -182,18 +188,21 @@ func (m *MockLogger) Panic(args ...interface{}) {
 }
 
 // WithField creates a new logger with a field
-func (m *MockLogger) WithField(key string, value interface{}) *MockLogger {
-	return m
+func (m *MockLogger) WithField(key string, value interface{}) *logrus.Entry {
+	// Return a new entry for interface compliance
+	return logrus.NewEntry(logrus.StandardLogger())
 }
 
 // WithFields creates a new logger with fields
-func (m *MockLogger) WithFields(fields map[string]interface{}) *MockLogger {
-	return m
+func (m *MockLogger) WithFields(fields logrus.Fields) *logrus.Entry {
+	// Return a new entry for interface compliance
+	return logrus.NewEntry(logrus.StandardLogger())
 }
 
 // WithError creates a new logger with an error
-func (m *MockLogger) WithError(err error) *MockLogger {
-	return m
+func (m *MockLogger) WithError(err error) *logrus.Entry {
+	// Return a new entry for interface compliance
+	return logrus.NewEntry(logrus.StandardLogger())
 }
 
 // Tracef logs a trace message

@@ -17,9 +17,17 @@ limitations under the License.
 package executor
 
 import (
-	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
 	"github.com/sirupsen/logrus"
 )
+
+// PRHandlerInterface defines the interface for PR handler operations needed by the executor
+type PRHandlerInterface interface {
+	ExecuteCommand(command string, args []string) error
+	PostComment(body string) error
+	CheckPRStatus(expectedStatus string) error
+	GetCommentsWithCache() ([]git.Comment, error)
+}
 
 // ExecutionConfig holds the configuration for command execution behavior
 type ExecutionConfig struct {
@@ -45,7 +53,7 @@ type ExecutionConfig struct {
 // ExecutionContext holds the context for command execution
 type ExecutionContext struct {
 	// PRHandler is the handler for PR operations
-	PRHandler *handler.PRHandler
+	PRHandler PRHandlerInterface
 	
 	// Logger is the logger instance for logging
 	Logger logrus.FieldLogger
@@ -61,6 +69,9 @@ type ExecutionContext struct {
 	
 	// CommentSender is the user who triggered the command
 	CommentSender string
+	
+	// TriggerComment is the original comment that triggered the command
+	TriggerComment string
 }
 
 // NewCLIExecutionConfig creates a new execution configuration for CLI mode

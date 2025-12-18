@@ -126,6 +126,7 @@ func TestValidator_ValidateSingleCommand(t *testing.T) {
 				Logger:        &MockLogger{},
 				Config:        tt.config,
 				CommentSender: "test-user",
+				TriggerComment: "/merge",
 			}
 
 			validator := NewValidator(ctx)
@@ -217,6 +218,7 @@ func TestValidator_ValidateMultiCommand(t *testing.T) {
 				Logger:        &MockLogger{},
 				Config:        tt.config,
 				CommentSender: "test-user",
+				TriggerComment: "/merge",
 			}
 
 			validator := NewValidator(ctx)
