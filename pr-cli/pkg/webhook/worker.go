@@ -76,6 +76,7 @@ func (w *Worker) start(ctx context.Context) {
 func (w *Worker) processJob(ctx context.Context, job *WebhookJob) {
 	logger := w.logger.WithFields(logrus.Fields{
 		"worker":   w.id,
+		"event_id": job.Event.EventID,
 		"platform": job.Event.Platform,
 		"repo":     fmt.Sprintf("%s/%s", job.Event.Repository.Owner, job.Event.Repository.Name),
 		"pr":       job.Event.PullRequest.Number,
@@ -112,6 +113,7 @@ func (w *Worker) processJob(ctx context.Context, job *WebhookJob) {
 		MetricsRecorder: NewWebhookMetricsRecorder(job.Event.Platform),
 		Platform:        job.Event.Platform,
 		CommentSender:   job.Event.Sender.Login,
+		TriggerComment: job.Event.Comment.Body,
 	}
 
 	// Create and execute command

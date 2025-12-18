@@ -38,6 +38,7 @@ type Server struct {
 	jobQueue  chan *WebhookJob
 	workers   []*Worker
 	startTime time.Time
+	// prHandler
 }
 
 // NewServer creates a new webhook server
