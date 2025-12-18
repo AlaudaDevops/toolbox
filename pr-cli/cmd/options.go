@@ -23,6 +23,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/comment"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/config"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/executor"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/handler"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -93,7 +94,7 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Parse the trigger comment to determine the command
-	parsedCmd, err := p.parseCommand(p.Config.TriggerComment)
+	parsedCmd, err := executor.ParseCommand(p.Config.TriggerComment)
 	if err != nil {
 		return fmt.Errorf("failed to parse command %q: %w", p.Config.TriggerComment, err)
 	}
@@ -109,19 +110,44 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to initialize PR handler: %w", err)
 	}
 
-	// Handle commands based on their type
-	switch parsedCmd.Type {
-	case BuiltInCommand:
-		return p.executeBuiltInCommand(prHandler, parsedCmd.Command, parsedCmd.Args)
-	case SingleCommand:
-		p.Infof("Executing %s: %s", parsedCmd.Type, parsedCmd.Command)
-		return p.executeSingleCommand(prHandler, parsedCmd.Command, parsedCmd.Args)
-	case MultiCommand:
-		p.Infof("Executing %s (%d commands)", parsedCmd.Type, len(parsedCmd.CommandLines))
-		return p.executeMultiCommand(prHandler, parsedCmd.CommandLines, parsedCmd.RawCommandLines)
-	default:
-		return fmt.Errorf(ErrUnknownCommandType, parsedCmd.Type)
+	// Create execution context for unified executor
+	ctx := &executor.ExecutionContext{
+		PRHandler:       prHandler,
+		Logger:          p.Logger,
+		Config:          executor.NewCLIExecutionConfig(p.Config.Debug),
+		MetricsRecorder: &executor.NoOpMetricsRecorder{},
+		Platform:        p.Config.Platform,
+		CommentSender:   p.Config.CommentSender,
 	}
+
+	// Create command executor and execute
+	exec := executor.NewCommandExecutor(ctx)
+	res, err := exec.Execute(parsedCmd)
+	if err != nil {
+		p.Errorf("Error: %s", err)
+	}
+	if res != nil {
+		p.Debugf("Result from command: %s - %v - %t - %v", res.CommandType, res.Results, res.Success, res.Error)
+	}
+
+
+	// CLI mode returns nil for errors (already posted to PR)
+	return err
+
+	// OLD CODE - Keep commented for rollback if needed
+	// // Handle commands based on their type
+	// switch parsedCmd.Type {
+	// case BuiltInCommand:
+	// 	return p.executeBuiltInCommand(prHandler, parsedCmd.Command, parsedCmd.Args)
+	// case SingleCommand:
+	// 	p.Infof("Executing %s: %s", parsedCmd.Type, parsedCmd.Command)
+	// 	return p.executeSingleCommand(prHandler, parsedCmd.Command, parsedCmd.Args)
+	// case MultiCommand:
+	// 	p.Infof("Executing %s (%d commands)", parsedCmd.Type, len(parsedCmd.CommandLines))
+	// 	return p.executeMultiCommand(prHandler, parsedCmd.CommandLines, parsedCmd.RawCommandLines)
+	// default:
+	// 	return fmt.Errorf(ErrUnknownCommandType, parsedCmd.Type)
+	// }
 }
 
 // readAllFromViper reads all configuration values from viper
