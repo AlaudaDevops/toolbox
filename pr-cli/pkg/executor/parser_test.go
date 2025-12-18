@@ -18,6 +18,8 @@ package executor
 
 import (
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestParseCommand(t *testing.T) {
@@ -26,6 +28,7 @@ func TestParseCommand(t *testing.T) {
 		comment     string
 		wantType    CommandType
 		wantCommand string
+		wantMultiCommand []string
 		wantArgs    []string
 		wantErr     bool
 	}{
@@ -57,6 +60,7 @@ func TestParseCommand(t *testing.T) {
 			name:     "multi-line command",
 			comment:  "/lgtm\n/ready",
 			wantType: MultiCommand,
+			wantMultiCommand: []string{"/lgtm", "/ready"},
 			wantErr:  false,
 		},
 		{
@@ -90,6 +94,10 @@ func TestParseCommand(t *testing.T) {
 				// For multi-command, just check that we have command lines
 				if len(got.CommandLines) == 0 {
 					t.Errorf("ParseCommand() MultiCommand has no CommandLines")
+				}
+				diff := cmp.Diff(tt.wantMultiCommand, got.CommandLines)
+				if diff != "" {
+					t.Errorf("ParseCommand() MultiCommand CommandLines mismatch (-want +got):\n%s", diff)
 				}
 				return
 			}

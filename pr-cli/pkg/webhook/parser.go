@@ -25,6 +25,7 @@ import (
 
 // WebhookEvent represents a parsed webhook event
 type WebhookEvent struct {
+	EventID     string
 	Platform    string
 	Action      string
 	Repository  Repository

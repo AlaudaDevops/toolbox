@@ -38,6 +38,7 @@ type Server struct {
 	jobQueue  chan *WebhookJob
 	workers   []*Worker
 	startTime time.Time
+	// prHandler
 }
 
 // NewServer creates a new webhook server
@@ -152,8 +153,6 @@ func (s *Server) startWorkers(ctx context.Context) {
 
 // processWebhookSync processes a webhook synchronously
 func (s *Server) processWebhookSync(event *WebhookEvent) error {
-	startTime := time.Now()
-
 	// Convert webhook event to config
 	cfg := event.ToConfig(s.config.BaseConfig)
 
@@ -172,22 +171,23 @@ func (s *Server) processWebhookSync(event *WebhookEvent) error {
 		return fmt.Errorf("failed to parse command: %w", err)
 	}
 
-	switch parsedCmd.Type {
-		case executor.SingleCommand, executor.BuiltInCommand:
-			if err = prHandler.ExecuteCommand(parsedCmd.Command, parsedCmd.Args); err != nil {
-				CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "error").Inc()
-				return fmt.Errorf("failed to execute command %s with args %v: %w", parsedCmd.Command, parsedCmd.Args, err)
-			}
-			CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "success").Inc()
-			WebhookProcessingDuration.WithLabelValues(event.Platform, parsedCmd.Command).Observe(time.Since(startTime).Seconds())
-		case executor.MultiCommand:
-			// TODO: Implement multicommand executor
-			//CommandExecutionTotal.WithLabelValues(event.Platform, parsedCmd.Command, "success").Inc()
-			// WebhookProcessingDuration.WithLabelValues(event.Platform, parsedCmd.Command).Observe(time.Since(startTime).Seconds())
-		default:
-			s.logger.Warnf("Unknown command type: %s", parsedCmd.Type)
-			CommandExecutionTotal.WithLabelValues(event.Platform, "unknown", "error").Inc()
+	// Create execution context with unified executor
+	execCtx := &executor.ExecutionContext{
+		PRHandler:       prHandler,
+		Logger:          s.logger,
+		Config:          executor.NewWebhookExecutionConfig(),
+		MetricsRecorder: NewWebhookMetricsRecorder(event.Platform),
+		Platform:        event.Platform,
+		CommentSender:   event.Sender.Login,
 	}
+
+	// Create and execute command (now supports multi-command)
+	cmdExecutor := executor.NewCommandExecutor(execCtx)
+	_, err = cmdExecutor.Execute(parsedCmd)
+	if err != nil {
+		return fmt.Errorf("command execution failed: %w", err)
+	}
+
 	return nil
 }
 

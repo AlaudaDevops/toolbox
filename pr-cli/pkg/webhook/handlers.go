@@ -25,6 +25,7 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/internal/version"
 	"github.com/sirupsen/logrus"
+	"github.com/google/uuid"
 )
 
 // handleWebhook processes incoming webhook requests
@@ -36,6 +37,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+
 
 	// Read request body
 	body, err := io.ReadAll(r.Body)
@@ -49,34 +51,48 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	// Determine platform from headers
 	platform := ""
 	eventType := ""
+	eventID := ""
 
 	if r.Header.Get("X-GitHub-Event") != "" {
 		platform = "github"
 		eventType = r.Header.Get("X-GitHub-Event")
+		eventID = r.Header.Get("X-GitHub-Delivery")
 	} else if r.Header.Get("X-Gitlab-Event") != "" {
 		platform = "gitlab"
 		eventType = r.Header.Get("X-Gitlab-Event")
+		eventID = r.Header.Get("X-Gitlab-Delivery")
 	} else {
 		s.logger.Warn("Unknown webhook source (missing platform headers)")
 		http.Error(w, "Unknown webhook source", http.StatusBadRequest)
 		WebhookRequestsTotal.WithLabelValues("unknown", "unknown", "error").Inc()
 		return
 	}
+	if eventID == "" {
+		eventID = uuid.NewString()
+		s.logger.Infof("No eventID found in webhook headers, generated a new one: %q", eventID)
+	}
+	logger := s.logger.WithFields(logrus.Fields{
+		"event_id": eventID,
+		"platform": platform,
+		"event_type": eventType,
+	})
+	s.logger.Infof("Received webhook event %q of type %q from %s", eventID, eventType, platform)
 
 	// Validate signature
 	if s.config.RequireSignature {
-		if platform == "github" {
+		switch platform {
+		case "github":
 			signature := r.Header.Get("X-Hub-Signature-256")
 			if err := ValidateGitHubSignature(body, signature, s.config.WebhookSecret); err != nil {
-				s.logger.Warnf("GitHub signature validation failed: %v", err)
+				logger.Warnf("GitHub signature validation failed: %v", err)
 				http.Error(w, "Signature validation failed", http.StatusUnauthorized)
 				WebhookRequestsTotal.WithLabelValues(platform, eventType, "unauthorized").Inc()
 				return
 			}
-		} else if platform == "gitlab" {
+		case "gitlab":
 			token := r.Header.Get("X-Gitlab-Token")
 			if err := ValidateGitLabToken(token, s.config.WebhookSecret); err != nil {
-				s.logger.Warnf("GitLab token validation failed: %v", err)
+				logger.Warnf("GitLab token validation failed: %v", err)
 				http.Error(w, "Token validation failed", http.StatusUnauthorized)
 				WebhookRequestsTotal.WithLabelValues(platform, eventType, "unauthorized").Inc()
 				return
@@ -86,24 +102,26 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Parse webhook payload
 	var event *WebhookEvent
-	if platform == "github" {
+	switch platform {
+	case "github":
 		event, err = ParseGitHubWebhook(body, eventType)
-	} else if platform == "gitlab" {
+	case "gitlab":
 		event, err = ParseGitLabWebhook(body, eventType)
 	}
-
 	if err != nil {
 		// This is expected for non-PR comments or non-created actions
-		s.logger.Debugf("Webhook parsing skipped: %v", err)
+		logger.Debugf("Webhook parsing skipped: %v", err)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "OK (skipped: %v)", err)
 		WebhookRequestsTotal.WithLabelValues(platform, eventType, "skipped").Inc()
 		return
 	}
+	//attributing the event ID
+	event.EventID = eventID
 
 	// Validate event
 	if err := ValidateWebhookEvent(event); err != nil {
-		s.logger.Warnf("Invalid webhook event: %v", err)
+		logger.Warnf("Invalid webhook event: %v", err)
 		http.Error(w, fmt.Sprintf("Invalid webhook event: %v", err), http.StatusBadRequest)
 		WebhookRequestsTotal.WithLabelValues(platform, eventType, "invalid").Inc()
 		return
@@ -111,7 +129,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Check if comment contains a command
 	if !event.IsCommandComment() {
-		s.logger.Debugf("Comment does not contain a command: %s", event.Comment.Body)
+		logger.Debugf("Comment does not contain a command: %s", event.Comment.Body)
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "OK (not a command)")
 		WebhookRequestsTotal.WithLabelValues(platform, eventType, "not_command").Inc()
@@ -120,20 +138,21 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Validate repository
 	if err := ValidateRepository(event.Repository.Owner, event.Repository.Name, s.config.AllowedRepos); err != nil {
-		s.logger.Warnf("Repository not allowed: %v", err)
+		logger.Warnf("Repository not allowed: %v", err)
 		http.Error(w, "Repository not allowed", http.StatusForbidden)
 		WebhookRequestsTotal.WithLabelValues(platform, eventType, "forbidden").Inc()
 		return
 	}
 
 	// Log the event
-	s.logger.WithFields(logrus.Fields{
+	logger = logger.WithFields(logrus.Fields{
 		"platform":   event.Platform,
 		"repository": fmt.Sprintf("%s/%s", event.Repository.Owner, event.Repository.Name),
 		"pr_number":  event.PullRequest.Number,
 		"command":    event.Comment.Body,
 		"sender":     event.Sender.Login,
-	}).Info("Received webhook event")
+	})
+	logger.Info("Received webhook event")
 
 	// Process webhook (async or sync)
 	if s.config.AsyncProcessing {
@@ -145,10 +164,10 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 
 		select {
 		case s.jobQueue <- job:
-			s.logger.Debug("Job enqueued successfully")
+			logger.Debug("Job enqueued successfully")
 			QueueSize.Set(float64(len(s.jobQueue)))
 		default:
-			s.logger.Error("Job queue is full")
+			logger.Error("Job queue is full")
 			http.Error(w, "Server busy, please try again later", http.StatusServiceUnavailable)
 			WebhookRequestsTotal.WithLabelValues(platform, eventType, "queue_full").Inc()
 			return
@@ -156,7 +175,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Process synchronously
 		if err := s.processWebhookSync(event); err != nil {
-			s.logger.Errorf("Failed to process webhook: %v", err)
+			logger.Errorf("Failed to process webhook: %v", err)
 			http.Error(w, "Failed to process webhook", http.StatusInternalServerError)
 			WebhookRequestsTotal.WithLabelValues(platform, eventType, "error").Inc()
 			return
