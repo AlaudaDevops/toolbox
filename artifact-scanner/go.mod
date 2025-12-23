@@ -1,6 +1,6 @@
 module github.com/AlaudaDevops/toolbox/artifact-scanner
 
-go 1.25.4
+go 1.25.5
 
 require (
 	github.com/AlaudaDevops/pkg v0.13.1-0.20250411092507-24e8b46d5269

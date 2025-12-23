@@ -1,6 +1,6 @@
 module github.com/alaudadevops/toolbox/pr-watcher
 
-go 1.25.4
+go 1.25.5
 
 require github.com/spf13/cobra v1.9.1
 
