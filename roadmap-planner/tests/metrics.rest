@@ -1,0 +1,47 @@
+@baseUrl = http://localhost:8080
+
+
+### Metrics
+
+GET {{baseUrl}}/api/metrics
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+
+### Metrics summary
+
+GET {{baseUrl}}/api/metrics/summary
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+
+### Metrics status
+
+GET {{baseUrl}}/api/metrics/status
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+### Metrics status
+
+@metricName = release_frequency
+# release_frequency
+# lead_time_to_release
+# cycle_time
+# patch_ratio
+# time_to_patch
+
+GET {{baseUrl}}/api/metrics/{{metricName}}
+X-Jira-Username: {{jiraUsername}}
+X-Jira-Password: {{jiraPassword}}
+X-Jira-BaseURL: {{jiraBaseUrl}}
+X-Jira-Project: {{jiraProject}}
+
+### Metrics prometheus
+
+GET {{baseUrl}}/metrics
