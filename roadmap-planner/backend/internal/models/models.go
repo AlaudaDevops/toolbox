@@ -71,6 +71,13 @@ type User struct {
 	EmailAddress string `json:"email_address"`
 }
 
+// StatusChange represents a status transition from Jira changelog
+type StatusChange struct {
+	FromStatus string    `json:"from_status"`
+	ToStatus   string    `json:"to_status"`
+	ChangedAt  time.Time `json:"changed_at"`
+}
+
 // CreateMilestoneRequest represents the request to create a new milestone
 type CreateMilestoneRequest struct {
 	Name     string `json:"name" binding:"required"`

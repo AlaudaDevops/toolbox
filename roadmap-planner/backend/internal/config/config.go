@@ -25,11 +25,12 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Debug  bool   `mapstructure:"debug"`
-	Logger Logger `mapstructure:"logger"`
-	Jira   Jira   `mapstructure:"jira"`
-	Server Server `mapstructure:"server"`
-	Cache  Cache  `mapstructure:"cache"`
+	Debug   bool    `mapstructure:"debug"`
+	Logger  Logger  `mapstructure:"logger"`
+	Jira    Jira    `mapstructure:"jira"`
+	Server  Server  `mapstructure:"server"`
+	Cache   Cache   `mapstructure:"cache"`
+	Metrics Metrics `mapstructure:"metrics"`
 }
 
 // Logger represents logger configuration settings
@@ -66,6 +67,29 @@ type Cache struct {
 	RefreshInterval string `mapstructure:"refresh_interval"`
 }
 
+// Metrics represents metrics system configuration
+type Metrics struct {
+	Enabled            bool               `mapstructure:"enabled"`
+	CollectionInterval string             `mapstructure:"collection_interval"`
+	HistoricalDays     int                `mapstructure:"historical_days"`
+	Prometheus         PrometheusConfig   `mapstructure:"prometheus"`
+	Calculators        []CalculatorConfig `mapstructure:"calculators"`
+}
+
+// PrometheusConfig represents Prometheus exporter configuration
+type PrometheusConfig struct {
+	Enabled   bool   `mapstructure:"enabled"`
+	Path      string `mapstructure:"path"`
+	Namespace string `mapstructure:"namespace"`
+}
+
+// CalculatorConfig represents configuration for a metric calculator
+type CalculatorConfig struct {
+	Name    string                 `mapstructure:"name"`
+	Enabled bool                   `mapstructure:"enabled"`
+	Options map[string]interface{} `mapstructure:"options"`
+}
+
 // Load loads the configuration from environment variables and config files
 func Load() (*Config, error) {
 	viper.SetConfigName("config")
@@ -87,6 +111,14 @@ func Load() (*Config, error) {
 	viper.SetDefault("cache.ttl", "5m")
 	viper.SetDefault("cache.refresh_interval", "1m")
 
+	// Metrics defaults
+	viper.SetDefault("metrics.enabled", false)
+	viper.SetDefault("metrics.collection_interval", "5m")
+	viper.SetDefault("metrics.historical_days", 365)
+	viper.SetDefault("metrics.prometheus.enabled", true)
+	viper.SetDefault("metrics.prometheus.path", "/metrics")
+	viper.SetDefault("metrics.prometheus.namespace", "roadmap")
+
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
@@ -98,6 +130,9 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("server.static_files_path", "STATIC_FILES_PATH")
 	_ = viper.BindEnv("server.port", "SERVER_PORT")
 	_ = viper.BindEnv("debug", "DEBUG")
+	_ = viper.BindEnv("metrics.enabled", "METRICS_ENABLED")
+	_ = viper.BindEnv("metrics.collection_interval", "METRICS_COLLECTION_INTERVAL")
+	_ = viper.BindEnv("metrics.historical_days", "METRICS_HISTORICAL_DAYS")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

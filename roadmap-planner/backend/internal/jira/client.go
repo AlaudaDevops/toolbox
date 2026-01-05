@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/models"
@@ -862,4 +863,138 @@ func (c *Client) handleError(resp *jira.Response, err error) string {
 		}
 	}
 	return err.Error()
+}
+
+// ChangelogEntry represents a single changelog entry from Jira
+type ChangelogEntry struct {
+	ID      string           `json:"id"`
+	Author  *jira.User       `json:"author"`
+	Created string           `json:"created"`
+	Items   []ChangelogItem  `json:"items"`
+}
+
+// ChangelogItem represents a single field change in a changelog entry
+type ChangelogItem struct {
+	Field      string `json:"field"`
+	FieldType  string `json:"fieldtype"`
+	From       string `json:"from"`
+	FromString string `json:"fromString"`
+	To         string `json:"to"`
+	ToString   string `json:"toString"`
+}
+
+// IssueChangelog represents the changelog of an issue
+type IssueChangelog struct {
+	StartAt    int              `json:"startAt"`
+	MaxResults int              `json:"maxResults"`
+	Total      int              `json:"total"`
+	Histories  []ChangelogEntry `json:"histories"`
+}
+
+// GetIssueChangelog fetches the changelog for a specific issue
+func (c *Client) GetIssueChangelog(ctx context.Context, issueID string) (*IssueChangelog, error) {
+	c.logger.Debug("Fetching changelog for issue", zap.String("issue_id", issueID))
+
+	// The changelog is included in the issue when using expand=changelog
+	issue, resp, err := c.inner.Issue.GetWithContext(ctx, issueID, &jira.GetQueryOptions{
+		Expand: "changelog",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get issue changelog: %s", c.handleError(resp, err))
+	}
+
+	if issue.Changelog == nil {
+		return &IssueChangelog{
+			Histories: []ChangelogEntry{},
+		}, nil
+	}
+
+	// Convert Jira changelog to our type
+	changelog := &IssueChangelog{
+		Total:     len(issue.Changelog.Histories),
+		Histories: make([]ChangelogEntry, 0, len(issue.Changelog.Histories)),
+	}
+
+	for _, history := range issue.Changelog.Histories {
+		entry := ChangelogEntry{
+			ID:      history.Id,
+			Author:  &history.Author,
+			Created: history.Created,
+			Items:   make([]ChangelogItem, 0, len(history.Items)),
+		}
+		for _, item := range history.Items {
+			// Convert interface{} to string for From and To fields
+			fromStr := ""
+			if item.From != nil {
+				if s, ok := item.From.(string); ok {
+					fromStr = s
+				}
+			}
+			toStr := ""
+			if item.To != nil {
+				if s, ok := item.To.(string); ok {
+					toStr = s
+				}
+			}
+			entry.Items = append(entry.Items, ChangelogItem{
+				Field:      item.Field,
+				FieldType:  item.FieldType,
+				From:       fromStr,
+				FromString: item.FromString,
+				To:         toStr,
+				ToString:   item.ToString,
+			})
+		}
+		changelog.Histories = append(changelog.Histories, entry)
+	}
+
+	c.logger.Debug("Fetched changelog",
+		zap.String("issue_id", issueID),
+		zap.Int("history_count", len(changelog.Histories)))
+
+	return changelog, nil
+}
+
+// GetStatusChanges extracts status changes from an issue's changelog
+func (c *Client) GetStatusChanges(ctx context.Context, issueID string) ([]models.StatusChange, error) {
+	changelog, err := c.GetIssueChangelog(ctx, issueID)
+	if err != nil {
+		return nil, err
+	}
+
+	var statusChanges []models.StatusChange
+	for _, history := range changelog.Histories {
+		for _, item := range history.Items {
+			if item.Field == "status" {
+				changedAt, _ := parseJiraDateTime(history.Created)
+				statusChanges = append(statusChanges, models.StatusChange{
+					FromStatus: item.FromString,
+					ToStatus:   item.ToString,
+					ChangedAt:  changedAt,
+				})
+			}
+		}
+	}
+
+	return statusChanges, nil
+}
+
+// parseJiraDateTime parses a Jira datetime string
+func parseJiraDateTime(dateStr string) (time.Time, error) {
+	// Jira uses format: 2024-01-15T10:30:00.000+0000
+	formats := []string{
+		"2006-01-02T15:04:05.000-0700",
+		"2006-01-02T15:04:05.000Z",
+		"2006-01-02T15:04:05-0700",
+		"2006-01-02T15:04:05Z",
+		"2006-01-02",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, dateStr); err == nil {
+			return t, nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse date: %s", dateStr)
 }
