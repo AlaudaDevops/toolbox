@@ -867,10 +867,10 @@ func (c *Client) handleError(resp *jira.Response, err error) string {
 
 // ChangelogEntry represents a single changelog entry from Jira
 type ChangelogEntry struct {
-	ID      string           `json:"id"`
-	Author  *jira.User       `json:"author"`
-	Created string           `json:"created"`
-	Items   []ChangelogItem  `json:"items"`
+	ID      string          `json:"id"`
+	Author  *jira.User      `json:"author"`
+	Created string          `json:"created"`
+	Items   []ChangelogItem `json:"items"`
 }
 
 // ChangelogItem represents a single field change in a changelog entry

@@ -282,7 +282,6 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	releases := make([]models.EnrichedRelease, len(c.releases))
 	copy(releases, c.releases)
 
-
 	epics := make([]models.EnrichedEpic, len(c.epics))
 	copy(epics, c.epics)
 
