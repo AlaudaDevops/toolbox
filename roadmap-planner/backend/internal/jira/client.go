@@ -774,7 +774,7 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	var jqlParts []string
 	jqlParts = append(jqlParts, fmt.Sprintf("project = %s", c.project))
 	jqlParts = append(jqlParts, "issuetype = Epic")
-	jqlParts = append(jqlParts, "resolution is empty")
+	jqlParts = append(jqlParts, "status not in (Cancelled,已取消)")
 
 	// Add milestone ID filter if provided
 	if len(milestoneIDs) > 0 {

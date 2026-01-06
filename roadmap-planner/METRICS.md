@@ -12,7 +12,14 @@ Add a pluggable metrics system to the roadmap-planner that calculates adapted DO
 - **Granularity**: Both plugin/component AND team/pillar level
 - **Flexibility**: Easy to change metric calculations in the future
 
+
 ## Metrics to Implement
+
+  1. Release Frequency - releases per month per component
+  2. Lead Time to Release - Epic creation → release date
+  3. Cycle Time - Epic "In Progress" → "Done"
+  4. Patch Ratio - patch releases / total releases
+  5. Time to Patch - bug report → patch release
 
 | Metric | Description | Data Source |
 |--------|-------------|-------------|

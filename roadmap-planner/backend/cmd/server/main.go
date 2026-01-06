@@ -75,59 +75,13 @@ func main() {
 	defer cancel()
 
 	// Initialize metrics system if enabled
-	var metricsService *metrics.Service
-	_ = metricsService // Silence unused warning when metrics disabled
+
 
 	if cfg.Metrics.Enabled {
 		logger.Info("Initializing metrics system")
-
-		// Create Jira client for metrics collector using config credentials
-		if cfg.Jira.BaseURL != "" && cfg.Jira.Username != "" && cfg.Jira.Password != "" {
-			jiraClient, err := jira.NewClient(
-				cfg.Jira.BaseURL,
-				cfg.Jira.Username,
-				cfg.Jira.Password,
-				cfg.Jira.Project,
-			)
-			if err != nil {
-				logger.Error("Failed to create Jira client for metrics", zap.Error(err))
-			} else {
-				// Create collector and service
-				collector := metrics.NewCollector(jiraClient, &cfg.Metrics)
-				metricsService = metrics.NewService(&cfg.Metrics, collector)
-
-				// Register calculators
-				registerCalculators(metricsService, &cfg.Metrics)
-
-				// Start collector in background
-				go func() {
-					if err := collector.Start(ctx); err != nil && err != context.Canceled {
-						logger.Error("Metrics collector stopped with error", zap.Error(err))
-					}
-				}()
-
-				// Add metrics API routes
-				api.AddMetricsRoutes(router, cfg, metricsService)
-				logger.Info("Metrics API routes added")
-
-				// Initialize Prometheus exporter if enabled
-				if cfg.Metrics.Prometheus.Enabled {
-					prometheusExporter := metrics.NewPrometheusExporter(&cfg.Metrics.Prometheus, metricsService)
-
-					// Add Prometheus endpoint (no auth required)
-					prometheusPath := cfg.Metrics.Prometheus.Path
-					if prometheusPath == "" {
-						prometheusPath = "/metrics"
-					}
-					router.GET(prometheusPath, prometheusExporter.GinHandler())
-					logger.Info("Prometheus metrics endpoint added", zap.String("path", prometheusPath))
-
-					// Start Prometheus updater
-					go prometheusExporter.StartUpdater(ctx, 1*time.Minute)
-				}
-			}
-		} else {
-			logger.Warn("Metrics enabled but Jira credentials not configured in config file")
+		err = initMetrics(ctx, router, cfg)
+		if err != nil {
+			logger.Error("Failed to initialize metrics system", zap.Error(err))
 		}
 	}
 
@@ -163,6 +117,60 @@ func main() {
 	}
 
 	logger.Info("Server exited")
+}
+
+// initMetrics initializes the metrics system if enabled in config
+func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) (error) {
+	if cfg.Jira.BaseURL == ""  || cfg.Jira.Username == "" || cfg.Jira.Password == "" {
+		logger.Warn("Metrics enabled but Jira credentials not configured in config file")
+		return nil
+	}
+
+	var metricsService *metrics.Service
+	jiraClient, err := jira.NewClient(
+		cfg.Jira.BaseURL,
+		cfg.Jira.Username,
+		cfg.Jira.Password,
+		cfg.Jira.Project,
+	)
+	if err != nil {
+		logger.Error("Failed to create Jira client for metrics", zap.Error(err))
+		return err
+	}
+	// Create collector and service
+	collector := metrics.NewCollector(jiraClient, &cfg.Metrics)
+	metricsService = metrics.NewService(&cfg.Metrics, collector)
+
+	// Register calculators
+	registerCalculators(metricsService, &cfg.Metrics)
+
+	// Start collector in background
+	go func() {
+		if err := collector.Start(ctx); err != nil && err != context.Canceled {
+			logger.Error("Metrics collector stopped with error", zap.Error(err))
+		}
+	}()
+
+	// Add metrics API routes
+	api.AddMetricsRoutes(router, cfg, metricsService)
+	logger.Info("Metrics API routes added")
+
+	// Initialize Prometheus exporter if enabled
+	if cfg.Metrics.Prometheus.Enabled {
+		prometheusExporter := metrics.NewPrometheusExporter(&cfg.Metrics.Prometheus, metricsService)
+
+		// Add Prometheus endpoint (no auth required)
+		prometheusPath := cfg.Metrics.Prometheus.Path
+		if prometheusPath == "" {
+			prometheusPath = "/metrics"
+		}
+		router.GET(prometheusPath, prometheusExporter.GinHandler())
+		logger.Info("Prometheus metrics endpoint added", zap.String("path", prometheusPath))
+
+		// Start Prometheus updater
+		go prometheusExporter.StartUpdater(ctx, 1*time.Minute)
+	}
+	return nil
 }
 
 // registerCalculators registers all metric calculators with the service

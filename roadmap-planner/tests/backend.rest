@@ -68,7 +68,7 @@ X-Jira-Project: {{jiraProject}}
 
 ### List epics with filters
 
-GET  {{baseUrl}}/api/epics?version=connectors-operator-v1.3&connectors-operator-v1.4
+GET  {{baseUrl}}/api/epics
 X-Jira-Username: {{jiraUsername}}
 X-Jira-Password: {{jiraPassword}}
 X-Jira-BaseURL: {{jiraBaseUrl}}

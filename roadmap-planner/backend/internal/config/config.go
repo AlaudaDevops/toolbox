@@ -73,6 +73,7 @@ type Metrics struct {
 	CollectionInterval string             `mapstructure:"collection_interval"`
 	HistoricalDays     int                `mapstructure:"historical_days"`
 	Prometheus         PrometheusConfig   `mapstructure:"prometheus"`
+	Filters            []FilterConfig     `mapstructure:"filters"`
 	Calculators        []CalculatorConfig `mapstructure:"calculators"`
 }
 
@@ -88,6 +89,32 @@ type CalculatorConfig struct {
 	Name    string                 `mapstructure:"name"`
 	Enabled bool                   `mapstructure:"enabled"`
 	Options map[string]interface{} `mapstructure:"options"`
+}
+
+// FilterConfig represents configuration for a data filter
+// used to filter data using options
+type FilterConfig struct {
+	Name    string                 `mapstructure:"name"`
+	Enabled bool                   `mapstructure:"enabled"`
+	Options map[string]interface{} `mapstructure:"options"`
+}
+
+func (c *Metrics) GetFilter(name string) *FilterConfig {
+	for _, filter := range c.Filters {
+		if filter.Name == name {
+			return &filter
+		}
+	}
+	return nil
+}
+
+func (c *Metrics) GetCalculator(name string) *CalculatorConfig {
+	for _, calculator := range c.Calculators {
+		if calculator.Name == name {
+			return &calculator
+		}
+	}
+	return nil
 }
 
 // Load loads the configuration from environment variables and config files
@@ -118,6 +145,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("metrics.prometheus.enabled", true)
 	viper.SetDefault("metrics.prometheus.path", "/metrics")
 	viper.SetDefault("metrics.prometheus.namespace", "roadmap")
+	viper.SetDefault("metrics.filters", []FilterConfig{})
 
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))

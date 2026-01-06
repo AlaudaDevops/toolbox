@@ -1,0 +1,1806 @@
+{
+  "id": "315800",
+  "key": "DEVOPS-40247",
+  "name": "ACP 4.0.1 新增microOS + Redhat8.10操作系统适配测试-devops适配",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "cytong",
+    "display_name": "Caiyun Tong",
+    "email_address": "cytong@alauda.io"
+  }
+}
+{
+  "id": "345407",
+  "key": "DEVOPS-42663",
+  "name": "AI-Augmented DevOps Demo & Research",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "350067"
+  ],
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "305438",
+  "key": "DEVOPS-38458",
+  "name": "4.0 延期到 4.1 的 issues",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "357056",
+  "key": "DEVOPS-43103",
+  "name": "ACP SRE Agent with Claude Code",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "350067"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "mingfu",
+    "display_name": "Ming Fu",
+    "email_address": "mingfu@alauda.io"
+  }
+}
+{
+  "id": "303999",
+  "key": "DEVOPS-38306",
+  "name": "ACP能否集成Jira和Gitea",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "346563",
+  "key": "DEVOPS-42760",
+  "name": "AIT权限下沉变动devops插件回归",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "huanyang",
+    "display_name": "Huan Yang",
+    "email_address": "huanyang@alauda.io"
+  }
+}
+{
+  "id": "334361",
+  "key": "DEVOPS-41945",
+  "name": "All plugins security patching for 4.2",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "335068"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "yksun",
+    "display_name": "Yukun Sun",
+    "email_address": "yksun@alauda.io"
+  }
+}
+{
+  "id": "334381",
+  "key": "DEVOPS-41947",
+  "name": "All plugins security patching for 4.3",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "335069"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "yksun",
+    "display_name": "Yukun Sun",
+    "email_address": "yksun@alauda.io"
+  }
+}
+{
+  "id": "345968",
+  "key": "DEVOPS-42732",
+  "name": "Artifact Cleanup - Best Practice [KB]",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "315084"
+  ],
+  "status": "设计完成",
+  "priority": "L3 - Low",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "344166",
+  "key": "DEVOPS-42607",
+  "name": "Artifact Cleanup - Pipeline Template",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "332616"
+  ],
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "344167",
+  "key": "DEVOPS-42608",
+  "name": "Artifact Promotion - Pipeline Template +  ApprovalRequest + Docs",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "315084"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "277215",
+  "key": "DEVOPS-34636",
+  "name": "DevOps 效能度量需求",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "gxjiao",
+    "display_name": "Guangxin Jiao[X]",
+    "email_address": "gxjiao@alauda.io"
+  }
+}
+{
+  "id": "297351",
+  "key": "DEVOPS-37640",
+  "name": "New Global Dashboard",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "313274"
+  ],
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "345977",
+  "key": "DEVOPS-42739",
+  "name": "Nexus 新版本 API RateLimit 影响与行动项分析 ",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "337337"
+  ],
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "kychen",
+    "display_name": "Kaiyong Chen",
+    "email_address": "kychen@alauda.io"
+  }
+}
+{
+  "id": "293080",
+  "key": "DEVOPS-37054",
+  "name": "Tekton Pipelines - Golang 应用流水线",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "345408",
+  "key": "DEVOPS-42664",
+  "name": "Component License Conformity",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "358221",
+  "key": "DEVOPS-43193",
+  "name": "Connector supports custom certificates",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "344148"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "292873",
+  "key": "DEVOPS-37013",
+  "name": "Tekton Pipelines - 提供 Java、Golang 应用+Tekton CI/CD + ArgoCD GitOps 黄金路径模板；以及自定义方案",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "292868"
+  ],
+  "status": "待处理",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "336610",
+  "key": "DEVOPS-42156",
+  "name": "Tekton Pipelines - 明确归档日志查询保存方案及配置",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314610"
+  ],
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "269483",
+  "key": "DEVOPS-33700",
+  "name": "【待讨论】实现平台可复用的审批能力，支持发现并使用第三方审批自定义能力",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L0 - Critical",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "345973",
+  "key": "DEVOPS-42737",
+  "name": "Connectors Operational Observability",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "344174"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "342917",
+  "key": "DEVOPS-42532",
+  "name": "Connectors发版效率提升 - 2026S1",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "ruiqiu",
+    "display_name": "Rui Qiu",
+    "email_address": "ruiqiu@alauda.io"
+  }
+}
+{
+  "id": "357057",
+  "key": "DEVOPS-43104",
+  "name": "Delivery and Monitoring of applications in ACP using Claude Code [KB]",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "350067"
+  ],
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "mingfu",
+    "display_name": "Ming Fu",
+    "email_address": "mingfu@alauda.io"
+  }
+}
+{
+  "id": "346205",
+  "key": "DEVOPS-42747",
+  "name": "DevOps - Support RHEL 8.10 and RHEL 9.6",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "337762",
+  "key": "DEVOPS-42254",
+  "name": "DevOps - global token Rotator",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "348857",
+  "key": "DEVOPS-42850",
+  "name": "DevOps - 支持无 License 和由代理商自行签发 License",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "dongliu",
+    "display_name": "Dong Liu",
+    "email_address": "dongliu@alauda.io"
+  }
+}
+{
+  "id": "344177",
+  "key": "DEVOPS-42615",
+  "name": "DevOps v4 Performance metrics and improvements",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "344174"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "huanyang",
+    "display_name": "Huan Yang",
+    "email_address": "huanyang@alauda.io"
+  }
+}
+{
+  "id": "343413",
+  "key": "DEVOPS-42570",
+  "name": "DevOps v4 发展规划",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "308930",
+  "key": "DEVOPS-39039",
+  "name": "Development IDE, build and debugging v1.0.0",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "269764",
+  "key": "DEVOPS-33787",
+  "name": "DevOps增加发布统计页面（S2 方案）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "305648",
+  "key": "DEVOPS-38492",
+  "name": "Jenkins 跟平台 SSO 方案",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "305647",
+  "key": "DEVOPS-38491",
+  "name": "Nexus 跟平台 SSO 方案",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "196253",
+  "key": "DEVOPS-22847",
+  "name": "Nexus 高可用方案",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "阻塞中",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "ykwang",
+    "display_name": "Yukun Wang[X]",
+    "email_address": "ykwang@alauda.io"
+  }
+}
+{
+  "id": "345888",
+  "key": "DEVOPS-42729",
+  "name": "Pipeline + Connectors DORA metrics",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "224632"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "327743",
+  "key": "DEVOPS-41385",
+  "name": "Pipeline - 4.2版本中社区Tekton版本升级与ACP适配",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "327156",
+  "key": "DEVOPS-41327",
+  "name": "Pipeline - 用户引导体验/校验能力增强",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "344176",
+  "key": "DEVOPS-42614",
+  "name": "Pipeline Trigger/Results performance baseline and testing",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "344174"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "huanyang",
+    "display_name": "Huan Yang",
+    "email_address": "huanyang@alauda.io"
+  }
+}
+{
+  "id": "350412",
+  "key": "DEVOPS-42949",
+  "name": "Pipeline integration with Connector - Testing Requirements",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "ruiqiu",
+    "display_name": "Rui Qiu",
+    "email_address": "ruiqiu@alauda.io"
+  }
+}
+{
+  "id": "350524",
+  "key": "DEVOPS-42967",
+  "name": "Plugin Functionality Maturity Assessment",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "332622",
+  "key": "DEVOPS-41821",
+  "name": "Secret management store connector",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "345978",
+  "key": "DEVOPS-42740",
+  "name": "Security patches 100% automatic",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345974"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "mingfu",
+    "display_name": "Ming Fu",
+    "email_address": "mingfu@alauda.io"
+  }
+}
+{
+  "id": "323826",
+  "key": "DEVOPS-41018",
+  "name": "Support Kubernetes 1.32",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "341060",
+  "key": "DEVOPS-42437",
+  "name": "Support Kubernetes 1.33",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "316907",
+  "key": "DEVOPS-40279",
+  "name": "Tekton Pipelines - Blue/Green and Canary deployments",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "293008"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "293107",
+  "key": "DEVOPS-37072",
+  "name": "Tekton Pipelines - GitOps 应用更新",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345832"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "345515",
+  "key": "DEVOPS-42693",
+  "name": "Tekton Pipelines - Resolver Pipeline/Task",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314744"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345864",
+  "key": "DEVOPS-42718",
+  "name": "Tekton Pipelines - UI集成Triggerbinding",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314610"
+  ],
+  "status": "设计完成",
+  "priority": "L3 - Low",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "339532",
+  "key": "DEVOPS-42370",
+  "name": "Tekton Pipelines - pipelinerun matrix 支持",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345514",
+  "key": "DEVOPS-42692",
+  "name": "Tekton Pipelines - v3迁移v4（方案调研）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "332632"
+  ],
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "293092",
+  "key": "DEVOPS-37059",
+  "name": "Tekton Pipelines - 制品触发器：二进制触发",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345871"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "349647",
+  "key": "DEVOPS-42889",
+  "name": "Tekton Pipelines - 多语言task-.net构建测试",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314610"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "349646",
+  "key": "DEVOPS-42888",
+  "name": "Tekton Pipelines - 多语言task-go构建测试Lint",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314610"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "349644",
+  "key": "DEVOPS-42886",
+  "name": "Tekton Pipelines - 多语言task-nodejs构建测试",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314610"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "339637",
+  "key": "DEVOPS-42387",
+  "name": "Tekton Pipelines - 安全或制品Task处理/扫描多个对象",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345522",
+  "key": "DEVOPS-42700",
+  "name": "Tekton Pipelines - 安全扫描:nodejs扫描/Golangci-lint/Java SpotBugs/Python Flake8",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "293008"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "349659",
+  "key": "DEVOPS-42891",
+  "name": "Tekton Pipelines - 应用更新发布（ACP应用/Helm Chart build/deployment）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345832"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "356375",
+  "key": "DEVOPS-43063",
+  "name": "Tekton Pipelines - 执行记录展示更多状态信息:触发分支/归档状态等",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "339639",
+  "key": "DEVOPS-42389",
+  "name": "Tekton Pipelines - 提供安全与制品扫描Task",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345872",
+  "key": "DEVOPS-42722",
+  "name": "Tekton Pipelines - 提供流水线指标展示方案+产品化展示（待细化）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345519"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345516",
+  "key": "DEVOPS-42694",
+  "name": "Tekton Pipelines - 支持多架构镜像构建合并",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345832"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345953",
+  "key": "DEVOPS-42731",
+  "name": "Tekton Pipelines - 支持镜像同步（skopeo）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345519"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "345520",
+  "key": "DEVOPS-42698",
+  "name": "Tekton Pipelines - 流水线串并执行策略",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345871"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345862",
+  "key": "DEVOPS-42717",
+  "name": "Tekton Pipelines - 流水线缓存",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345519"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "338615",
+  "key": "DEVOPS-42290",
+  "name": "Tekton Pipelines - 流水线指标展示-HK [KB]",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345513",
+  "key": "DEVOPS-42691",
+  "name": "Tekton Pipelines - 流水线通知",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345832"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "332656",
+  "key": "DEVOPS-41828",
+  "name": "Tekton Pipelines - 流水线邮件审批",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314744"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "293091",
+  "key": "DEVOPS-37058",
+  "name": "Tekton Pipelines - 组件版本策略",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345871"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "293106",
+  "key": "DEVOPS-37071",
+  "name": "Tekton Pipelines - 自动化测试catalog",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314744"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "332654",
+  "key": "DEVOPS-41826",
+  "name": "Tekton Pipelines - 流水线约束策略",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345871"
+  ],
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "349793",
+  "key": "DEVOPS-42899",
+  "name": "Tekton Pipelines - 英文培训文档提供素材&对比OCP-ACP DevOps产品文档，从文档层面输出产品差异",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345972"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345517",
+  "key": "DEVOPS-42695",
+  "name": "Tekton Pipelines - 虚拟机应用部署",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "314744"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "349787",
+  "key": "DEVOPS-42897",
+  "name": "Tekton Pipelines - 触发历史可观测",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "345521",
+  "key": "DEVOPS-42699",
+  "name": "Tekton Pipelines -制品归档下载",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345871"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "349802",
+  "key": "DEVOPS-42900",
+  "name": "Tekton Pipelines -提供UI创建管理PAC Repo",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "323229",
+  "key": "DEVOPS-40876",
+  "name": "Tekton Pipelines 补齐各组件的集成测试以保证质量",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "328187",
+  "key": "DEVOPS-41448",
+  "name": "Toolchain FAQ & Deployment parameters [Docs]",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "328146"
+  ],
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "345488",
+  "key": "DEVOPS-42687",
+  "name": "harbor robot account 和 registry gateway 适配 ACP 4.2 版本",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "335068"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "307766",
+  "key": "DEVOPS-38871",
+  "name": "nexus对接AD设置自动同步",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "阻塞中",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "284837",
+  "key": "DEVOPS-35730",
+  "name": "tekton构建出来的镜像，时间戳标签跟国内时间相差8小时（时区UTC）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "323845",
+  "key": "DEVOPS-41021",
+  "name": "【DevOps】实时日志、实时事件替换（使用 v3.18 后版本实时日志、事件能力）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "278152",
+  "key": "DEVOPS-34754",
+  "name": "【devops】Tekton流水线优化配置maven setting",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "276567",
+  "key": "DEVOPS-34545",
+  "name": "二进制构建能力及对应CI完整流程梳理（Jar 包为例）",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "gxjiao",
+    "display_name": "Guangxin Jiao[X]",
+    "email_address": "gxjiao@alauda.io"
+  }
+}
+{
+  "id": "277770",
+  "key": "DEVOPS-34705",
+  "name": "制品晋级 - 基于国君期货等客户反馈的功能调整与优化",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "gxjiao",
+    "display_name": "Guangxin Jiao[X]",
+    "email_address": "gxjiao@alauda.io"
+  }
+}
+{
+  "id": "348367",
+  "key": "DEVOPS-42833",
+  "name": "单插件发版周期压缩至 1 天",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "345974"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "mingfu",
+    "display_name": "Ming Fu",
+    "email_address": "mingfu@alauda.io"
+  }
+}
+{
+  "id": "358746",
+  "key": "DEVOPS-43239",
+  "name": "去掉源码/文档中docker相关词",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "349109",
+  "key": "DEVOPS-42861",
+  "name": "命名空间默认安全策略调整，从 Baseline 调整为 Restricted 模式，业务分析及改造",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "310294",
+  "key": "DEVOPS-39271",
+  "name": "基本面 - 自动化解决漏洞",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "325242",
+  "key": "DEVOPS-41208",
+  "name": "安全自动化修复和发布落地",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "315062"
+  ],
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "357070",
+  "key": "DEVOPS-43110",
+  "name": "工具 Restricted 安全策略适配",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "345419",
+  "key": "DEVOPS-42673",
+  "name": "工具链测试使用权限修改",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "huanyang",
+    "display_name": "Huan Yang",
+    "email_address": "huanyang@alauda.io"
+  }
+}
+{
+  "id": "338898",
+  "key": "DEVOPS-42306",
+  "name": "支持 infra node/master node/worker node",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "328179",
+  "key": "DEVOPS-41443",
+  "name": "明确 Nexus 在生产环境的存储, 网络，CPU 的需求基线",
+  "versions": null,
+  "components": null,
+  "milestone_ids": [
+    "328147"
+  ],
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "jtcheng",
+    "display_name": "Jingtao Cheng",
+    "email_address": "jtcheng@alauda.io"
+  }
+}
+{
+  "id": "339638",
+  "key": "DEVOPS-42388",
+  "name": "移除 Tektoncd-Operator 中对 middleware/spilo 的依赖",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "319181",
+  "key": "DEVOPS-40446",
+  "name": "第一期文档规范变更落地 - DevOps 文档调整",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "274317",
+  "key": "DEVOPS-34338",
+  "name": "镜像合并taskS2方案 考虑转产品化",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "gxjiao",
+    "display_name": "Guangxin Jiao[X]",
+    "email_address": "gxjiao@alauda.io"
+  }
+}
+{
+  "id": "295523",
+  "key": "DEVOPS-37365",
+  "name": "【v1】tekton流水线模板图形化编辑",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "295522",
+  "key": "DEVOPS-37364",
+  "name": "【v1】tekton流水线模板预览功能",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "321269",
+  "key": "DEVOPS-40633",
+  "name": "【v3】流水线执行参数动态表单，参数1和2联动，更新参数1的值后、参数2的值未跟着清空",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "269796",
+  "key": "DEVOPS-33797",
+  "name": "【待讨论】流水线支持批量发布",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "269785",
+  "key": "DEVOPS-33793",
+  "name": "【待讨论】流水线支持指定发布时间窗口",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "daniel",
+    "display_name": "Daniel Morinigo",
+    "email_address": "daniel@alauda.io"
+  }
+}
+{
+  "id": "327467",
+  "key": "DEVOPS-41349",
+  "name": "上海证券流水线接入内部的漏洞扫描",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "326600",
+  "key": "DEVOPS-41269",
+  "name": "制品晋级是否能配置通知",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "358402",
+  "key": "DEVOPS-43222",
+  "name": "去掉源码中Docker相关的词",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "bozhou",
+    "display_name": "Bo Zhou",
+    "email_address": "bozhou@alauda.io"
+  }
+}
+{
+  "id": "297172",
+  "key": "DEVOPS-37608",
+  "name": "手动关闭Jenkins模板创建的入口和限制用户使用Jenkins流水线模板",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "302490",
+  "key": "DEVOPS-38181",
+  "name": "支持 nexus 安装插件",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "设计完成",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "systembot",
+    "display_name": "System Bot",
+    "email_address": "bot@alauda.io"
+  }
+}
+{
+  "id": "276932",
+  "key": "DEVOPS-34607",
+  "name": "目前tekton流水线关于python模板没有可选的task，实现从nexus拉取依赖包，然后构建镜像",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L2 - Medium",
+  "assignee": {
+    "account_id": "",
+    "name": "qingliu",
+    "display_name": "Qing Liu",
+    "email_address": "qingliu@alauda.io"
+  }
+}
+{
+  "id": "276989",
+  "key": "DEVOPS-34617",
+  "name": "镜像同步 Task 重新设计并开放为官方Task",
+  "versions": null,
+  "components": null,
+  "milestone_ids": null,
+  "status": "待处理",
+  "priority": "L1 - High",
+  "assignee": {
+    "account_id": "",
+    "name": "kychen",
+    "display_name": "Kaiyong Chen",
+    "email_address": "kychen@alauda.io"
+  }
+}

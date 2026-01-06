@@ -139,7 +139,15 @@ func (c *Collector) fetchReleases(ctx context.Context) ([]models.EnrichedRelease
 		releases = append(releases, release)
 	}
 
-	c.logger.Debug("Fetched releases", zap.Int("count", len(releases)))
+	originalCount := len(releases)
+
+	// TODO: optmize this code to pre-construct filters
+	if filter := c.config.GetFilter("releases"); filter != nil && filter.Enabled && len(filter.Options) > 0 {
+		releases = c.filterReleases(releases, filter.Options)
+		c.logger.Debug("Filtered releases")
+	}
+
+	c.logger.Debug("Fetched releases", zap.Int("count", len(releases)), zap.Int("original", originalCount))
 	return releases, nil
 }
 
@@ -274,6 +282,7 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	releases := make([]models.EnrichedRelease, len(c.releases))
 	copy(releases, c.releases)
 
+
 	epics := make([]models.EnrichedEpic, len(c.epics))
 	copy(epics, c.epics)
 
@@ -306,4 +315,35 @@ func (c *Collector) EpicCount() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return len(c.epics)
+}
+
+func (c *Collector) filterReleases(releases []models.EnrichedRelease, options map[string]interface{}) (filtered []models.EnrichedRelease) {
+	filtered = make([]models.EnrichedRelease, 0, len(releases))
+	filters := make([]func(models.EnrichedRelease) bool, 0, len(options))
+	filteredOut := make([]string, 0, len(releases))
+	if v, ok := options["name_regex"]; ok {
+		logger.Debugf("Will filter release by name regex: %s", v)
+		regexString := v.(string)
+		regex := regexp.MustCompile(regexString)
+		filters = append(filters, func(r models.EnrichedRelease) bool {
+
+			return regex.MatchString(r.Name)
+		})
+	}
+	for _, r := range releases {
+		shouldAppend := true
+		for _, f := range filters {
+			if !f(r) {
+				shouldAppend = false
+				break
+			}
+		}
+		if shouldAppend {
+			filtered = append(filtered, r)
+		} else {
+			filteredOut = append(filteredOut, r.Name)
+		}
+	}
+	logger.Debugf("Filtered out %d releases: %v", len(filteredOut), filteredOut)
+	return
 }
