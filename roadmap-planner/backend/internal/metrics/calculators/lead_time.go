@@ -47,7 +47,7 @@ func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.Calcula
 	percentile := c.GetIntOption("percentile", 50) // Default to median
 
 	// Group epics by component
-	componentEpics := make(map[string][]models.EnrichedEpic)
+	componentEpics := make(map[string][]models.EnrichedIssue)
 	for _, epic := range data.Epics {
 		// Skip epics without release date
 		if epic.ReleaseDate.IsZero() || epic.CreatedDate.IsZero() {

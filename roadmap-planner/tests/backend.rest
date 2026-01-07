@@ -8,7 +8,7 @@
 # @jiraBaseUrl = {{jiraBaseUrl}}
 # @jiraProject = {{jiraProject}}
 # @assigneeId = {{$shared assigneeId}}
-@issueKey = DEVOPS-41822
+@issueKey =
 
 ### Health Check
 GET {{baseUrl}}/health

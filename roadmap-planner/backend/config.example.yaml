@@ -40,11 +40,22 @@ metrics:
     path: "/metrics"
     namespace: "roadmap"         # Metric prefix: roadmap_dora_*
 
+  filters:
+    - name: "releases"
+      enabled: true
+      options:
+        name_regex: '^[a-zA-Z0-9\-]+\-[v]*\d+.\d+.\d+$'
+
+    - name: "issues"
+      enabled: true
+      options:
+        issuetypes: ["Bug"]
+
   calculators:
     - name: "release_frequency"
       enabled: true
       options:
-        window_months: 3         # Rolling window for calculation
+        window_months: 4         # Rolling window for calculation
 
     - name: "lead_time_to_release"
       enabled: true
@@ -54,13 +65,14 @@ metrics:
     - name: "cycle_time"
       enabled: true
       options:
-        in_progress_statuses: ["In Progress", "In Development"]
-        done_statuses: ["Done", "Closed", "Released"]
+        in_progress_statuses: ["In Progress", "In Development", "调研中", "调研完成", "设计完成", "开发完成", "测试完成", "验收完成"]
+        done_statuses: ["Done", "Closed", "Released", "已完成"]
+        component_pattern: '^[a-zA-Z0-9\-]+\-[v]*\d+.\d+.\d+$'
 
     - name: "patch_ratio"
       enabled: true
       options:
-        patch_pattern: "^(.+)-(\\d+\\.\\d+\\.\\d+)$"  # component-X.Y.Z
+        patch_pattern: "^(.+)-[v]*(\\d+\\.\\d+\\.\\d+)$"  # component-X.Y.Z
 
     - name: "time_to_patch"
       enabled: true

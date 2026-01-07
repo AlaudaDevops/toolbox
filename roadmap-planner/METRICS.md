@@ -199,6 +199,8 @@ calculators:
         - "Closed"
         - "Released"
         - "已完成"  # Chinese locale
+      # Optional: Regex pattern to only calculate matching versions
+      component_pattern: '^[a-zA-Z0-9\-]+\-[v]*\d+.\d+.\d+$'
 ```
 
 ---
@@ -511,6 +513,11 @@ metrics:
       enabled: true
       options:
         name_regex: "^.*$"         # Regex to filter version names
+
+    - name: "issues"
+      enabled: true
+      options:
+        issuetypes: ["Bug"]        # Issue types to include
 
   calculators:
     - name: "release_frequency"

@@ -41,7 +41,8 @@ type Collector struct {
 
 	mu            sync.RWMutex
 	releases      []models.EnrichedRelease
-	epics         []models.EnrichedEpic
+	epics         []models.EnrichedIssue
+	issues        []models.EnrichedIssue
 	lastCollected time.Time
 }
 
@@ -52,7 +53,8 @@ func NewCollector(jiraClient *jira.Client, cfg *config.Metrics) *Collector {
 		config:     cfg,
 		logger:     logger.WithComponent("metrics-collector"),
 		releases:   []models.EnrichedRelease{},
-		epics:      []models.EnrichedEpic{},
+		epics:      []models.EnrichedIssue{},
+		issues:     []models.EnrichedIssue{},
 	}
 }
 
@@ -103,6 +105,9 @@ func (c *Collector) Collect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch releases: %w", err)
 	}
+	c.mu.Lock()
+	c.releases = releases
+	c.mu.Unlock()
 
 	// Fetch epics
 	epics, err := c.fetchEpics(ctx)
@@ -110,16 +115,23 @@ func (c *Collector) Collect(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch epics: %w", err)
 	}
 
+	// Fetch issues (Bugs)
+	issues, err := c.fetchIssues(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to fetch issues: %w", err)
+	}
+
 	// Update cached data
 	c.mu.Lock()
-	c.releases = releases
 	c.epics = epics
+	c.issues = issues
 	c.lastCollected = time.Now()
 	c.mu.Unlock()
 
 	c.logger.Info("Collection complete",
 		zap.Int("releases", len(releases)),
 		zap.Int("epics", len(epics)),
+		zap.Int("issues", len(issues)),
 		zap.Duration("duration", time.Since(startTime)))
 
 	return nil
@@ -227,7 +239,7 @@ func classifyReleaseType(major, minor, patch int, name string) string {
 }
 
 // fetchEpics gets epic data from Jira
-func (c *Collector) fetchEpics(ctx context.Context) ([]models.EnrichedEpic, error) {
+func (c *Collector) fetchEpics(ctx context.Context) ([]models.EnrichedIssue, error) {
 	// Use the existing GetEpicsWithFilter method
 	rawEpics, err := c.jiraClient.GetEpicsWithFilter(ctx, nil, nil, nil, nil)
 	if err != nil {
@@ -244,9 +256,9 @@ func (c *Collector) fetchEpics(ctx context.Context) ([]models.EnrichedEpic, erro
 	}
 	c.mu.RUnlock()
 
-	epics := make([]models.EnrichedEpic, 0, len(rawEpics))
+	epics := make([]models.EnrichedIssue, 0, len(rawEpics))
 	for _, epic := range rawEpics {
-		enriched := models.EnrichedEpic{
+		enriched := models.EnrichedIssue{
 			ID:           epic.ID,
 			Key:          epic.Key,
 			Name:         epic.Name,
@@ -285,6 +297,73 @@ func (c *Collector) fetchEpics(ctx context.Context) ([]models.EnrichedEpic, erro
 	return epics, nil
 }
 
+// fetchIssues gets issues data from Jira
+func (c *Collector) fetchIssues(ctx context.Context) ([]models.EnrichedIssue, error) {
+	// Use the existing GetEpicsWithFilter method
+	var issueTypes []string
+	if filter := c.config.GetFilter("issues"); filter != nil && filter.Enabled && len(filter.Options) > 0 {
+		issueTypes = filter.GetStringSliceOption("issuetypes", []string{"Bug"})
+	}
+
+	rawIssues, err := c.jiraClient.GetIssuesWithFilter(ctx, nil, nil, nil, issueTypes)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build a map of version names to release dates
+	c.mu.RLock()
+	versionDates := make(map[string]time.Time)
+	for _, r := range c.releases {
+		if !r.ReleaseDate.IsZero() {
+			versionDates[r.Name] = r.ReleaseDate
+		}
+	}
+	c.mu.RUnlock()
+
+
+	countWithout := 0
+	countWith := 0
+	issues := make([]models.EnrichedIssue, 0, len(rawIssues))
+	for _, issue := range rawIssues {
+		enriched := models.EnrichedIssue{
+			ID:           issue.ID,
+			Key:          issue.Key,
+			Name:         issue.Name,
+			Components:   issue.Components,
+			Versions:     issue.Versions,
+			Status:       issue.Status,
+			Priority:     issue.Priority,
+			IssueType:    issue.Type,
+			ResolvedDate: issue.ResolutionDate,
+			CreatedDate:  issue.CreationDate,
+		}
+
+		// fallback to extracting component data from versions
+		extractComponentFromVersions := (len(enriched.Components) == 0 && len(issue.Versions) > 0)
+
+		// Find the earliest release date from versions
+		for _, versionName := range issue.Versions {
+			if releaseDate, ok := versionDates[versionName]; ok {
+				enriched.ReleaseDate = releaseDate
+				countWith++
+			} else {
+				countWithout++
+			}
+			if extractComponentFromVersions {
+				component, major, minor, _ := parseVersionName(versionName)
+				if component != "" && major+minor > 0 {
+					// Only add component if it's a valid version
+					enriched.Components = append(enriched.Components, component)
+				}
+			}
+		}
+		issues = append(issues, enriched)
+	}
+
+	c.logger.Debug("Fetched issues", zap.Int("count", len(issues)), zap.Int("without", countWithout), zap.Int("with", countWith))
+	return issues, nil
+}
+
 // GetData returns the current cached data for metric calculation
 func (c *Collector) GetData() (*models.CalculationContext, error) {
 	c.mu.RLock()
@@ -294,12 +373,16 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	releases := make([]models.EnrichedRelease, len(c.releases))
 	copy(releases, c.releases)
 
-	epics := make([]models.EnrichedEpic, len(c.epics))
+	epics := make([]models.EnrichedIssue, len(c.epics))
 	copy(epics, c.epics)
+
+	issues := make([]models.EnrichedIssue, len(c.issues))
+	copy(issues, c.issues)
 
 	return &models.CalculationContext{
 		Releases: releases,
 		Epics:    epics,
+		Issues:   issues,
 		TimeRange: models.TimeRange{
 			Start: time.Now().AddDate(0, 0, -c.config.HistoricalDays),
 			End:   time.Now(),

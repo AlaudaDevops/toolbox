@@ -51,7 +51,7 @@ func (c *CycleTimeCalculator) Calculate(ctx context.Context, data *models.Calcul
 
 	filteredEpics := make(map[string][]string)
 	// Group epics by component
-	componentEpics := make(map[string][]models.EnrichedEpic)
+	componentEpics := make(map[string][]models.EnrichedIssue)
 	for _, epic := range data.Epics {
 		// Only include resolved epics
 		if epic.ResolvedDate.IsZero() {
@@ -140,7 +140,7 @@ func (c *CycleTimeCalculator) Calculate(ctx context.Context, data *models.Calcul
 }
 
 // calculateCycleTime calculates the cycle time for a single epic based on status changes
-func (c *CycleTimeCalculator) calculateCycleTime(epic models.EnrichedEpic, inProgressStatuses, doneStatuses []string) float64 {
+func (c *CycleTimeCalculator) calculateCycleTime(epic models.EnrichedIssue, inProgressStatuses, doneStatuses []string) float64 {
 	var startTime, endTime time.Time
 
 	// Find when the epic entered "In Progress" and when it became "Done"

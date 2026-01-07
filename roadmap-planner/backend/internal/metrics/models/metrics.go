@@ -78,7 +78,8 @@ type MetricFilters struct {
 // CalculationContext provides all data needed for metric calculation
 type CalculationContext struct {
 	Releases  []EnrichedRelease
-	Epics     []EnrichedEpic
+	Epics     []EnrichedIssue
+	Issues    []EnrichedIssue
 	TimeRange TimeRange
 	Filters   MetricFilters
 }
@@ -98,8 +99,8 @@ type EnrichedRelease struct {
 	Patch int `json:"patch"`
 }
 
-// EnrichedEpic represents an Epic with additional metadata for metrics
-type EnrichedEpic struct {
+// EnrichedIssue represents an Issue with additional metadata for metrics
+type EnrichedIssue struct {
 	ID            string                    `json:"id"`
 	Key           string                    `json:"key"`
 	Name          string                    `json:"name"`

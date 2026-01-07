@@ -65,6 +65,22 @@ type Epic struct {
 	CreationDate   time.Time `json:"creation_date,omitempty"`
 }
 
+// Issue represents a product requirement or set of stories
+type Issue struct {
+	ID              string    `json:"id"`
+	Key             string    `json:"key"`
+	Type            string    `json:"type"`
+	Name            string    `json:"name"`
+	Versions        []string  `json:"versions"` // Fix version for sorting
+	Components      []string  `json:"components"`
+	AffectsVersions []string  `json:"affected_versions"`
+	Status          string    `json:"status"`
+	Priority        string    `json:"priority"`
+	Assignee        *User     `json:"assignee,omitempty"`
+	ResolutionDate  time.Time `json:"resolution_date,omitempty"`
+	CreationDate    time.Time `json:"creation_date,omitempty"`
+}
+
 // User represents a Jira user
 type User struct {
 	AccountID    string `json:"account_id"`
@@ -234,6 +250,25 @@ func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
 	}
 
 	return epic
+}
+
+// ConvertJiraIssueToIssue converts a Jira issue to an Epic model
+func ConvertJiraIssueToIssue(issue *jira.Issue) *Issue {
+	bug := &Issue{
+		ID:             issue.ID,
+		Key:            issue.Key,
+		Name:           issue.Fields.Summary,
+		Type:           issue.Fields.Type.Name,
+		Versions:       extractVersionsFromIssue(issue),
+		Components:     extractComponentsFromIssue(issue),
+		Status:         extractStatusFromIssue(issue),
+		Priority:       extractPriorityFromIssue(issue),
+		Assignee:       convertJiraUserToUser(issue.Fields.Assignee),
+		ResolutionDate: time.Time(issue.Fields.Resolutiondate),
+		CreationDate:   time.Time(issue.Fields.Created),
+	}
+
+	return bug
 }
 
 // ConvertJiraProjectToProject converts a Jira project to a Project model
@@ -519,25 +554,12 @@ func SortMilestones(milestones []Milestone) {
 // SortEpics sorts epics by fix version (blanks first), then by name
 func SortEpics(epics []Epic) {
 	sort.Slice(epics, func(i, j int) bool {
-
-		// // Blanks (empty versions) should come first
-		// if epics[i].Version == "" && epics[j].Version != "" {
+		// if epics[i].Priority < epics[j].Priority {
 		// 	return true
 		// }
-		// if epics[i].Version != "" && epics[j].Version == "" {
-		// 	return false
-		// }
 
-		// // If both have versions or both are blank, sort by version then name
-		// if epics[i].Version != epics[j].Version {
-		// 	return epics[i].Version < epics[j].Version
-		// }
-
-		if epics[i].Priority < epics[j].Priority {
-			return true
-		}
-
-		return epics[i].Name < epics[j].Name
+		// return epics[i].Name < epics[j].Name
+		return epics[i].Priority < epics[j].Priority && epics[i].Name < epics[j].Name
 	})
 }
 

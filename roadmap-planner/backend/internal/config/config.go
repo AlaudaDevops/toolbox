@@ -69,12 +69,12 @@ type Cache struct {
 
 // Metrics represents metrics system configuration
 type Metrics struct {
-	Enabled            bool               `mapstructure:"enabled"`
-	CollectionInterval string             `mapstructure:"collection_interval"`
-	HistoricalDays     int                `mapstructure:"historical_days"`
-	Prometheus         PrometheusConfig   `mapstructure:"prometheus"`
-	Filters            []FilterConfig     `mapstructure:"filters"`
-	Calculators        []CalculatorConfig `mapstructure:"calculators"`
+	Enabled            bool             `mapstructure:"enabled"`
+	CollectionInterval string           `mapstructure:"collection_interval"`
+	HistoricalDays     int              `mapstructure:"historical_days"`
+	Prometheus         PrometheusConfig `mapstructure:"prometheus"`
+	Filters            []OptionsConfig  `mapstructure:"filters"`
+	Calculators        []OptionsConfig  `mapstructure:"calculators"`
 }
 
 // PrometheusConfig represents Prometheus exporter configuration
@@ -84,22 +84,89 @@ type PrometheusConfig struct {
 	Namespace string `mapstructure:"namespace"`
 }
 
-// CalculatorConfig represents configuration for a metric calculator
-type CalculatorConfig struct {
+type OptionsConfig struct {
 	Name    string                 `mapstructure:"name"`
 	Enabled bool                   `mapstructure:"enabled"`
 	Options map[string]interface{} `mapstructure:"options"`
 }
 
-// FilterConfig represents configuration for a data filter
-// used to filter data using options
-type FilterConfig struct {
-	Name    string                 `mapstructure:"name"`
-	Enabled bool                   `mapstructure:"enabled"`
-	Options map[string]interface{} `mapstructure:"options"`
+// GetOption retrieves an option value with a default fallback
+func (b OptionsConfig) GetOption(key string, defaultValue interface{}) interface{} {
+	if val, exists := b.Options[key]; exists {
+		return val
+	}
+	return defaultValue
 }
 
-func (c *Metrics) GetFilter(name string) *FilterConfig {
+// GetIntOption retrieves an int option with a default fallback
+func (b OptionsConfig) GetIntOption(key string, defaultValue int) int {
+	val := b.GetOption(key, defaultValue)
+	switch v := val.(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	case int64:
+		return int(v)
+	default:
+		return defaultValue
+	}
+}
+
+// GetFloat64Option retrieves a float64 option with a default fallback
+func (b OptionsConfig) GetFloat64Option(key string, defaultValue float64) float64 {
+	val := b.GetOption(key, defaultValue)
+	switch v := val.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case int64:
+		return float64(v)
+	default:
+		return defaultValue
+	}
+}
+
+// GetStringOption retrieves a string option with a default fallback
+func (b OptionsConfig) GetStringOption(key string, defaultValue string) string {
+	val := b.GetOption(key, defaultValue)
+	if s, ok := val.(string); ok {
+		return s
+	}
+	return defaultValue
+}
+
+// GetStringSliceOption retrieves a string slice option with a default fallback
+func (b OptionsConfig) GetStringSliceOption(key string, defaultValue []string) []string {
+	val := b.GetOption(key, nil)
+	if val == nil {
+		return defaultValue
+	}
+	switch v := val.(type) {
+	case []string:
+		return v
+	case []interface{}:
+		result := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok {
+				result = append(result, s)
+			}
+		}
+		return result
+	default:
+		return defaultValue
+	}
+}
+
+// // CalculatorConfig represents configuration for a metric calculator
+// type CalculatorConfig OptionsConfig
+
+// // FilterConfig represents configuration for a data filter
+// // used to filter data using options
+// type FilterConfig OptionsConfig
+
+func (c *Metrics) GetFilter(name string) *OptionsConfig {
 	for _, filter := range c.Filters {
 		if filter.Name == name {
 			return &filter
@@ -108,7 +175,7 @@ func (c *Metrics) GetFilter(name string) *FilterConfig {
 	return nil
 }
 
-func (c *Metrics) GetCalculator(name string) *CalculatorConfig {
+func (c *Metrics) GetCalculator(name string) *OptionsConfig {
 	for _, calculator := range c.Calculators {
 		if calculator.Name == name {
 			return &calculator
@@ -145,7 +212,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("metrics.prometheus.enabled", true)
 	viper.SetDefault("metrics.prometheus.path", "/metrics")
 	viper.SetDefault("metrics.prometheus.namespace", "roadmap")
-	viper.SetDefault("metrics.filters", []FilterConfig{})
+	viper.SetDefault("metrics.filters", []OptionsConfig{})
 
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))

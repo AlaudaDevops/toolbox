@@ -845,6 +845,65 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	return epics, nil
 }
 
+// GetIssuesWithFilter fetches issues with optional filtering
+func (c *Client) GetIssuesWithFilter(ctx context.Context, epicIDs []string, components []string, versions []string, issueTypes []string) ([]models.Issue, error) {
+	// Build JQL query with filters
+	var jqlParts []string
+	jqlParts = append(jqlParts, fmt.Sprintf("project = %s", c.project))
+	jqlParts = append(jqlParts, "status not in (Cancelled,已取消)")
+	jqlParts = append(jqlParts, "created > startOfDay(-366)")
+
+	if len(issueTypes) > 0 {
+		typeFilter := fmt.Sprintf(`issuetype in (%s)`, strings.Join(issueTypes, ","))
+		jqlParts = append(jqlParts, typeFilter)
+	}
+	// Add milestone ID filter if provided
+	if len(epicIDs) > 0 {
+		milestoneFilter := fmt.Sprintf(`"Epic Link" in (%s)`, strings.Join(epicIDs, ","))
+		jqlParts = append(jqlParts, milestoneFilter)
+	}
+
+	// Add component filter if provided
+	if len(components) > 0 {
+		componentFilter := fmt.Sprintf(`component in (%q)`, strings.Join(components, ","))
+		jqlParts = append(jqlParts, componentFilter)
+	}
+
+	// Add version filter if provided
+	if len(versions) > 0 {
+		versionFilter := fmt.Sprintf(`fixVersion in (%q)`, strings.Join(versions, ","))
+		jqlParts = append(jqlParts, versionFilter)
+	}
+
+	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
+
+	searchOptions := &jira.SearchOptions{
+		Fields:     []string{"summary", "assignee", "priority", "components", "issuetype", "status", "parent", "fixVersions", "created", "issuelinks", "resolutiondate", "created", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		MaxResults: 2000,
+	}
+
+	jiraIssues, resp, err := c.inner.Issue.SearchWithContext(ctx, jqlQuery, searchOptions)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch issues: %s", c.handleError(resp, err))
+	}
+
+	c.logger.Info("Found issues with filter",
+		zap.Int("count", len(jiraIssues)),
+		zap.Strings("epic_ids", epicIDs),
+		zap.Strings("issueTypes", issueTypes),
+		zap.Strings("components", components),
+		zap.Strings("versions", versions))
+
+	issues := make([]models.Issue, 0, len(jiraIssues))
+	for _, issue := range jiraIssues {
+
+		bug := models.ConvertJiraIssueToIssue(&issue)
+
+		issues = append(issues, *bug)
+	}
+	return issues, nil
+}
+
 // removeIssueLink removes an issue link
 func (c *Client) removeIssueLink(ctx context.Context, linkID string) error {
 	resp, err := c.inner.Issue.DeleteLinkWithContext(ctx, linkID)

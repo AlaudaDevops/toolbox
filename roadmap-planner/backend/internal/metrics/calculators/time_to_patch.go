@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/models"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 )
 
 // TimeToPatchCalculator calculates time from bug report to patch release
@@ -45,37 +46,51 @@ func NewTimeToPatchCalculator(options map[string]interface{}) *TimeToPatchCalcul
 // Calculate computes the time to patch metric
 func (c *TimeToPatchCalculator) Calculate(ctx context.Context, data *models.CalculationContext) ([]models.MetricResult, error) {
 	percentile := c.GetIntOption("percentile", 50)
-	bugTypes := c.GetStringSliceOption("bug_types", []string{"Bug", "Vulnerability", "Security"})
+	bugTypes := c.GetStringSliceOption("bug_types", []string{"Bug"})
+
+	filteredIssues := make(map[string][]string)
+	count := 0
 
 	// Group bugs by component
-	componentBugs := make(map[string][]models.EnrichedEpic)
-	for _, epic := range data.Epics {
+	componentBugs := make(map[string][]models.EnrichedIssue)
+	for _, issue := range data.Issues {
 		// Only include bugs/vulnerabilities that have been released
-		if epic.ReleaseDate.IsZero() || epic.CreatedDate.IsZero() {
+		if issue.ReleaseDate.IsZero() || issue.CreatedDate.IsZero() {
+			filteredIssues["No release date"] = append(filteredIssues["No release date"], issue.Key)
+			count++
 			continue
 		}
 
 		// Filter by issue type (bugs, vulnerabilities)
-		if !Contains(bugTypes, epic.IssueType) {
+		if !Contains(bugTypes, issue.IssueType) {
+			filteredIssues["IssueType mismatch"] = append(filteredIssues["IssueType mismatch"], issue.Key)
+			count++
 			continue
 		}
 
 		// Apply time range filter on release date
-		if epic.ReleaseDate.Before(data.TimeRange.Start) || epic.ReleaseDate.After(data.TimeRange.End) {
+		if issue.ReleaseDate.Before(data.TimeRange.Start) || issue.ReleaseDate.After(data.TimeRange.End) {
+			filteredIssues["Not in range"] = append(filteredIssues["Not in range"], issue.Key)
+			count++
 			continue
 		}
 
-		for _, comp := range epic.Components {
+		for _, comp := range issue.Components {
 			if len(data.Filters.Components) > 0 && !Contains(data.Filters.Components, comp) {
+				filteredIssues["Not in component filter"] = append(filteredIssues["Not in component filter"], issue.Key)
+				count++
 				continue
 			}
-			componentBugs[comp] = append(componentBugs[comp], epic)
+			componentBugs[comp] = append(componentBugs[comp], issue)
 		}
 
-		if len(epic.Components) == 0 {
-			componentBugs["unknown"] = append(componentBugs["unknown"], epic)
+		if len(issue.Components) == 0 {
+			componentBugs["unknown"] = append(componentBugs["unknown"], issue)
+			filteredIssues["No component"] = append(filteredIssues["No component"], issue.Key)
 		}
 	}
+
+	logger.Debugf("Filtered issues from time to patch calculation: (%d)  %v", count, filteredIssues)
 
 	results := make([]models.MetricResult, 0, len(componentBugs))
 
