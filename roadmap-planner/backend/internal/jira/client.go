@@ -805,7 +805,7 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
 
 	searchOptions := &jira.SearchOptions{
-		Fields:     []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		Fields:     []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "resolutiondate", "created", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
 		MaxResults: 2000,
 	}
 
@@ -867,10 +867,10 @@ func (c *Client) handleError(resp *jira.Response, err error) string {
 
 // ChangelogEntry represents a single changelog entry from Jira
 type ChangelogEntry struct {
-	ID      string           `json:"id"`
-	Author  *jira.User       `json:"author"`
-	Created string           `json:"created"`
-	Items   []ChangelogItem  `json:"items"`
+	ID      string          `json:"id"`
+	Author  *jira.User      `json:"author"`
+	Created string          `json:"created"`
+	Items   []ChangelogItem `json:"items"`
 }
 
 // ChangelogItem represents a single field change in a changelog entry

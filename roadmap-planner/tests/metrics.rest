@@ -30,9 +30,9 @@ X-Jira-Project: {{jiraProject}}
 ### Metrics status
 
 @metricName = release_frequency
-# @metricName = lead_time_to_release
+@metricName = lead_time_to_release
 # @metricName = cycle_time
-@metricName = patch_ratio
+# @metricName = patch_ratio
 # @metricName = time_to_patch
 
 GET {{baseUrl}}/api/metrics/{{metricName}}

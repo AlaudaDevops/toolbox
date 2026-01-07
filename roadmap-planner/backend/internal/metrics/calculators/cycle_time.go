@@ -21,6 +21,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/models"
 )
 
@@ -46,23 +47,32 @@ func NewCycleTimeCalculator(options map[string]interface{}) *CycleTimeCalculator
 func (c *CycleTimeCalculator) Calculate(ctx context.Context, data *models.CalculationContext) ([]models.MetricResult, error) {
 	percentile := c.GetIntOption("percentile", 50)
 	inProgressStatuses := c.GetStringSliceOption("in_progress_statuses", []string{"In Progress", "In Development"})
-	doneStatuses := c.GetStringSliceOption("done_statuses", []string{"Done", "Closed", "Released"})
+	doneStatuses := c.GetStringSliceOption("done_statuses", []string{"Done", "Closed", "Released", "已完成"})
 
+	filteredEpics := make(map[string][]string)
 	// Group epics by component
 	componentEpics := make(map[string][]models.EnrichedEpic)
 	for _, epic := range data.Epics {
 		// Only include resolved epics
 		if epic.ResolvedDate.IsZero() {
+			filteredEpics["No resolved date"] = append(filteredEpics["No resolved date"], epic.Key)
 			continue
 		}
 
 		// Apply time range filter on resolved date
 		if epic.ResolvedDate.Before(data.TimeRange.Start) || epic.ResolvedDate.After(data.TimeRange.End) {
+			filteredEpics["Not in range"] = append(filteredEpics["Not in range"], epic.Key)
 			continue
 		}
 
+		// Apply component filter if specified
+		if !FilterByComponent(epic.Components, data.Filters.Components) {
+			filteredEpics["Not in component filter"] = append(filteredEpics["Not in component filter"], epic.Key)
+			continue
+		}
 		for _, comp := range epic.Components {
 			if len(data.Filters.Components) > 0 && !Contains(data.Filters.Components, comp) {
+				filteredEpics["Not in component filter"] = append(filteredEpics["Not in component filter"], epic.Key)
 				continue
 			}
 			componentEpics[comp] = append(componentEpics[comp], epic)
@@ -70,8 +80,11 @@ func (c *CycleTimeCalculator) Calculate(ctx context.Context, data *models.Calcul
 
 		if len(epic.Components) == 0 {
 			componentEpics["unknown"] = append(componentEpics["unknown"], epic)
+			filteredEpics["No component"] = append(filteredEpics["No component"], epic.Key)
 		}
 	}
+
+	logger.Debugf("Filtered epics from cycle time calculation: %v", filteredEpics)
 
 	results := make([]models.MetricResult, 0, len(componentEpics))
 
@@ -86,6 +99,7 @@ func (c *CycleTimeCalculator) Calculate(ctx context.Context, data *models.Calcul
 		}
 
 		if len(cycleTimes) == 0 {
+			logger.Debugf("No cycle times for component %s", component)
 			continue
 		}
 

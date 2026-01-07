@@ -247,21 +247,33 @@ func (c *Collector) fetchEpics(ctx context.Context) ([]models.EnrichedEpic, erro
 	epics := make([]models.EnrichedEpic, 0, len(rawEpics))
 	for _, epic := range rawEpics {
 		enriched := models.EnrichedEpic{
-			ID:         epic.ID,
-			Key:        epic.Key,
-			Name:       epic.Name,
-			Components: epic.Components,
-			Versions:   epic.Versions,
-			Status:     epic.Status,
-			Priority:   epic.Priority,
-			IssueType:  "Epic",
+			ID:           epic.ID,
+			Key:          epic.Key,
+			Name:         epic.Name,
+			Components:   epic.Components,
+			Versions:     epic.Versions,
+			Status:       epic.Status,
+			Priority:     epic.Priority,
+			IssueType:    "Epic",
+			ResolvedDate: epic.ResolutionDate,
+			CreatedDate:  epic.CreationDate,
 		}
+
+		// fallback to extracting component data from versions
+		extractComponentFromVersions := (len(enriched.Components) == 0 && len(epic.Versions) > 0)
 
 		// Find the earliest release date from versions
 		for _, versionName := range epic.Versions {
 			if releaseDate, ok := versionDates[versionName]; ok {
 				if enriched.ReleaseDate.IsZero() || releaseDate.Before(enriched.ReleaseDate) {
 					enriched.ReleaseDate = releaseDate
+				}
+			}
+			if extractComponentFromVersions {
+				component, major, minor, _ := parseVersionName(versionName)
+				if component != "" && major+minor > 0 {
+					// Only add component if it's a valid version
+					enriched.Components = append(enriched.Components, component)
 				}
 			}
 		}
@@ -281,7 +293,6 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	// Copy the data to avoid race conditions
 	releases := make([]models.EnrichedRelease, len(c.releases))
 	copy(releases, c.releases)
-
 
 	epics := make([]models.EnrichedEpic, len(c.epics))
 	copy(epics, c.epics)

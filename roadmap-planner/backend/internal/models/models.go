@@ -52,15 +52,17 @@ type Milestone struct {
 
 // Epic represents a product requirement or set of stories
 type Epic struct {
-	ID           string   `json:"id"`
-	Key          string   `json:"key"`
-	Name         string   `json:"name"`
-	Versions     []string `json:"versions"` // Fix version for sorting
-	Components   []string `json:"components"`
-	MilestoneIDs []string `json:"milestone_ids"`
-	Status       string   `json:"status"`
-	Priority     string   `json:"priority"`
-	Assignee     *User    `json:"assignee,omitempty"`
+	ID             string    `json:"id"`
+	Key            string    `json:"key"`
+	Name           string    `json:"name"`
+	Versions       []string  `json:"versions"` // Fix version for sorting
+	Components     []string  `json:"components"`
+	MilestoneIDs   []string  `json:"milestone_ids"`
+	Status         string    `json:"status"`
+	Priority       string    `json:"priority"`
+	Assignee       *User     `json:"assignee,omitempty"`
+	ResolutionDate time.Time `json:"resolution_date,omitempty"`
+	CreationDate   time.Time `json:"creation_date,omitempty"`
 }
 
 // User represents a Jira user
@@ -216,16 +218,19 @@ func ConvertJiraIssueToMilestone(issue *jira.Issue, pillarID string) *Milestone 
 
 // ConvertJiraIssueToEpic converts a Jira issue to an Epic model
 func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
+	// issue.Transitions
 	epic := &Epic{
-		ID:           issue.ID,
-		Key:          issue.Key,
-		Name:         issue.Fields.Summary,
-		Versions:     extractVersionsFromIssue(issue),
-		Components:   extractComponentsFromIssue(issue),
-		MilestoneIDs: extractMilestoneIdsFromIssue(issue),
-		Status:       extractStatusFromIssue(issue),
-		Priority:     extractPriorityFromIssue(issue),
-		Assignee:     convertJiraUserToUser(issue.Fields.Assignee),
+		ID:             issue.ID,
+		Key:            issue.Key,
+		Name:           issue.Fields.Summary,
+		Versions:       extractVersionsFromIssue(issue),
+		Components:     extractComponentsFromIssue(issue),
+		MilestoneIDs:   extractMilestoneIdsFromIssue(issue),
+		Status:         extractStatusFromIssue(issue),
+		Priority:       extractPriorityFromIssue(issue),
+		Assignee:       convertJiraUserToUser(issue.Fields.Assignee),
+		ResolutionDate: time.Time(issue.Fields.Resolutiondate),
+		CreationDate:   time.Time(issue.Fields.Created),
 	}
 
 	return epic

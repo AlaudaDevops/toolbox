@@ -33,10 +33,10 @@ import (
 
 // PrometheusExporter exposes metrics in Prometheus format
 type PrometheusExporter struct {
-	config    *config.PrometheusConfig
-	service   *Service
-	logger    *zap.Logger
-	registry  *prometheus.Registry
+	config   *config.PrometheusConfig
+	service  *Service
+	logger   *zap.Logger
+	registry *prometheus.Registry
 
 	mu sync.RWMutex
 

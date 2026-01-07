@@ -76,7 +76,6 @@ func main() {
 
 	// Initialize metrics system if enabled
 
-
 	if cfg.Metrics.Enabled {
 		logger.Info("Initializing metrics system")
 		err = initMetrics(ctx, router, cfg)
@@ -120,8 +119,8 @@ func main() {
 }
 
 // initMetrics initializes the metrics system if enabled in config
-func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) (error) {
-	if cfg.Jira.BaseURL == ""  || cfg.Jira.Username == "" || cfg.Jira.Password == "" {
+func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) error {
+	if cfg.Jira.BaseURL == "" || cfg.Jira.Username == "" || cfg.Jira.Password == "" {
 		logger.Warn("Metrics enabled but Jira credentials not configured in config file")
 		return nil
 	}
