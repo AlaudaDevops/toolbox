@@ -66,10 +66,6 @@ func (c *CycleTimeCalculator) Calculate(ctx context.Context, data *models.Calcul
 		}
 
 		// Apply component filter if specified
-		if !FilterByComponent(epic.Components, data.Filters.Components) {
-			filteredEpics["Not in component filter"] = append(filteredEpics["Not in component filter"], epic.Key)
-			continue
-		}
 		for _, comp := range epic.Components {
 			if len(data.Filters.Components) > 0 && !Contains(data.Filters.Components, comp) {
 				filteredEpics["Not in component filter"] = append(filteredEpics["Not in component filter"], epic.Key)

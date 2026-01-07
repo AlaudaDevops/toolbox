@@ -52,7 +52,7 @@ type PrometheusExporter struct {
 	collectionErrors   prometheus.Counter
 	releasesTotal      prometheus.Gauge
 	epicsTotal         prometheus.Gauge
-	issuesTotal         prometheus.Gauge
+	issuesTotal        prometheus.Gauge
 }
 
 // NewPrometheusExporter creates a new Prometheus exporter

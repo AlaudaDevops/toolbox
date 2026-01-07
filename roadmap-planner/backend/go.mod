@@ -5,6 +5,7 @@ go 1.25.4
 require (
 	github.com/andygrunwald/go-jira v1.16.1
 	github.com/gin-gonic/gin v1.10.1
+	github.com/google/go-cmp v0.7.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/viper v1.19.0
 	github.com/trivago/tgo v1.0.7

@@ -234,7 +234,6 @@ func ConvertJiraIssueToMilestone(issue *jira.Issue, pillarID string) *Milestone 
 
 // ConvertJiraIssueToEpic converts a Jira issue to an Epic model
 func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
-	// issue.Transitions
 	epic := &Epic{
 		ID:             issue.ID,
 		Key:            issue.Key,
@@ -252,7 +251,7 @@ func ConvertJiraIssueToEpic(issue *jira.Issue, milestoneID string) *Epic {
 	return epic
 }
 
-// ConvertJiraIssueToIssue converts a Jira issue to an Epic model
+// ConvertJiraIssueToIssue converts a Jira issue to an Issue model
 func ConvertJiraIssueToIssue(issue *jira.Issue) *Issue {
 	bug := &Issue{
 		ID:             issue.ID,
@@ -554,12 +553,11 @@ func SortMilestones(milestones []Milestone) {
 // SortEpics sorts epics by fix version (blanks first), then by name
 func SortEpics(epics []Epic) {
 	sort.Slice(epics, func(i, j int) bool {
-		// if epics[i].Priority < epics[j].Priority {
-		// 	return true
-		// }
+		if epics[i].Priority != epics[j].Priority {
+			return epics[i].Priority < epics[j].Priority
 
-		// return epics[i].Name < epics[j].Name
-		return epics[i].Priority < epics[j].Priority && epics[i].Name < epics[j].Name
+		}
+		return epics[i].Name < epics[j].Name
 	})
 }
 

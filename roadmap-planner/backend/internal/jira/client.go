@@ -805,7 +805,7 @@ func (c *Client) GetEpicsWithFilter(ctx context.Context, milestoneIDs []string, 
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
 
 	searchOptions := &jira.SearchOptions{
-		Fields:     []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "resolutiondate", "created", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		Fields:     []string{"summary", "assignee", "priority", "components", "status", "parent", "fixVersions", "created", "issuelinks", "resolutiondate", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
 		MaxResults: 2000,
 	}
 
@@ -857,7 +857,7 @@ func (c *Client) GetIssuesWithFilter(ctx context.Context, epicIDs []string, comp
 		typeFilter := fmt.Sprintf(`issuetype in (%s)`, strings.Join(issueTypes, ","))
 		jqlParts = append(jqlParts, typeFilter)
 	}
-	// Add milestone ID filter if provided
+	// Add epic ID filter if provided
 	if len(epicIDs) > 0 {
 		milestoneFilter := fmt.Sprintf(`"Epic Link" in (%s)`, strings.Join(epicIDs, ","))
 		jqlParts = append(jqlParts, milestoneFilter)
@@ -878,7 +878,7 @@ func (c *Client) GetIssuesWithFilter(ctx context.Context, epicIDs []string, comp
 	jqlQuery := strings.Join(jqlParts, " AND ") + " ORDER BY created ASC"
 
 	searchOptions := &jira.SearchOptions{
-		Fields:     []string{"summary", "assignee", "priority", "components", "issuetype", "status", "parent", "fixVersions", "created", "issuelinks", "resolutiondate", "created", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
+		Fields:     []string{"summary", "assignee", "priority", "components", "issuetype", "status", "parent", "fixVersions", "created", "issuelinks", "resolutiondate", "customfield_12242", "customfield_10020", "customfield_10021", "customfield_12801", "customfield_sequence", "customfield_rank"},
 		MaxResults: 2000,
 	}
 

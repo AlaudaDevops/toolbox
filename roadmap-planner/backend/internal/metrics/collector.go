@@ -153,7 +153,7 @@ func (c *Collector) fetchReleases(ctx context.Context) ([]models.EnrichedRelease
 
 	originalCount := len(releases)
 
-	// TODO: optmize this code to pre-construct filters
+	// TODO: optimize this code to pre-construct filters
 	if filter := c.config.GetFilter("releases"); filter != nil && filter.Enabled && len(filter.Options) > 0 {
 		releases = c.filterReleases(releases, filter.Options)
 		c.logger.Debug("Filtered releases")
@@ -226,9 +226,6 @@ func classifyReleaseType(major, minor, patch int, name string) string {
 	}
 
 	// Classify based on version numbers
-	if patch > 0 && minor == 0 && major == 0 {
-		return "patch"
-	}
 	if patch > 0 {
 		return "patch"
 	}
@@ -343,7 +340,9 @@ func (c *Collector) fetchIssues(ctx context.Context) ([]models.EnrichedIssue, er
 		// Find the earliest release date from versions
 		for _, versionName := range issue.Versions {
 			if releaseDate, ok := versionDates[versionName]; ok {
-				enriched.ReleaseDate = releaseDate
+				if enriched.ReleaseDate.IsZero() || releaseDate.Before(enriched.ReleaseDate) {
+					enriched.ReleaseDate = releaseDate
+				}
 				countWith++
 			} else {
 				countWithout++
