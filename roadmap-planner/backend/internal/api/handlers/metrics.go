@@ -137,6 +137,7 @@ func (h *MetricsHandler) GetCollectorStatus(c *gin.Context) {
 		"last_collected": lastCollected,
 		"releases_count": collector.ReleaseCount(),
 		"epics_count":    collector.EpicCount(),
+		"issues_count":   collector.IssuesCount(),
 	})
 }
 

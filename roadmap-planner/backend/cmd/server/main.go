@@ -125,7 +125,6 @@ func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) er
 		return nil
 	}
 
-	var metricsService *metrics.Service
 	jiraClient, err := jira.NewClient(
 		cfg.Jira.BaseURL,
 		cfg.Jira.Username,
@@ -138,7 +137,7 @@ func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) er
 	}
 	// Create collector and service
 	collector := metrics.NewCollector(jiraClient, &cfg.Metrics)
-	metricsService = metrics.NewService(&cfg.Metrics, collector)
+	metricsService := metrics.NewService(&cfg.Metrics, collector)
 
 	// Register calculators
 	registerCalculators(metricsService, &cfg.Metrics)

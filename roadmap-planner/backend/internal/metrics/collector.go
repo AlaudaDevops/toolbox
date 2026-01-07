@@ -410,6 +410,13 @@ func (c *Collector) EpicCount() int {
 	return len(c.epics)
 }
 
+// IssuesCount returns the number of issues
+func (c *Collector) IssuesCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.issues)
+}
+
 func (c *Collector) filterReleases(releases []models.EnrichedRelease, options map[string]interface{}) (filtered []models.EnrichedRelease) {
 	filtered = make([]models.EnrichedRelease, 0, len(releases))
 	filters := make([]func(models.EnrichedRelease) bool, 0, len(options))

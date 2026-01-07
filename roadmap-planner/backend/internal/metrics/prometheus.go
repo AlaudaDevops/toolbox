@@ -52,6 +52,7 @@ type PrometheusExporter struct {
 	collectionErrors   prometheus.Counter
 	releasesTotal      prometheus.Gauge
 	epicsTotal         prometheus.Gauge
+	issuesTotal         prometheus.Gauge
 }
 
 // NewPrometheusExporter creates a new Prometheus exporter
@@ -154,6 +155,15 @@ func NewPrometheusExporter(cfg *config.PrometheusConfig, service *Service) *Prom
 				Help:      "Total number of epics in cache",
 			},
 		),
+
+		issuesTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Namespace: namespace,
+				Subsystem: "collector",
+				Name:      "issues_total",
+				Help:      "Total number of issues in cache",
+			},
+		),
 	}
 
 	// Register metrics
@@ -167,6 +177,7 @@ func NewPrometheusExporter(cfg *config.PrometheusConfig, service *Service) *Prom
 		e.collectionErrors,
 		e.releasesTotal,
 		e.epicsTotal,
+		e.issuesTotal,
 	)
 
 	return e
@@ -201,6 +212,7 @@ func (e *PrometheusExporter) Update(ctx context.Context) error {
 		}
 		e.releasesTotal.Set(float64(collector.ReleaseCount()))
 		e.epicsTotal.Set(float64(collector.EpicCount()))
+		e.issuesTotal.Set(float64(collector.IssuesCount()))
 	}
 
 	// Calculate and update each metric
