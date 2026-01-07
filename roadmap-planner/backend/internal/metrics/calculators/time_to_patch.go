@@ -21,8 +21,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/models"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/models"
 )
 
 // TimeToPatchCalculator calculates time from bug report to patch release

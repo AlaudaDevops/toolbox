@@ -320,7 +320,6 @@ func (c *Collector) fetchIssues(ctx context.Context) ([]models.EnrichedIssue, er
 	}
 	c.mu.RUnlock()
 
-
 	countWithout := 0
 	countWith := 0
 	issues := make([]models.EnrichedIssue, 0, len(rawIssues))
