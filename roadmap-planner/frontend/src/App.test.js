@@ -1,14 +1,48 @@
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
+// Mock the entire useAuth module including AuthProvider
+jest.mock('./hooks/useAuth', () => {
+  const mockReact = require('react');
+  return {
+    AuthProvider: ({ children }) => mockReact.createElement('div', { 'data-testid': 'auth-provider' }, children),
+    useAuth: () => ({
+      isAuthenticated: false,
+      isLoading: false,
+      login: jest.fn(),
+      logout: jest.fn(),
+      credentials: null,
+      project: 'TEST'
+    })
+  };
+});
+
+// Mock the RoadmapProvider
+jest.mock('./hooks/useRoadmap', () => {
+  const mockReact = require('react');
+  return {
+    RoadmapProvider: ({ children }) => mockReact.createElement('div', { 'data-testid': 'roadmap-provider' }, children),
+    useRoadmap: () => ({
+      pillars: [],
+      milestones: [],
+      epics: [],
+      loading: false,
+      error: null,
+      refreshData: jest.fn(),
+      createMilestone: jest.fn(),
+      createEpic: jest.fn(),
+      updateEpic: jest.fn(),
+      getAssignableUsers: jest.fn(() => Promise.resolve({ success: true, data: [] }))
+    })
+  };
+});
+
 // Basic smoke test to ensure the app renders without crashing
 test('renders roadmap planner application', () => {
   render(<App />);
 
-  // Look for any text that might indicate the app is loaded
-  // This is a basic test that can be expanded as components are developed
-  const appElement = screen.getByRole('main') || document.body;
-  expect(appElement).toBeInTheDocument();
+  // When not authenticated, should show login modal
+  expect(screen.getByText(/Login to Jira/i)).toBeInTheDocument();
 });
 
 test('app has proper structure', () => {

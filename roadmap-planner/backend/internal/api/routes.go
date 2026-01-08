@@ -24,6 +24,7 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/handlers"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/middleware"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -118,4 +119,24 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	}
 
 	return router
+}
+
+// AddMetricsRoutes adds metrics-related routes to an existing router
+func AddMetricsRoutes(router *gin.Engine, cfg *config.Config, metricsService *metrics.Service) {
+	if metricsService == nil {
+		return
+	}
+
+	metricsHandler := handlers.NewMetricsHandler(cfg, metricsService)
+
+	// Protected metrics routes (require authentication)
+	api := router.Group("/api")
+	metricsGroup := api.Group("/metrics")
+	metricsGroup.Use(middleware.AuthMiddleware())
+	{
+		metricsGroup.GET("", metricsHandler.ListMetrics)
+		metricsGroup.GET("/summary", metricsHandler.GetSummary)
+		metricsGroup.GET("/status", metricsHandler.GetCollectorStatus)
+		metricsGroup.GET("/:name", metricsHandler.GetMetric)
+	}
 }

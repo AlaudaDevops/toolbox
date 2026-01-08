@@ -161,6 +161,40 @@ export const roadmapAPI = {
   },
 };
 
+export const metricsAPI = {
+  // Get all available metrics
+  listMetrics: async () => {
+    const response = await api.get('/api/metrics');
+    return response.data;
+  },
+
+  // Get specific metric with filters
+  getMetric: async (name, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.components) {
+      filters.components.forEach(c => params.append('component', c));
+    }
+    const response = await api.get(`/api/metrics/${name}?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get all metrics summary
+  getSummary: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.components) {
+      filters.components.forEach(c => params.append('component', c));
+    }
+    const response = await api.get(`/api/metrics/summary?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get collector status
+  getStatus: async () => {
+    const response = await api.get('/api/metrics/status');
+    return response.data;
+  },
+};
+
 // Error handling helper
 export const handleAPIError = (error) => {
   if (error.response) {

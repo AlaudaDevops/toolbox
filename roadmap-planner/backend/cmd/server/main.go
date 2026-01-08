@@ -27,7 +27,10 @@ import (
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/jira"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/calculators"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -67,6 +70,20 @@ func main() {
 	// Create router
 	router := api.NewRouter(cfg)
 
+	// Create context for background workers
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Initialize metrics system if enabled
+
+	if cfg.Metrics.Enabled {
+		logger.Info("Initializing metrics system")
+		err = initMetrics(ctx, router, cfg)
+		if err != nil {
+			logger.Error("Failed to initialize metrics system", zap.Error(err))
+		}
+	}
+
 	// Create HTTP server
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.Server.Port),
@@ -87,13 +104,109 @@ func main() {
 	<-quit
 	logger.Info("Shutting down server...")
 
-	// Give outstanding requests 30 seconds to complete
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// Cancel background workers (metrics collector, prometheus updater)
+	cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	// Give outstanding requests 30 seconds to complete
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Fatal("Server forced to shutdown", zap.Error(err))
 	}
 
 	logger.Info("Server exited")
+}
+
+// initMetrics initializes the metrics system if enabled in config
+func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) error {
+	if cfg.Jira.BaseURL == "" || cfg.Jira.Username == "" || cfg.Jira.Password == "" {
+		logger.Warn("Metrics enabled but Jira credentials not configured in config file")
+		return nil
+	}
+
+	jiraClient, err := jira.NewClient(
+		cfg.Jira.BaseURL,
+		cfg.Jira.Username,
+		cfg.Jira.Password,
+		cfg.Jira.Project,
+	)
+	if err != nil {
+		logger.Error("Failed to create Jira client for metrics", zap.Error(err))
+		return err
+	}
+	// Create collector and service
+	collector := metrics.NewCollector(jiraClient, &cfg.Metrics)
+	metricsService := metrics.NewService(&cfg.Metrics, collector)
+
+	// Register calculators
+	registerCalculators(metricsService, &cfg.Metrics)
+
+	// Start collector in background
+	go func() {
+		if err := collector.Start(ctx); err != nil && err != context.Canceled {
+			logger.Error("Metrics collector stopped with error", zap.Error(err))
+		}
+	}()
+
+	// Add metrics API routes
+	api.AddMetricsRoutes(router, cfg, metricsService)
+	logger.Info("Metrics API routes added")
+
+	// Initialize Prometheus exporter if enabled
+	if cfg.Metrics.Prometheus.Enabled {
+		prometheusExporter := metrics.NewPrometheusExporter(&cfg.Metrics.Prometheus, metricsService)
+
+		// Add Prometheus endpoint (no auth required)
+		prometheusPath := cfg.Metrics.Prometheus.Path
+		if prometheusPath == "" {
+			prometheusPath = "/metrics"
+		}
+		router.GET(prometheusPath, prometheusExporter.GinHandler())
+		logger.Info("Prometheus metrics endpoint added", zap.String("path", prometheusPath))
+
+		// Start Prometheus updater
+		go prometheusExporter.StartUpdater(ctx, 1*time.Minute)
+	}
+	return nil
+}
+
+// registerCalculators registers all metric calculators with the service
+func registerCalculators(svc *metrics.Service, cfg *config.Metrics) {
+	// Get options for each calculator from config
+	getOptions := func(name string) map[string]interface{} {
+		for _, calc := range cfg.Calculators {
+			if calc.Name == name {
+				return calc.Options
+			}
+		}
+		return nil
+	}
+
+	// Register release frequency calculator
+	if err := svc.RegisterCalculator(calculators.NewReleaseFrequencyCalculator(getOptions("release_frequency"))); err != nil {
+		logger.Warn("Failed to register release_frequency calculator", zap.Error(err))
+	}
+
+	// Register lead time calculator
+	if err := svc.RegisterCalculator(calculators.NewLeadTimeCalculator(getOptions("lead_time_to_release"))); err != nil {
+		logger.Warn("Failed to register lead_time_to_release calculator", zap.Error(err))
+	}
+
+	// Register cycle time calculator
+	if err := svc.RegisterCalculator(calculators.NewCycleTimeCalculator(getOptions("cycle_time"))); err != nil {
+		logger.Warn("Failed to register cycle_time calculator", zap.Error(err))
+	}
+
+	// Register patch ratio calculator
+	if err := svc.RegisterCalculator(calculators.NewPatchRatioCalculator(getOptions("patch_ratio"))); err != nil {
+		logger.Warn("Failed to register patch_ratio calculator", zap.Error(err))
+	}
+
+	// Register time to patch calculator
+	if err := svc.RegisterCalculator(calculators.NewTimeToPatchCalculator(getOptions("time_to_patch"))); err != nil {
+		logger.Warn("Failed to register time_to_patch calculator", zap.Error(err))
+	}
+
+	logger.Info("Metric calculators registered", zap.Int("count", svc.Registry().Count()))
 }

@@ -28,3 +28,53 @@ logger:
 cache:
   ttl: "5m"              # Time to live for cached data
   refresh_interval: "1m"  # How often to refresh cache
+
+# Metrics configuration
+metrics:
+  enabled: true
+  collection_interval: "5m"      # How often to fetch from Jira
+  historical_days: 365           # How far back to query
+
+  prometheus:
+    enabled: true
+    path: "/metrics"
+    namespace: "roadmap"         # Metric prefix: roadmap_dora_*
+
+  filters:
+    - name: "releases"
+      enabled: true
+      options:
+        name_regex: '^[a-zA-Z0-9\-]+\-[v]*\d+.\d+.\d+$'
+
+    - name: "issues"
+      enabled: true
+      options:
+        issuetypes: ["Bug"]
+
+  calculators:
+    - name: "release_frequency"
+      enabled: true
+      options:
+        window_months: 4         # Rolling window for calculation
+
+    - name: "lead_time_to_release"
+      enabled: true
+      options:
+        percentile: 50           # Use median (P50)
+
+    - name: "cycle_time"
+      enabled: true
+      options:
+        in_progress_statuses: ["In Progress", "In Development", "调研中", "调研完成", "设计完成", "开发完成", "测试完成", "验收完成"]
+        done_statuses: ["Done", "Closed", "Released", "已完成"]
+        component_pattern: '^[a-zA-Z0-9\-]+\-[v]*\d+.\d+.\d+$'
+
+    - name: "patch_ratio"
+      enabled: true
+      options:
+        patch_pattern: "^(.+)-[v]*(\\d+\\.\\d+\\.\\d+)$"  # component-X.Y.Z
+
+    - name: "time_to_patch"
+      enabled: true
+      options:
+        bug_types: ["Bug", "Vulnerability", "Security"]
