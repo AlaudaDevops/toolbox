@@ -1,15 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import KanbanBoard from './components/KanbanBoard';
+import MetricsDashboard from './components/MetricsDashboard';
 import LoginModal from './components/modals/LoginModal';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { RoadmapProvider } from './hooks/useRoadmap';
-import { LogOut } from 'lucide-react';
+import { LogOut, LayoutDashboard, BarChart3 } from 'lucide-react';
 import './App.css';
 
 function AppContent() {
   const { isAuthenticated, isLoading } = useAuth();
   const { logout } = useAuth();
+  const [currentView, setCurrentView] = useState('roadmap'); // 'roadmap' | 'metrics'
 
   if (isLoading) {
     return (
@@ -28,15 +30,33 @@ function AppContent() {
     <RoadmapProvider>
       <div className="app">
         <header className="app-header">
-          <h2>Roadmap Planner</h2>
-          <div class="right-top">
+          <div className="app-header__left">
+            <h2>Roadmap Planner</h2>
+            <nav className="app-nav">
+              <button
+                className={`app-nav__item ${currentView === 'roadmap' ? 'app-nav__item--active' : ''}`}
+                onClick={() => setCurrentView('roadmap')}
+              >
+                <LayoutDashboard size={16} />
+                <span>Roadmap</span>
+              </button>
+              <button
+                className={`app-nav__item ${currentView === 'metrics' ? 'app-nav__item--active' : ''}`}
+                onClick={() => setCurrentView('metrics')}
+              >
+                <BarChart3 size={16} />
+                <span>Metrics</span>
+              </button>
+            </nav>
+          </div>
+          <div className="right-top">
             <button onClick={logout} className="btn " title="Logout">
               <LogOut size={16} />
             </button>
           </div>
         </header>
         <main className="app-main">
-          <KanbanBoard />
+          {currentView === 'roadmap' ? <KanbanBoard /> : <MetricsDashboard />}
         </main>
       </div>
     </RoadmapProvider>
