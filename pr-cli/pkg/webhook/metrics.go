@@ -65,4 +65,22 @@ var (
 			Help: "Number of active worker goroutines",
 		},
 	)
+
+	// PREventProcessingTotal counts pull_request events processed
+	PREventProcessingTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pr_cli_pr_event_total",
+			Help: "Total number of pull_request events processed",
+		},
+		[]string{"platform", "action", "status"},
+	)
+
+	// WorkflowDispatchTotal counts workflow dispatch triggers
+	WorkflowDispatchTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "pr_cli_workflow_dispatch_total",
+			Help: "Total number of workflow dispatch triggers",
+		},
+		[]string{"platform", "workflow", "status"},
+	)
 )

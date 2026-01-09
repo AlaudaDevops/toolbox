@@ -24,8 +24,10 @@ import (
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/internal/version"
-	"github.com/sirupsen/logrus"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/platforms/github"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // handleWebhook processes incoming webhook requests
@@ -100,7 +102,13 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Parse webhook payload
+	// Handle pull_request events separately
+	if platform == "github" && eventType == "pull_request" {
+		s.handlePullRequestEvent(w, r, body, logger, platform, eventType, startTime)
+		return
+	}
+
+	// Parse webhook payload for issue_comment events
 	var event *WebhookEvent
 	switch platform {
 	case "github":
@@ -216,4 +224,109 @@ func (s *Server) handleReadiness(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, "OK")
+}
+
+// handlePullRequestEvent handles GitHub pull_request webhook events
+func (s *Server) handlePullRequestEvent(w http.ResponseWriter, r *http.Request, body []byte, logger *logrus.Entry, platform, eventType string, startTime time.Time) {
+	// Check if PR event handling is enabled
+	if !s.config.PREventEnabled {
+		logger.Debug("pull_request events disabled, skipping")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, "OK (pull_request events disabled)")
+		WebhookRequestsTotal.WithLabelValues(platform, eventType, "disabled").Inc()
+		return
+	}
+
+	// Parse pull_request webhook payload
+	prEvent, err := ParseGitHubPullRequestWebhook(body, s.config.PREventActions)
+	if err != nil {
+		logger.Debugf("PR webhook parsing skipped: %v", err)
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "OK (skipped: %v)", err)
+		WebhookRequestsTotal.WithLabelValues(platform, eventType, "skipped").Inc()
+		return
+	}
+
+	// Validate repository
+	if err := ValidateRepository(prEvent.Repository.Owner, prEvent.Repository.Name, s.config.AllowedRepos); err != nil {
+		logger.Warnf("Repository not allowed: %v", err)
+		http.Error(w, "Repository not allowed", http.StatusForbidden)
+		WebhookRequestsTotal.WithLabelValues(platform, eventType, "forbidden").Inc()
+		return
+	}
+
+	// Log the event
+	logger = logger.WithFields(logrus.Fields{
+		"repository": fmt.Sprintf("%s/%s", prEvent.Repository.Owner, prEvent.Repository.Name),
+		"pr_number":  prEvent.PullRequest.Number,
+		"pr_action":  prEvent.Action,
+		"sender":     prEvent.Sender.Login,
+	})
+	logger.Info("Received pull_request webhook event")
+
+	// Process the PR event (trigger workflow)
+	if err := s.processPullRequestEvent(prEvent); err != nil {
+		logger.Errorf("Failed to process pull_request event: %v", err)
+		http.Error(w, "Failed to process pull_request event", http.StatusInternalServerError)
+		PREventProcessingTotal.WithLabelValues(platform, prEvent.Action, "error").Inc()
+		return
+	}
+
+	// Success response
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, "OK")
+	PREventProcessingTotal.WithLabelValues(platform, prEvent.Action, "success").Inc()
+	WebhookRequestsTotal.WithLabelValues(platform, eventType, "success").Inc()
+	WebhookProcessingDuration.WithLabelValues(platform, "pull_request").Observe(time.Since(startTime).Seconds())
+}
+
+// processPullRequestEvent triggers a workflow dispatch for a pull_request event
+func (s *Server) processPullRequestEvent(event *PRWebhookEvent) error {
+	// Create GitHub client configuration
+	cfg := &git.Config{
+		Platform: event.Platform,
+		Token:    s.config.BaseConfig.Token,
+		BaseURL:  s.config.BaseConfig.BaseURL,
+		Owner:    event.Repository.Owner,
+		Repo:     event.Repository.Name,
+		PRNum:    event.PullRequest.Number,
+	}
+
+	// Create GitHub client using factory
+	factory := &github.Factory{}
+	client, err := factory.CreateClient(s.logger, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create GitHub client: %w", err)
+	}
+
+	// Cast to GitHub client to access TriggerWorkflowDispatch
+	ghClient, ok := client.(*github.Client)
+	if !ok {
+		return fmt.Errorf("expected GitHub client, got different type")
+	}
+
+	// Build workflow inputs from PR event
+	inputs := map[string]interface{}{
+		"pr_number": fmt.Sprintf("%d", event.PullRequest.Number),
+		"pr_action": event.Action,
+		"head_ref":  event.PullRequest.HeadRef,
+		"head_sha":  event.PullRequest.HeadSHA,
+		"base_ref":  event.PullRequest.BaseRef,
+		"sender":    event.Sender.Login,
+	}
+
+	// Merge with configured static inputs
+	for k, v := range s.config.WorkflowInputs {
+		inputs[k] = v
+	}
+
+	// Trigger workflow dispatch
+	if err := ghClient.TriggerWorkflowDispatch(s.config.WorkflowFile, s.config.WorkflowRef, inputs); err != nil {
+		WorkflowDispatchTotal.WithLabelValues(event.Platform, s.config.WorkflowFile, "error").Inc()
+		return fmt.Errorf("failed to trigger workflow dispatch: %w", err)
+	}
+
+	WorkflowDispatchTotal.WithLabelValues(event.Platform, s.config.WorkflowFile, "success").Inc()
+	s.logger.Infof("Successfully triggered workflow %s for PR #%d", s.config.WorkflowFile, event.PullRequest.Number)
+	return nil
 }
