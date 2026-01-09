@@ -142,6 +142,11 @@ kubectl logs -f deployment/pr-cli-webhook -n pr-automation
 | `QUEUE_SIZE` | Job queue size | `100` | No |
 | `RATE_LIMIT_ENABLED` | Enable rate limiting | `true` | No |
 | `RATE_LIMIT_REQUESTS` | Max requests per minute per IP | `100` | No |
+| `PR_EVENT_ENABLED` | Enable pull_request event handling | `false` | No |
+| `PR_EVENT_ACTIONS` | PR actions to listen for | `opened,synchronize,reopened,ready_for_review,edited` | No |
+| `WORKFLOW_FILE` | Workflow file to trigger | - | If PR_EVENT_ENABLED |
+| `WORKFLOW_REF` | Git ref for workflow dispatch | `main` | No |
+| `WORKFLOW_INPUTS` | Static workflow inputs (key=value,key=value) | - | No |
 
 ### Command-Line Flags
 
@@ -165,6 +170,11 @@ Flags:
   --queue-size int              Job queue size (default 100)
   --rate-limit-enabled          Enable rate limiting (default true)
   --rate-limit-requests int     Max requests per minute per IP (default 100)
+  --pr-event-enabled            Enable pull_request event handling (default false)
+  --pr-event-actions strings    PR actions to listen for (default [opened,synchronize,reopened,ready_for_review,edited])
+  --workflow-file string        Workflow file to trigger (e.g., .github/workflows/pr-check.yml)
+  --workflow-ref string         Git ref for workflow dispatch (default "main")
+  --workflow-inputs strings     Static workflow inputs (key=value format)
 ```
 
 ## Monitoring
@@ -192,8 +202,12 @@ curl http://localhost:8080/metrics
 
 # Prometheus metrics:
 # pr_cli_webhook_requests_total{platform="github",event_type="issue_comment",status="success"} 150
+# pr_cli_webhook_requests_total{platform="github",event_type="pull_request",status="success"} 75
 # pr_cli_webhook_processing_duration_seconds{platform="github",command="lgtm"} 0.234
 # pr_cli_command_execution_total{platform="github",command="merge",status="success"} 45
+# pr_cli_pr_event_total{platform="github",action="opened",status="success"} 30
+# pr_cli_pr_event_total{platform="github",action="synchronize",status="success"} 45
+# pr_cli_workflow_dispatch_total{platform="github",workflow=".github/workflows/pr-check.yml",status="success"} 75
 # pr_cli_queue_size 5
 # pr_cli_active_workers 10
 ```
