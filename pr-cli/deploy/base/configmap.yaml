@@ -8,19 +8,27 @@ data:
   WEBHOOK_PATH: "/webhook"
   HEALTH_PATH: "/health"
   METRICS_PATH: "/metrics"
-  
+
   # Processing Configuration
   ASYNC_PROCESSING: "true"
   WORKER_COUNT: "10"
   QUEUE_SIZE: "100"
-  
+
   # Rate Limiting
   RATE_LIMIT_ENABLED: "true"
   RATE_LIMIT_REQUESTS: "100"
-  
+
   # Security
   REQUIRE_SIGNATURE: "true"
-  
+
+  # Pull Request Event Handling
+  # Set PR_EVENT_ENABLED to "true" to trigger workflows on PR events
+  PR_EVENT_ENABLED: "false"
+  PR_EVENT_ACTIONS: "opened,synchronize,reopened,ready_for_review,edited"
+  # WORKFLOW_FILE: ".github/workflows/pr-check.yml"  # Required if PR_EVENT_ENABLED is true
+  WORKFLOW_REF: "main"
+  # WORKFLOW_INPUTS: "key1=value1,key2=value2"  # Optional static inputs
+
   # PR CLI Configuration
   PR_PLATFORM: "github"
   PR_LGTM_THRESHOLD: "1"
