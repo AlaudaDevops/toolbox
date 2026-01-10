@@ -226,21 +226,12 @@ func ParseGitHubPullRequestWebhook(payload []byte, allowedActions []string) (*PR
 		return nil, fmt.Errorf("failed to parse GitHub pull_request payload: %w", err)
 	}
 
-	// Check if action is in allowedActions
-	actionAllowed := false
-	for _, action := range allowedActions {
-		if ghPayload.Action == action {
-			actionAllowed = true
-			break
-		}
-	}
-	if !actionAllowed {
-		return nil, fmt.Errorf("action %q not in allowed actions", ghPayload.Action)
+	if err := validatePRAction(ghPayload.Action, allowedActions); err != nil {
+		return nil, err
 	}
 
-	// Skip draft PRs unless action is "ready_for_review"
-	if ghPayload.PullRequest.Draft && ghPayload.Action != "ready_for_review" {
-		return nil, fmt.Errorf("skipping draft PR")
+	if err := validateDraftPR(ghPayload.PullRequest.Draft, ghPayload.Action); err != nil {
+		return nil, err
 	}
 
 	event := &PRWebhookEvent{
@@ -267,6 +258,22 @@ func ParseGitHubPullRequestWebhook(payload []byte, allowedActions []string) (*PR
 	}
 
 	return event, nil
+}
+
+func validatePRAction(action string, allowedActions []string) error {
+	for _, allowed := range allowedActions {
+		if action == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("action %q not in allowed actions", action)
+}
+
+func validateDraftPR(isDraft bool, action string) error {
+	if isDraft && action != "ready_for_review" {
+		return fmt.Errorf("skipping draft PR")
+	}
+	return nil
 }
 
 // ParseGitLabWebhook parses a GitLab webhook payload

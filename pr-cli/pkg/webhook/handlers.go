@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/internal/version"
-	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/platforms/github"
 	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/git"
+	"github.com/AlaudaDevops/toolbox/pr-cli/pkg/platforms/github"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 )
@@ -39,7 +39,6 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
 
 	// Read request body
 	body, err := io.ReadAll(r.Body)
@@ -74,8 +73,8 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request) {
 		s.logger.Infof("No eventID found in webhook headers, generated a new one: %q", eventID)
 	}
 	logger := s.logger.WithFields(logrus.Fields{
-		"event_id": eventID,
-		"platform": platform,
+		"event_id":   eventID,
+		"platform":   platform,
 		"event_type": eventType,
 	})
 	s.logger.Infof("Received webhook event %q of type %q from %s", eventID, eventType, platform)
@@ -296,13 +295,14 @@ func (s *Server) processPullRequestEvent(event *PRWebhookEvent) error {
 	factory := &github.Factory{}
 	client, err := factory.CreateClient(s.logger, cfg)
 	if err != nil {
-		return fmt.Errorf("failed to create GitHub client: %w", err)
+		return fmt.Errorf("failed to create GitHub client for repo %s/%s: %w",
+			event.Repository.Owner, event.Repository.Name, err)
 	}
 
 	// Cast to GitHub client to access TriggerWorkflowDispatch
 	ghClient, ok := client.(*github.Client)
 	if !ok {
-		return fmt.Errorf("expected GitHub client, got different type")
+		return fmt.Errorf("expected GitHub client for platform %s, got different client type", event.Platform)
 	}
 
 	// Build workflow inputs from PR event
@@ -315,18 +315,32 @@ func (s *Server) processPullRequestEvent(event *PRWebhookEvent) error {
 		"sender":    event.Sender.Login,
 	}
 
+	s.logger.Debugf("Built workflow inputs from PR event: pr_number=%d, pr_action=%s, head_ref=%s, head_sha=%s, base_ref=%s, sender=%s",
+		event.PullRequest.Number, event.Action, event.PullRequest.HeadRef, event.PullRequest.HeadSHA, event.PullRequest.BaseRef, event.Sender.Login)
+
 	// Merge with configured static inputs
-	for k, v := range s.config.WorkflowInputs {
-		inputs[k] = v
+	if len(s.config.WorkflowInputs) > 0 {
+		s.logger.Debugf("Merging %d static workflow inputs with dynamic PR inputs", len(s.config.WorkflowInputs))
+		for k, v := range s.config.WorkflowInputs {
+			if _, exists := inputs[k]; exists {
+				s.logger.Debugf("Static input %q overriding dynamic input", k)
+			}
+			inputs[k] = v
+		}
 	}
 
 	// Trigger workflow dispatch
+	s.logger.Infof("Triggering workflow dispatch: workflow=%s, ref=%s, repo=%s/%s, pr=%d",
+		s.config.WorkflowFile, s.config.WorkflowRef, event.Repository.Owner, event.Repository.Name, event.PullRequest.Number)
+
 	if err := ghClient.TriggerWorkflowDispatch(s.config.WorkflowFile, s.config.WorkflowRef, inputs); err != nil {
 		WorkflowDispatchTotal.WithLabelValues(event.Platform, s.config.WorkflowFile, "error").Inc()
-		return fmt.Errorf("failed to trigger workflow dispatch: %w", err)
+		return fmt.Errorf("failed to trigger workflow dispatch for workflow %q on ref %q: %w",
+			s.config.WorkflowFile, s.config.WorkflowRef, err)
 	}
 
 	WorkflowDispatchTotal.WithLabelValues(event.Platform, s.config.WorkflowFile, "success").Inc()
-	s.logger.Infof("Successfully triggered workflow %s for PR #%d", s.config.WorkflowFile, event.PullRequest.Number)
+	s.logger.Infof("Successfully triggered workflow %s for PR #%d (action=%s, head_sha=%s)",
+		s.config.WorkflowFile, event.PullRequest.Number, event.Action, event.PullRequest.HeadSHA)
 	return nil
 }

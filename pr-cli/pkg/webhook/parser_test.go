@@ -573,3 +573,87 @@ func TestParseGitHubPullRequestWebhook(t *testing.T) {
 		})
 	}
 }
+
+func TestValidatePRAction(t *testing.T) {
+	tests := []struct {
+		name           string
+		action         string
+		allowedActions []string
+		expectError    bool
+	}{
+		{
+			name:           "action allowed",
+			action:         "opened",
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    false,
+		},
+		{
+			name:           "action not allowed",
+			action:         "closed",
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    true,
+		},
+		{
+			name:           "empty allowed actions",
+			action:         "opened",
+			allowedActions: []string{},
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePRAction(tt.action, tt.allowedActions)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateDraftPR(t *testing.T) {
+	tests := []struct {
+		name        string
+		isDraft     bool
+		action      string
+		expectError bool
+	}{
+		{
+			name:        "non-draft PR any action",
+			isDraft:     false,
+			action:      "opened",
+			expectError: false,
+		},
+		{
+			name:        "draft PR with ready_for_review",
+			isDraft:     true,
+			action:      "ready_for_review",
+			expectError: false,
+		},
+		{
+			name:        "draft PR with other action",
+			isDraft:     true,
+			action:      "opened",
+			expectError: true,
+		},
+		{
+			name:        "draft PR with synchronize",
+			isDraft:     true,
+			action:      "synchronize",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDraftPR(tt.isDraft, tt.action)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

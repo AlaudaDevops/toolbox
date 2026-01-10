@@ -216,13 +216,30 @@ func (wc *WebhookConfig) Validate() error {
 	if wc.RateLimitEnabled && wc.RateLimitRequests < 1 {
 		return fmt.Errorf("rate limit requests must be at least 1")
 	}
-	if wc.PREventEnabled && wc.WorkflowFile == "" {
-		return fmt.Errorf("workflow file is required when PR event handling is enabled")
+	if wc.PREventEnabled {
+		trimmedWorkflowFile := strings.TrimSpace(wc.WorkflowFile)
+		if trimmedWorkflowFile == "" {
+			return fmt.Errorf("workflow file is required when PR event handling is enabled")
+		}
+		if !isValidWorkflowPath(trimmedWorkflowFile) {
+			return fmt.Errorf("workflow file path %q is invalid: must be a valid file path (e.g., .github/workflows/pr-check.yml)", wc.WorkflowFile)
+		}
+		wc.WorkflowFile = trimmedWorkflowFile
 	}
 	if wc.BaseConfig == nil {
 		return fmt.Errorf("base config is required")
 	}
 	return nil
+}
+
+func isValidWorkflowPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	if strings.Contains(path, "..") {
+		return false
+	}
+	return strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml")
 }
 
 // DebugString returns a string representation with sensitive data redacted

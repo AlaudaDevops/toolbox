@@ -204,6 +204,12 @@ pr-cli serve \
 
 When a PR is opened or updated, the service triggers the specified workflow with inputs like `pr_number`, `pr_action`, `head_ref`, `head_sha`, `base_ref`, and `sender`.
 
+> ⚠️ **Security Considerations**: When enabling PR event handling with workflow dispatch, ensure:
+> - The `--allowed-repos` flag is configured to restrict which repositories can trigger workflows
+> - The workflow file being triggered has appropriate security controls and doesn't execute untrusted code
+> - The GitHub token used has minimal required permissions (only `actions:write` for dispatch)
+> - Webhook signature validation is enabled (`--require-signature=true`, the default)
+
 > 📘 **Full Documentation**: See [Webhook Service Guide](docs/webhook-usage.md) for complete configuration options and deployment instructions.
 
 ## Configuration
