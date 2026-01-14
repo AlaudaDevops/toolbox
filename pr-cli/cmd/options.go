@@ -83,6 +83,7 @@ func (p *PROption) AddFlags(flags *pflag.FlagSet) {
 	// Debug and logging flags
 	flags.BoolVar(&p.Config.Verbose, "verbose", false, "Enable verbose logging (debug level logs)")
 	flags.BoolVar(&p.Config.Debug, "debug", false, "Enable debug mode (skip comment sender validation and allow PR creators to approve their own PR)")
+	flags.StringVar(&p.Config.LogFormat, "log_format", "json", "Change log output format \"console\" or \"json\" (defaults to json)")
 	flags.StringVar(&p.Config.ResultsDir, "results-dir", p.Config.ResultsDir, "Directory to write results files (default: /tekton/results)")
 }
 
@@ -129,7 +130,6 @@ func (p *PROption) Run(cmd *cobra.Command, args []string) error {
 	if res != nil {
 		p.Debugf("Result from command: %s - %v - %t - %v", res.CommandType, res.Results, res.Success, res.Error)
 	}
-
 
 	// CLI mode returns nil for errors (already posted to PR)
 	return err

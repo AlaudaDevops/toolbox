@@ -64,6 +64,7 @@ Create a comment on a pull request with a command like `/lgtm` and the server wi
 - `PR_EVENT_ENABLED` - Enable pull_request event handling to trigger workflows (default: `false`)
 - `PR_EVENT_ACTIONS` - Comma-separated PR actions to listen for (default: `opened,synchronize,reopened,ready_for_review,edited`)
 - `WORKFLOW_FILE` - Workflow file to trigger for PR events (e.g., `.github/workflows/pr-check.yml`)
+- `WORKFLOW_REPO` - Repository to trigger workflow file. If empty will use the same as event (e.g alaudadevops/toolbox)
 - `WORKFLOW_REF` - Git ref to use for workflow dispatch (default: `main`)
 - `WORKFLOW_INPUTS` - Static workflow inputs in `key=value,key=value` format
 
@@ -400,4 +401,3 @@ If you're currently using PR CLI with Tekton Pipelines:
 5. Decommission Tekton Pipelines once migration is complete
 
 See `docs/webhook-service-design.md` for detailed migration guide.
-

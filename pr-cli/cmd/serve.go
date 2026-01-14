@@ -72,6 +72,7 @@ Environment Variables:
   PR_EVENT_ENABLED         Enable pull_request event handling (default: false)
   PR_EVENT_ACTIONS         Comma-separated PR actions to listen for (default: opened,synchronize,reopened,ready_for_review,edited)
   WORKFLOW_FILE            Workflow file to trigger for PR events
+  WORKFLOW_REPO            Sets a fixed workflow repository to trigger. Defaults to the same repository as the event.
   WORKFLOW_REF             Git ref for workflow dispatch (default: main)
   WORKFLOW_INPUTS          Static workflow inputs (key=value,key=value format)
 
@@ -115,6 +116,7 @@ func init() {
 
 	// Workflow dispatch flags
 	serveCmd.Flags().String("workflow-file", "", "Workflow file to trigger (e.g., .github/workflows/pr-check.yml)")
+	serveCmd.Flags().String("workflow-repo", "", "Repository to trigger workflow file. If empty will use the same as event (e.g alaudadevops/toolbox)")
 	serveCmd.Flags().String("workflow-ref", "main", "Git ref to use for workflow dispatch")
 	serveCmd.Flags().StringToString("workflow-inputs", nil, "Static workflow inputs (key=value)")
 
@@ -200,6 +202,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 	if workflowRef, _ := cmd.Flags().GetString("workflow-ref"); cmd.Flags().Changed("workflow-ref") {
 		webhookConfig.WorkflowRef = workflowRef
 	}
+	if workflowRepo, _ := cmd.Flags().GetString("workflow-repo"); cmd.Flags().Changed("workflow-repo") {
+		webhookConfig.WorkflowRepo = workflowRepo
+	}
 	if workflowInputs, _ := cmd.Flags().GetStringToString("workflow-inputs"); len(workflowInputs) > 0 {
 		webhookConfig.WorkflowInputs = workflowInputs
 	}
@@ -227,7 +232,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	} else {
 		logger.SetLevel(logrus.InfoLevel)
 	}
-	logger.SetFormatter(&logrus.JSONFormatter{})
+	switch prOption.Config.LogFormat {
+	case "console":
+		logger.SetFormatter(&logrus.TextFormatter{})
+	default:
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
+
+	// printing config
+	logger.Debugf("Webhook config: %v", webhookConfig)
+	// if data, err := json.Marshal(webhookConfig); err != nil {
+
+	// }
 
 	// Create and start server
 	server := webhook.NewServer(webhookConfig, logger)

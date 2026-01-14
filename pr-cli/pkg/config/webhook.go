@@ -56,6 +56,7 @@ type WebhookConfig struct {
 
 	// Workflow dispatch configuration
 	WorkflowFile   string            `json:"workflow_file" yaml:"workflow_file" mapstructure:"workflow-file"`
+	WorkflowRepo   string            `json:"workflow_repo" yaml:"workflow_repo" mapstructure:"workflow-repo"`
 	WorkflowRef    string            `json:"workflow_ref" yaml:"workflow_ref" mapstructure:"workflow-ref"`
 	WorkflowInputs map[string]string `json:"workflow_inputs" yaml:"workflow_inputs" mapstructure:"workflow-inputs"`
 
@@ -172,6 +173,10 @@ func (wc *WebhookConfig) LoadFromEnv() error {
 	// Workflow dispatch configuration
 	if workflowFile := os.Getenv("WORKFLOW_FILE"); workflowFile != "" {
 		wc.WorkflowFile = workflowFile
+	}
+	// Workflow dispatch configuration
+	if workFlowRepo := os.Getenv("WORKFLOW_REPO"); workFlowRepo != "" {
+		wc.WorkflowRepo = workFlowRepo
 	}
 	if workflowRef := os.Getenv("WORKFLOW_REF"); workflowRef != "" {
 		wc.WorkflowRef = workflowRef

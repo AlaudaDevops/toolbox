@@ -33,6 +33,12 @@ go mod tidy
 export PR_TOKEN="ghp_your_github_token"
 export WEBHOOK_SECRET="your-webhook-secret"
 export ALLOWED_REPOS="your-org/*"
+# enabling PR workflow triggering
+export PR_EVENT_ENABLED=true
+export WORKFLOW_FILE=kilo-pr-review.yaml # name of the file in the target repository
+# export WORKFLOW_REPO=org/repo # org and repo to trigger workflow
+
+
 
 # Build and run
 make build-local
@@ -145,6 +151,7 @@ kubectl logs -f deployment/pr-cli-webhook -n pr-automation
 | `PR_EVENT_ENABLED` | Enable pull_request event handling | `false` | No |
 | `PR_EVENT_ACTIONS` | PR actions to listen for | `opened,synchronize,reopened,ready_for_review,edited` | No |
 | `WORKFLOW_FILE` | Workflow file to trigger | - | If PR_EVENT_ENABLED |
+| `WORKFLOW_REPO` | Repository to trigger workflow file. If empty will use the same as event | - | No |
 | `WORKFLOW_REF` | Git ref for workflow dispatch | `main` | No |
 | `WORKFLOW_INPUTS` | Static workflow inputs (key=value,key=value) | - | No |
 
@@ -173,6 +180,7 @@ Flags:
   --pr-event-enabled            Enable pull_request event handling (default false)
   --pr-event-actions strings    PR actions to listen for (default [opened,synchronize,reopened,ready_for_review,edited])
   --workflow-file string        Workflow file to trigger (e.g., .github/workflows/pr-check.yml)
+  --workflow-repo string        Repository to trigger workflow file. If empty will use the same as event (e.g alaudadevops/toolbox)
   --workflow-ref string         Git ref for workflow dispatch (default "main")
   --workflow-inputs strings     Static workflow inputs (key=value format)
 ```
@@ -347,4 +355,3 @@ export QUEUE_SIZE=20
 
 **Last Updated**: 2025-10-31  
 **Version**: 1.0
-

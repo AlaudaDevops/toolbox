@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/pr-cli/internal/version"
@@ -291,6 +292,18 @@ func (s *Server) processPullRequestEvent(event *PRWebhookEvent) error {
 		PRNum:    event.PullRequest.Number,
 	}
 
+	if s.config.WorkflowRepo != "" {
+		s.logger.Debugf("changing config to use repo %s", s.config.WorkflowRepo)
+		parts := strings.Split(s.config.WorkflowRepo, "/")
+		if len(parts) != 2 {
+			s.logger.Warnf("Workflow repo is setup with a wrong value: %s", s.config.WorkflowRepo)
+		} else {
+			cfg.Owner = parts[0]
+			cfg.Repo = parts[1]
+		}
+	}
+	s.logger.Debugf("Git config: %#v", cfg)
+
 	// Create GitHub client using factory
 	factory := &github.Factory{}
 	client, err := factory.CreateClient(s.logger, cfg)
@@ -307,12 +320,8 @@ func (s *Server) processPullRequestEvent(event *PRWebhookEvent) error {
 
 	// Build workflow inputs from PR event
 	inputs := map[string]interface{}{
-		"pr_number": fmt.Sprintf("%d", event.PullRequest.Number),
-		"pr_action": event.Action,
-		"head_ref":  event.PullRequest.HeadRef,
-		"head_sha":  event.PullRequest.HeadSHA,
-		"base_ref":  event.PullRequest.BaseRef,
-		"sender":    event.Sender.Login,
+		"pr_number":  fmt.Sprintf("%d", event.PullRequest.Number),
+		"repository": fmt.Sprintf("%s/%s", event.Repository.Owner, event.Repository.Name),
 	}
 
 	s.logger.Debugf("Built workflow inputs from PR event: pr_number=%d, pr_action=%s, head_ref=%s, head_sha=%s, base_ref=%s, sender=%s",
