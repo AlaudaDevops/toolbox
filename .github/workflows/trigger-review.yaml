@@ -7,14 +7,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
-  # Allow manual trigger for existing PRs
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to review (leave empty for latest)"
-        required: false
-        type: string
-
 jobs:
   trigger-review:
     runs-on: ubuntu-latest
