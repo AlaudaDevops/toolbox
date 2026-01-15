@@ -50,6 +50,16 @@ type WebhookConfig struct {
 	RateLimitEnabled  bool `json:"rate_limit_enabled" yaml:"rate_limit_enabled" mapstructure:"rate-limit-enabled"`
 	RateLimitRequests int  `json:"rate_limit_requests" yaml:"rate_limit_requests" mapstructure:"rate-limit-requests"`
 
+	// Pull Request event configuration
+	PREventEnabled bool     `json:"pr_event_enabled" yaml:"pr_event_enabled" mapstructure:"pr-event-enabled"`
+	PREventActions []string `json:"pr_event_actions" yaml:"pr_event_actions" mapstructure:"pr-event-actions"`
+
+	// Workflow dispatch configuration
+	WorkflowFile   string            `json:"workflow_file" yaml:"workflow_file" mapstructure:"workflow-file"`
+	WorkflowRepo   string            `json:"workflow_repo" yaml:"workflow_repo" mapstructure:"workflow-repo"`
+	WorkflowRef    string            `json:"workflow_ref" yaml:"workflow_ref" mapstructure:"workflow-ref"`
+	WorkflowInputs map[string]string `json:"workflow_inputs" yaml:"workflow_inputs" mapstructure:"workflow-inputs"`
+
 	// Base PR CLI configuration
 	BaseConfig *Config `json:"-" yaml:"-"`
 }
@@ -68,6 +78,9 @@ func NewDefaultWebhookConfig() *WebhookConfig {
 		QueueSize:         100,
 		RateLimitEnabled:  true,
 		RateLimitRequests: 100,
+		PREventEnabled:    false,
+		PREventActions:    []string{"opened", "synchronize", "reopened", "ready_for_review", "edited"},
+		WorkflowRef:       "main",
 		BaseConfig:        NewDefaultConfig(),
 	}
 }
@@ -146,6 +159,40 @@ func (wc *WebhookConfig) LoadFromEnv() error {
 		}
 	}
 
+	// Pull Request event configuration
+	if prEventEnabled := os.Getenv("PR_EVENT_ENABLED"); prEventEnabled != "" {
+		wc.PREventEnabled = prEventEnabled == "true"
+	}
+	if prEventActions := os.Getenv("PR_EVENT_ACTIONS"); prEventActions != "" {
+		wc.PREventActions = strings.Split(prEventActions, ",")
+		for i := range wc.PREventActions {
+			wc.PREventActions[i] = strings.TrimSpace(wc.PREventActions[i])
+		}
+	}
+
+	// Workflow dispatch configuration
+	if workflowFile := os.Getenv("WORKFLOW_FILE"); workflowFile != "" {
+		wc.WorkflowFile = workflowFile
+	}
+	// Workflow dispatch configuration
+	if workFlowRepo := os.Getenv("WORKFLOW_REPO"); workFlowRepo != "" {
+		wc.WorkflowRepo = workFlowRepo
+	}
+	if workflowRef := os.Getenv("WORKFLOW_REF"); workflowRef != "" {
+		wc.WorkflowRef = workflowRef
+	}
+	if workflowInputs := os.Getenv("WORKFLOW_INPUTS"); workflowInputs != "" {
+		// Parse as key=value,key=value format
+		wc.WorkflowInputs = make(map[string]string)
+		pairs := strings.Split(workflowInputs, ",")
+		for _, pair := range pairs {
+			kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+			if len(kv) == 2 {
+				wc.WorkflowInputs[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -174,10 +221,30 @@ func (wc *WebhookConfig) Validate() error {
 	if wc.RateLimitEnabled && wc.RateLimitRequests < 1 {
 		return fmt.Errorf("rate limit requests must be at least 1")
 	}
+	if wc.PREventEnabled {
+		trimmedWorkflowFile := strings.TrimSpace(wc.WorkflowFile)
+		if trimmedWorkflowFile == "" {
+			return fmt.Errorf("workflow file is required when PR event handling is enabled")
+		}
+		if !isValidWorkflowPath(trimmedWorkflowFile) {
+			return fmt.Errorf("workflow file path %q is invalid: must be a valid file path (e.g., .github/workflows/pr-check.yml)", wc.WorkflowFile)
+		}
+		wc.WorkflowFile = trimmedWorkflowFile
+	}
 	if wc.BaseConfig == nil {
 		return fmt.Errorf("base config is required")
 	}
 	return nil
+}
+
+func isValidWorkflowPath(path string) bool {
+	if path == "" {
+		return false
+	}
+	if strings.Contains(path, "..") {
+		return false
+	}
+	return strings.HasSuffix(path, ".yml") || strings.HasSuffix(path, ".yaml")
 }
 
 // DebugString returns a string representation with sensitive data redacted

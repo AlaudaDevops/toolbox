@@ -1688,3 +1688,23 @@ func (c *Client) RerunWorkflowRunFailedJobs(runID int64) error {
 	c.Infof("Successfully triggered rerun of failed jobs for workflow run ID: %d", runID)
 	return nil
 }
+
+// TriggerWorkflowDispatch triggers a workflow via workflow_dispatch event
+func (c *Client) TriggerWorkflowDispatch(workflowFile, ref string, inputs map[string]interface{}) error {
+	c.Debugf("Triggering workflow dispatch: workflow=%s, ref=%s", workflowFile, ref)
+
+	event := github.CreateWorkflowDispatchEventRequest{
+		Ref:    ref,
+		Inputs: inputs,
+	}
+
+	_, err := c.client.Actions.CreateWorkflowDispatchEventByFileName(
+		c.ctx, c.owner, c.repo, workflowFile, event,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to trigger workflow dispatch for %s: %w", workflowFile, err)
+	}
+
+	c.Infof("Successfully triggered workflow: %s on ref: %s", workflowFile, ref)
+	return nil
+}

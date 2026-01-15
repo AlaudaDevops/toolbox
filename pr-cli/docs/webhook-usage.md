@@ -22,7 +22,8 @@ export WEBHOOK_SECRET="your-webhook-secret"
 3. Set Content type to: `application/json`
 4. Set Secret to: `your-webhook-secret` (same as WEBHOOK_SECRET)
 5. Select "Let me select individual events" and choose:
-   - Issue comments
+   - Issue comments (for PR comment commands like `/lgtm`, `/merge`)
+   - Pull requests (if using PR event handling to trigger workflows)
 6. Save the webhook
 
 ### 3. Test the Webhook
@@ -58,6 +59,14 @@ Create a comment on a pull request with a command like `/lgtm` and the server wi
 #### Rate Limiting
 - `RATE_LIMIT_ENABLED` - Enable rate limiting (default: `true`)
 - `RATE_LIMIT_REQUESTS` - Max requests per minute per IP (default: `100`)
+
+#### Pull Request Event Handling
+- `PR_EVENT_ENABLED` - Enable pull_request event handling to trigger workflows (default: `false`)
+- `PR_EVENT_ACTIONS` - Comma-separated PR actions to listen for (default: `opened,synchronize,reopened,ready_for_review,edited`)
+- `WORKFLOW_FILE` - Workflow file to trigger for PR events (e.g., `.github/workflows/pr-check.yml`)
+- `WORKFLOW_REPO` - Repository to trigger workflow file. If empty will use the same as event (e.g alaudadevops/toolbox)
+- `WORKFLOW_REF` - Git ref to use for workflow dispatch (default: `main`)
+- `WORKFLOW_INPUTS` - Static workflow inputs in `key=value,key=value` format
 
 #### PR CLI Configuration
 All standard PR CLI environment variables are supported:
@@ -118,11 +127,13 @@ All environment variables can also be set via command-line flags:
 
 The webhook service exposes the following Prometheus metrics:
 
-- `webhook_requests_total` - Total webhook requests (labels: platform, event_type, status)
-- `webhook_processing_duration_seconds` - Webhook processing duration (labels: platform, command)
-- `command_execution_total` - Total command executions (labels: platform, command, status)
-- `webhook_queue_size` - Current job queue size
-- `webhook_active_workers` - Number of active workers
+- `pr_cli_webhook_requests_total` - Total webhook requests (labels: platform, event_type, status)
+- `pr_cli_webhook_processing_duration_seconds` - Webhook processing duration (labels: platform, command)
+- `pr_cli_command_execution_total` - Total command executions (labels: platform, command, status)
+- `pr_cli_queue_size` - Current job queue size
+- `pr_cli_active_workers` - Number of active workers
+- `pr_cli_pr_event_total` - Total pull_request events processed (labels: platform, action, status)
+- `pr_cli_workflow_dispatch_total` - Total workflow dispatch triggers (labels: platform, workflow, status)
 
 ## Security
 
@@ -301,6 +312,71 @@ export ALLOWED_REPOS="myorg/*"
   --queue-size=200
 ```
 
+### PR Event Handling (Trigger Workflows)
+
+Enable the webhook to trigger GitHub Actions workflows when PRs are opened or updated:
+
+```bash
+export PR_TOKEN="ghp_xxxxxxxxxxxx"
+export WEBHOOK_SECRET="my-secret-key"
+export ALLOWED_REPOS="myorg/*"
+export PR_EVENT_ENABLED="true"
+export WORKFLOW_FILE=".github/workflows/pr-check.yml"
+export WORKFLOW_REF="main"
+./pr-cli serve --verbose
+```
+
+Or with CLI flags:
+
+```bash
+./pr-cli serve \
+  --pr-event-enabled \
+  --workflow-file=.github/workflows/pr-check.yml \
+  --workflow-ref=main \
+  --pr-event-actions=opened,synchronize,reopened \
+  --allowed-repos="myorg/*"
+```
+
+The triggered workflow will receive these inputs:
+- `pr_number`  - Pull request number
+- `repository` - Repository in org/repo format
+
+
+Example workflow that can be triggered:
+
+```yaml
+# .github/workflows/pr-check.yml
+name: PR Check
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Pull request number'
+        required: true
+      pr_action:
+        description: 'PR action'
+        required: true
+      head_ref:
+        description: 'Head branch'
+        required: true
+      head_sha:
+        description: 'Head SHA'
+        required: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head_sha }}
+      - name: Run checks
+        run: |
+          echo "Checking PR #${{ inputs.pr_number }}"
+          echo "Action: ${{ inputs.pr_action }}"
+          # Add your checks here
+```
+
 ### GitLab Setup
 
 ```bash
@@ -322,4 +398,3 @@ If you're currently using PR CLI with Tekton Pipelines:
 5. Decommission Tekton Pipelines once migration is complete
 
 See `docs/webhook-service-design.md` for detailed migration guide.
-

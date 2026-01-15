@@ -38,7 +38,8 @@ PR comment commands. This mode eliminates the need for Tekton Pipelines and prov
 faster response times with lower resource usage.
 
 The server listens for webhook events, validates signatures, and executes PR commands
-using the same logic as the CLI mode.
+using the same logic as the CLI mode. It can also handle pull_request events to trigger
+GitHub Actions workflows via workflow_dispatch.
 
 Example:
   # Start server with default settings
@@ -49,6 +50,9 @@ Example:
 
   # Start with TLS
   pr-cli serve --tls-enabled --tls-cert-file=/etc/certs/tls.crt --tls-key-file=/etc/certs/tls.key
+
+  # Start with PR event handling to trigger workflows
+  pr-cli serve --pr-event-enabled --workflow-file=.github/workflows/pr-check.yml
 
 Environment Variables:
   LISTEN_ADDR              Server listen address (default: :8080)
@@ -65,6 +69,12 @@ Environment Variables:
   QUEUE_SIZE               Job queue size (default: 100)
   RATE_LIMIT_ENABLED       Enable rate limiting (default: true)
   RATE_LIMIT_REQUESTS      Max requests per minute per IP (default: 100)
+  PR_EVENT_ENABLED         Enable pull_request event handling (default: false)
+  PR_EVENT_ACTIONS         Comma-separated PR actions to listen for (default: opened,synchronize,reopened,ready_for_review,edited)
+  WORKFLOW_FILE            Workflow file to trigger for PR events
+  WORKFLOW_REPO            Sets a fixed workflow repository to trigger. Defaults to the same repository as the event.
+  WORKFLOW_REF             Git ref for workflow dispatch (default: main)
+  WORKFLOW_INPUTS          Static workflow inputs (key=value,key=value format)
 
   Plus all PR CLI environment variables (PR_TOKEN, PR_PLATFORM, etc.)
 `,
@@ -99,6 +109,16 @@ func init() {
 	// Rate limiting flags
 	serveCmd.Flags().Bool("rate-limit-enabled", true, "Enable rate limiting")
 	serveCmd.Flags().Int("rate-limit-requests", 100, "Max requests per minute per IP")
+
+	// Pull request event flags
+	serveCmd.Flags().Bool("pr-event-enabled", false, "Enable pull_request event handling to trigger workflows")
+	serveCmd.Flags().StringSlice("pr-event-actions", []string{"opened", "synchronize", "reopened", "ready_for_review", "edited"}, "PR actions to listen for")
+
+	// Workflow dispatch flags
+	serveCmd.Flags().String("workflow-file", "", "Workflow file to trigger (e.g., .github/workflows/pr-check.yml)")
+	serveCmd.Flags().String("workflow-repo", "", "Repository to trigger workflow file. If empty will use the same as event (e.g alaudadevops/toolbox)")
+	serveCmd.Flags().String("workflow-ref", "main", "Git ref to use for workflow dispatch")
+	serveCmd.Flags().StringToString("workflow-inputs", nil, "Static workflow inputs (key=value)")
 
 	// Add PR CLI flags to serve command
 	prOption.AddFlags(serveCmd.Flags())
@@ -167,6 +187,28 @@ func runServe(cmd *cobra.Command, args []string) error {
 		webhookConfig.RateLimitRequests = rateLimitReqs
 	}
 
+	// Pull request event configuration
+	if prEventEnabled, _ := cmd.Flags().GetBool("pr-event-enabled"); cmd.Flags().Changed("pr-event-enabled") {
+		webhookConfig.PREventEnabled = prEventEnabled
+	}
+	if prEventActions, _ := cmd.Flags().GetStringSlice("pr-event-actions"); cmd.Flags().Changed("pr-event-actions") {
+		webhookConfig.PREventActions = prEventActions
+	}
+
+	// Workflow dispatch configuration
+	if workflowFile, _ := cmd.Flags().GetString("workflow-file"); workflowFile != "" {
+		webhookConfig.WorkflowFile = workflowFile
+	}
+	if workflowRef, _ := cmd.Flags().GetString("workflow-ref"); cmd.Flags().Changed("workflow-ref") {
+		webhookConfig.WorkflowRef = workflowRef
+	}
+	if workflowRepo, _ := cmd.Flags().GetString("workflow-repo"); cmd.Flags().Changed("workflow-repo") {
+		webhookConfig.WorkflowRepo = workflowRepo
+	}
+	if workflowInputs, _ := cmd.Flags().GetStringToString("workflow-inputs"); len(workflowInputs) > 0 {
+		webhookConfig.WorkflowInputs = workflowInputs
+	}
+
 	// Load from environment variables (overrides flags)
 	if err := webhookConfig.LoadFromEnv(); err != nil {
 		return fmt.Errorf("failed to load webhook config from environment: %w", err)
@@ -190,7 +232,18 @@ func runServe(cmd *cobra.Command, args []string) error {
 	} else {
 		logger.SetLevel(logrus.InfoLevel)
 	}
-	logger.SetFormatter(&logrus.JSONFormatter{})
+	switch prOption.Config.LogFormat {
+	case "console":
+		logger.SetFormatter(&logrus.TextFormatter{})
+	default:
+		logger.SetFormatter(&logrus.JSONFormatter{})
+	}
+
+	// printing config
+	logger.Debugf("Webhook config: %v", webhookConfig)
+	// if data, err := json.Marshal(webhookConfig); err != nil {
+
+	// }
 
 	// Create and start server
 	server := webhook.NewServer(webhookConfig, logger)

@@ -14,6 +14,8 @@ PR CLI is a tool that processes comment commands on pull requests and executes c
 - **Multiple merge methods**: merge, squash, rebase
 - **Reviewer management**: Assign and unassign reviewers
 - **Status checks**: Verify CI/CD status before operations
+- **Webhook Server**: Run as a service to receive GitHub/GitLab webhooks directly
+- **PR Event Handling**: Trigger GitHub Actions workflows on PR open/update events
 
 ## Installation
 
@@ -40,6 +42,8 @@ go install github.com/AlaudaDevops/toolbox/pr-cli@latest
 | **This README** | Project overview, installation, and quick start | New users getting started |
 | **[📋 CLI Reference](docs/usage.md)** | Complete command-line usage guide | Users needing detailed CLI documentation |
 | **[🔧 Pipeline Integration](pipeline/README.md)** | Tekton Pipeline setup and configuration | DevOps teams setting up automation |
+| **[🌐 Webhook Service](docs/webhook-usage.md)** | Webhook server deployment and configuration | Teams running PR CLI as a service |
+| **[⚡ Webhook Quick Start](docs/webhook-quick-start.md)** | Quick setup guide for webhook service | Users setting up webhook service quickly |
 
 ## Quick Start
 
@@ -172,6 +176,41 @@ pr-cli --platform github \
 - `rebase` - Rebase merge
 
 > 📘 **Pipeline Integration**: For Tekton Pipeline integration and detailed command usage, see [pipeline/README.md](pipeline/README.md)
+
+## Webhook Service Mode
+
+PR CLI can run as a standalone webhook server that receives events directly from GitHub/GitLab:
+
+```bash
+# Start webhook server
+pr-cli serve \
+  --webhook-secret="your-secret" \
+  --allowed-repos="myorg/*" \
+  --token="$GITHUB_TOKEN"
+```
+
+### PR Event Handling
+
+The webhook service can also trigger GitHub Actions workflows when PRs are opened or updated:
+
+```bash
+# Enable PR event handling to trigger workflows
+pr-cli serve \
+  --pr-event-enabled \
+  --workflow-file=.github/workflows/pr-check.yml \
+  --webhook-secret="your-secret" \
+  --allowed-repos="myorg/*"
+```
+
+When a PR is opened or updated, the service triggers the specified workflow with inputs like `pr_number`, `pr_action`, `head_ref`, `head_sha`, `base_ref`, and `sender`.
+
+> ⚠️ **Security Considerations**: When enabling PR event handling with workflow dispatch, ensure:
+> - The `--allowed-repos` flag is configured to restrict which repositories can trigger workflows
+> - The workflow file being triggered has appropriate security controls and doesn't execute untrusted code
+> - The GitHub token used has minimal required permissions (only `actions:write` for dispatch)
+> - Webhook signature validation is enabled (`--require-signature=true`, the default)
+
+> 📘 **Full Documentation**: See [Webhook Service Guide](docs/webhook-usage.md) for complete configuration options and deployment instructions.
 
 ## Configuration
 

@@ -376,3 +376,284 @@ func TestWebhookEventJSON(t *testing.T) {
 	assert.Equal(t, event.Repository.Owner, decoded.Repository.Owner)
 	assert.Equal(t, event.PullRequest.Number, decoded.PullRequest.Number)
 }
+
+func TestParseGitHubPullRequestWebhook(t *testing.T) {
+	tests := []struct {
+		name           string
+		payload        string
+		allowedActions []string
+		expectError    bool
+		errorContains  string
+		validate       func(t *testing.T, event *PRWebhookEvent)
+	}{
+		{
+			name: "valid opened PR event",
+			payload: `{
+				"action": "opened",
+				"number": 42,
+				"pull_request": {
+					"number": 42,
+					"state": "open",
+					"title": "Add new feature",
+					"draft": false,
+					"user": {
+						"login": "pr-author"
+					},
+					"head": {
+						"ref": "feature-branch",
+						"sha": "abc123def456"
+					},
+					"base": {
+						"ref": "main"
+					}
+				},
+				"repository": {
+					"name": "test-repo",
+					"html_url": "https://github.com/test-owner/test-repo",
+					"owner": {
+						"login": "test-owner"
+					}
+				},
+				"sender": {
+					"login": "pr-author"
+				}
+			}`,
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    false,
+			validate: func(t *testing.T, event *PRWebhookEvent) {
+				assert.Equal(t, "github", event.Platform)
+				assert.Equal(t, "opened", event.Action)
+				assert.Equal(t, 42, event.PullRequest.Number)
+				assert.Equal(t, "open", event.PullRequest.State)
+				assert.Equal(t, "Add new feature", event.PullRequest.Title)
+				assert.False(t, event.PullRequest.Draft)
+				assert.Equal(t, "pr-author", event.PullRequest.Author)
+				assert.Equal(t, "feature-branch", event.PullRequest.HeadRef)
+				assert.Equal(t, "abc123def456", event.PullRequest.HeadSHA)
+				assert.Equal(t, "main", event.PullRequest.BaseRef)
+				assert.Equal(t, "test-repo", event.Repository.Name)
+				assert.Equal(t, "test-owner", event.Repository.Owner)
+				assert.Equal(t, "pr-author", event.Sender.Login)
+			},
+		},
+		{
+			name: "valid synchronize PR event",
+			payload: `{
+				"action": "synchronize",
+				"number": 123,
+				"pull_request": {
+					"number": 123,
+					"state": "open",
+					"title": "Update feature",
+					"draft": false,
+					"user": {"login": "author"},
+					"head": {"ref": "feature", "sha": "newsha123"},
+					"base": {"ref": "main"}
+				},
+				"repository": {
+					"name": "repo",
+					"owner": {"login": "owner"}
+				},
+				"sender": {"login": "author"}
+			}`,
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    false,
+			validate: func(t *testing.T, event *PRWebhookEvent) {
+				assert.Equal(t, "synchronize", event.Action)
+				assert.Equal(t, 123, event.PullRequest.Number)
+				assert.Equal(t, "newsha123", event.PullRequest.HeadSHA)
+			},
+		},
+		{
+			name: "action not in allowed list",
+			payload: `{
+				"action": "closed",
+				"number": 1,
+				"pull_request": {
+					"number": 1,
+					"state": "closed",
+					"draft": false,
+					"user": {"login": "author"},
+					"head": {"ref": "feature", "sha": "sha"},
+					"base": {"ref": "main"}
+				},
+				"repository": {"name": "repo", "owner": {"login": "owner"}},
+				"sender": {"login": "author"}
+			}`,
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    true,
+			errorContains:  "not in allowed actions",
+		},
+		{
+			name: "draft PR should be skipped",
+			payload: `{
+				"action": "opened",
+				"number": 1,
+				"pull_request": {
+					"number": 1,
+					"state": "open",
+					"draft": true,
+					"user": {"login": "author"},
+					"head": {"ref": "feature", "sha": "sha"},
+					"base": {"ref": "main"}
+				},
+				"repository": {"name": "repo", "owner": {"login": "owner"}},
+				"sender": {"login": "author"}
+			}`,
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    true,
+			errorContains:  "draft PR",
+		},
+		{
+			name: "ready_for_review on draft PR should pass",
+			payload: `{
+				"action": "ready_for_review",
+				"number": 1,
+				"pull_request": {
+					"number": 1,
+					"state": "open",
+					"draft": true,
+					"user": {"login": "author"},
+					"head": {"ref": "feature", "sha": "sha"},
+					"base": {"ref": "main"}
+				},
+				"repository": {"name": "repo", "owner": {"login": "owner"}},
+				"sender": {"login": "author"}
+			}`,
+			allowedActions: []string{"ready_for_review"},
+			expectError:    false,
+			validate: func(t *testing.T, event *PRWebhookEvent) {
+				assert.Equal(t, "ready_for_review", event.Action)
+			},
+		},
+		{
+			name:           "invalid JSON payload",
+			payload:        `{invalid json`,
+			allowedActions: []string{"opened"},
+			expectError:    true,
+			errorContains:  "failed to parse",
+		},
+		{
+			name: "empty allowed actions",
+			payload: `{
+				"action": "opened",
+				"number": 1,
+				"pull_request": {
+					"number": 1,
+					"state": "open",
+					"draft": false,
+					"user": {"login": "author"},
+					"head": {"ref": "feature", "sha": "sha"},
+					"base": {"ref": "main"}
+				},
+				"repository": {"name": "repo", "owner": {"login": "owner"}},
+				"sender": {"login": "author"}
+			}`,
+			allowedActions: []string{},
+			expectError:    true,
+			errorContains:  "not in allowed actions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event, err := ParseGitHubPullRequestWebhook([]byte(tt.payload), tt.allowedActions)
+			if tt.expectError {
+				assert.Error(t, err)
+				if tt.errorContains != "" {
+					assert.Contains(t, err.Error(), tt.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, event)
+				if tt.validate != nil {
+					tt.validate(t, event)
+				}
+			}
+		})
+	}
+}
+
+func TestValidatePRAction(t *testing.T) {
+	tests := []struct {
+		name           string
+		action         string
+		allowedActions []string
+		expectError    bool
+	}{
+		{
+			name:           "action allowed",
+			action:         "opened",
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    false,
+		},
+		{
+			name:           "action not allowed",
+			action:         "closed",
+			allowedActions: []string{"opened", "synchronize"},
+			expectError:    true,
+		},
+		{
+			name:           "empty allowed actions",
+			action:         "opened",
+			allowedActions: []string{},
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validatePRAction(tt.action, tt.allowedActions)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestValidateDraftPR(t *testing.T) {
+	tests := []struct {
+		name        string
+		isDraft     bool
+		action      string
+		expectError bool
+	}{
+		{
+			name:        "non-draft PR any action",
+			isDraft:     false,
+			action:      "opened",
+			expectError: false,
+		},
+		{
+			name:        "draft PR with ready_for_review",
+			isDraft:     true,
+			action:      "ready_for_review",
+			expectError: false,
+		},
+		{
+			name:        "draft PR with other action",
+			isDraft:     true,
+			action:      "opened",
+			expectError: true,
+		},
+		{
+			name:        "draft PR with synchronize",
+			isDraft:     true,
+			action:      "synchronize",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateDraftPR(tt.isDraft, tt.action)
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

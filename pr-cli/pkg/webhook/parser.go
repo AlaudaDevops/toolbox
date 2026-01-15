@@ -91,6 +91,60 @@ type GitHubWebhookPayload struct {
 	} `json:"sender"`
 }
 
+// GitHubPullRequestPayload represents GitHub pull_request webhook payload structure
+type GitHubPullRequestPayload struct {
+	Action      string `json:"action"`
+	Number      int    `json:"number"`
+	PullRequest struct {
+		Number int    `json:"number"`
+		State  string `json:"state"`
+		Title  string `json:"title"`
+		Draft  bool   `json:"draft"`
+		User   struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Head struct {
+			Ref string `json:"ref"`
+			SHA string `json:"sha"`
+		} `json:"head"`
+		Base struct {
+			Ref string `json:"ref"`
+		} `json:"base"`
+	} `json:"pull_request"`
+	Repository struct {
+		Name  string `json:"name"`
+		Owner struct {
+			Login string `json:"login"`
+		} `json:"owner"`
+		HTMLURL string `json:"html_url"`
+	} `json:"repository"`
+	Sender struct {
+		Login string `json:"login"`
+	} `json:"sender"`
+}
+
+// PRWebhookEvent represents a parsed pull_request webhook event
+type PRWebhookEvent struct {
+	EventID     string
+	Platform    string
+	Action      string
+	Repository  Repository
+	PullRequest PRInfo
+	Sender      User
+}
+
+// PRInfo represents pull request information from pull_request event
+type PRInfo struct {
+	Number  int
+	State   string
+	Title   string
+	Draft   bool
+	Author  string
+	HeadRef string
+	HeadSHA string
+	BaseRef string
+}
+
 // GitLabWebhookPayload represents GitLab webhook payload structure
 type GitLabWebhookPayload struct {
 	ObjectKind       string `json:"object_kind"`
@@ -163,6 +217,63 @@ func ParseGitHubWebhook(payload []byte, eventType string) (*WebhookEvent, error)
 	}
 
 	return event, nil
+}
+
+// ParseGitHubPullRequestWebhook parses a GitHub pull_request webhook payload
+func ParseGitHubPullRequestWebhook(payload []byte, allowedActions []string) (*PRWebhookEvent, error) {
+	var ghPayload GitHubPullRequestPayload
+	if err := json.Unmarshal(payload, &ghPayload); err != nil {
+		return nil, fmt.Errorf("failed to parse GitHub pull_request payload: %w", err)
+	}
+
+	if err := validatePRAction(ghPayload.Action, allowedActions); err != nil {
+		return nil, err
+	}
+
+	if err := validateDraftPR(ghPayload.PullRequest.Draft, ghPayload.Action); err != nil {
+		return nil, err
+	}
+
+	event := &PRWebhookEvent{
+		Platform: "github",
+		Action:   ghPayload.Action,
+		Repository: Repository{
+			Owner: ghPayload.Repository.Owner.Login,
+			Name:  ghPayload.Repository.Name,
+			URL:   ghPayload.Repository.HTMLURL,
+		},
+		PullRequest: PRInfo{
+			Number:  ghPayload.PullRequest.Number,
+			State:   ghPayload.PullRequest.State,
+			Title:   ghPayload.PullRequest.Title,
+			Draft:   ghPayload.PullRequest.Draft,
+			Author:  ghPayload.PullRequest.User.Login,
+			HeadRef: ghPayload.PullRequest.Head.Ref,
+			HeadSHA: ghPayload.PullRequest.Head.SHA,
+			BaseRef: ghPayload.PullRequest.Base.Ref,
+		},
+		Sender: User{
+			Login: ghPayload.Sender.Login,
+		},
+	}
+
+	return event, nil
+}
+
+func validatePRAction(action string, allowedActions []string) error {
+	for _, allowed := range allowedActions {
+		if action == allowed {
+			return nil
+		}
+	}
+	return fmt.Errorf("action %q not in allowed actions", action)
+}
+
+func validateDraftPR(isDraft bool, action string) error {
+	if isDraft && action != "ready_for_review" {
+		return fmt.Errorf("skipping draft PR")
+	}
+	return nil
 }
 
 // ParseGitLabWebhook parses a GitLab webhook payload
