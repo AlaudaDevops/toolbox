@@ -1,10 +1,10 @@
 # use curl to download cli
 ARG BUILDER_IMAGE=build-harbor.alauda.cn/ops/photon:5-alauda-202511251100
-ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.5-alauda-202512020944
+ARG RUNTIME_IMAGE=build-harbor.alauda.cn/ops/alpine:3.21.5-alauda-202512241200
 FROM ${BUILDER_IMAGE} AS download
 
 # renovate: datasource=github-releases depName=kubectl packageName=AlaudaDevops/kubernetes
-ARG KUBECTL_VERSION=v1.33.5-alauda-6
+ARG KUBECTL_VERSION=v1.33.8-alauda-3
 
 RUN set -eux; \
     if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then \
