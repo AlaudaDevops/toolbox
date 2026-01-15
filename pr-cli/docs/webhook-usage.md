@@ -338,12 +338,9 @@ Or with CLI flags:
 ```
 
 The triggered workflow will receive these inputs:
-- `pr_number` - Pull request number
-- `pr_action` - The action (opened, synchronize, etc.)
-- `head_ref` - Source branch name
-- `head_sha` - Head commit SHA
-- `base_ref` - Target branch name
-- `sender` - User who triggered the event
+- `pr_number`  - Pull request number
+- `repository` - Repository in org/repo format
+
 
 Example workflow that can be triggered:
 
