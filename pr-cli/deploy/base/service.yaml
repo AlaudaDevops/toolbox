@@ -3,15 +3,14 @@ kind: Service
 metadata:
   name: pr-cli-webhook
   labels:
-    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/version: "0.2.0"
 spec:
   type: ClusterIP
   ports:
-  - name: http
-    port: 80
-    targetPort: http
-    protocol: TCP
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
   selector:
     app.kubernetes.io/name: pr-cli
     app.kubernetes.io/component: webhook-service
-

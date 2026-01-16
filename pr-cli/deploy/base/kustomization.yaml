@@ -1,17 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: pr-cli
+# namespace: pr-cli
 
 resources:
-  - namespace.yaml
   - serviceaccount.yaml
   - deployment.yaml
   - service.yaml
   - configmap.yaml
   - secret.yaml
   # - servicemonitor.yaml
-  - networkpolicy.yaml
 
 labels:
   - pairs:

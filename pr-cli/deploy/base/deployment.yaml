@@ -3,9 +3,9 @@ kind: Deployment
 metadata:
   name: pr-cli-webhook
   labels:
-    app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/version: "0.2.0"
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,7 +20,7 @@ spec:
       labels:
         app.kubernetes.io/name: pr-cli
         app.kubernetes.io/component: webhook-service
-        app.kubernetes.io/version: "1.0.0"
+        app.kubernetes.io/version: "0.2.0"
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
@@ -34,78 +34,77 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - name: pr-cli
-        image: pr-cli:latest
-        imagePullPolicy: IfNotPresent
-        command:
-          - /usr/local/bin/pr-cli
-          - serve
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        envFrom:
-        - configMapRef:
-            name: pr-cli-config
-        - secretRef:
-            name: pr-cli-secrets
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        resources:
-          requests:
-            cpu: 100m
-            memory: 128Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: http
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        readinessProbe:
-          httpGet:
-            path: /health/ready
-            port: http
-          initialDelaySeconds: 5
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 2
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          runAsNonRoot: true
-          runAsUser: 65532
-          capabilities:
-            drop:
-            - ALL
-        volumeMounts:
-        - name: tmp
-          mountPath: /tmp
+        - name: pr-cli
+          image: pr-cli:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - /usr/local/bin/pr-cli
+            - serve
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: pr-cli-config
+            - secretRef:
+                name: pr-cli-secrets
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds:
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
       volumes:
-      - name: tmp
-        emptyDir: {}
+        - name: tmp
+          emptyDir: {}
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            podAffinityTerm:
-              labelSelector:
-                matchExpressions:
-                - key: app.kubernetes.io/name
-                  operator: In
-                  values:
-                  - pr-cli
-              topologyKey: kubernetes.io/hostname
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - pr-cli
+                topologyKey: kubernetes.io/hostname
       terminationGracePeriodSeconds: 30
-
