@@ -111,13 +111,17 @@ func loggingMiddleware(logger *logrus.Logger) func(http.Handler) http.Handler {
 
 			next.ServeHTTP(wrapped, r)
 
-			logger.WithFields(logrus.Fields{
-				"method":      r.Method,
-				"path":        r.URL.Path,
-				"status":      wrapped.statusCode,
-				"duration_ms": time.Since(start).Milliseconds(),
-				"ip":          getClientIP(r),
-			}).Info("HTTP request")
+			// TODO: make this configurable
+			// for now just skipping health check logs
+			if !strings.HasPrefix(r.URL.Path, "/health") {
+				logger.WithFields(logrus.Fields{
+					"method":      r.Method,
+					"path":        r.URL.Path,
+					"status":      wrapped.statusCode,
+					"duration_ms": time.Since(start).Milliseconds(),
+					"ip":          getClientIP(r),
+				}).Info("HTTP request")
+			}
 		})
 	}
 }
