@@ -165,6 +165,9 @@ func runDependaBot() error {
 
 	// CLI config has highest priority
 	finalConfig := configReader.MergeConfigs(repoConfig, &cfg)
+	if err := configReader.ApplyHookRules(finalConfig); err != nil {
+		return fmt.Errorf("failed to apply conditional hook rules: %w", err)
+	}
 	finalConfig = configReader.ApplyDefaults(finalConfig)
 	applyCleanupSetting(finalConfig.Runtime)
 	logrus.Debug("Final config:", finalConfig.String())

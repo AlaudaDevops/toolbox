@@ -1,0 +1,16 @@
+description: verify hooks are injected for matching tektoncd repository
+
+hooks:
+  preVerifyScan:
+    enabled: true
+    script: |
+      #!/bin/bash
+      set -ex
+      make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+
+  postVerifyScan:
+    enabled: true
+    script: |
+      #!/bin/bash
+      set -ex
+      make clean-patches-default

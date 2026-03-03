@@ -1,0 +1,33 @@
+description: keep existing pre verify hook and fill missing post verify hook
+
+repoURL: https://github.com/alauda/tektoncd-results.git
+
+existingHooks:
+  preVerifyScan:
+    enabled: true
+    script: |
+      #!/bin/bash
+      echo "existing pre verify"
+
+  postVerifyScan:
+    enabled: false
+
+rules:
+  - name: tektoncd verify hooks
+    when:
+      repoNameGlob: "tektoncd-*"
+    strategy: fillEmpty
+    hooks:
+      preVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          set -ex
+          make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+
+      postVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          set -ex
+          make clean-patches-default

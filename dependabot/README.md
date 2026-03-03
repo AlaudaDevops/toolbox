@@ -264,6 +264,36 @@ With this setup:
 2. If no vulnerabilities remain, it exits early and skips PR generation.
 3. If vulnerabilities remain, it cleans up and continues with the regular update flow to regenerate commands.
 
+#### Apply Hooks Conditionally in Global Config
+
+You can also configure conditional hook injection in a global config file (for example `hack/dependabot/bot.yaml`) and apply it only to matched repositories:
+
+```yaml
+hooks:
+  rules:
+    - name: tektoncd verify hooks
+      when:
+        repoNameGlob: "tektoncd-*"
+      strategy: fillEmpty # optional: fillEmpty (default) | override
+      hooks:
+        preVerifyScan:
+          script: |
+            #!/bin/bash
+            set -ex
+            make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+        postVerifyScan:
+          script: |
+            #!/bin/bash
+            set -ex
+            make clean-patches-default
+```
+
+Behavior:
+
+1. Rule matching is based on repository name (without `.git`) extracted from `repo.url`.
+2. `fillEmpty` only injects hooks when the target hook is not configured.
+3. `override` always replaces existing hooks for matched repositories.
+
 ### Git Provider Support
 
 DependaBot currently supports GitHub and Gitlab providers. You can specify the provider using the `--git.provider` parameter or configure it in the local configuration file.

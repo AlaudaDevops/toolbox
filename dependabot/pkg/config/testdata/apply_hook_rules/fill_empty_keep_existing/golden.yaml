@@ -1,0 +1,15 @@
+description: fillEmpty strategy preserves existing pre hook and injects post hook
+
+hooks:
+  preVerifyScan:
+    enabled: true
+    script: |
+      #!/bin/bash
+      echo "existing pre verify"
+
+  postVerifyScan:
+    enabled: true
+    script: |
+      #!/bin/bash
+      set -ex
+      make clean-patches-default

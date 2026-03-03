@@ -1,0 +1,8 @@
+description: hooks remain empty when repository does not match rule
+
+hooks:
+  preVerifyScan:
+    enabled: false
+
+  postVerifyScan:
+    enabled: false

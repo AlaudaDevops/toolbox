@@ -20,8 +20,11 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
@@ -146,6 +149,8 @@ type HooksConfig struct {
 	PreCommit *HookConfig `yaml:"preCommit" json:"preCommit" mapstructure:"preCommit"`
 	// PostCommit contains script to execute after committing changes
 	PostCommit *HookConfig `yaml:"postCommit" json:"postCommit" mapstructure:"postCommit"`
+	// Rules contains conditional hook injection rules, typically used in global config
+	Rules []HookRule `yaml:"rules" json:"rules" mapstructure:"rules"`
 }
 
 // HookConfig contains configuration for a single pipeline hook
@@ -156,6 +161,27 @@ type HookConfig struct {
 	Timeout string `yaml:"timeout" json:"timeout" mapstructure:"timeout"`
 	// ContinueOnError determines whether to continue pipeline execution if script fails
 	ContinueOnError bool `yaml:"continueOnError" json:"continueOnError" mapstructure:"continueOnError"`
+}
+
+const (
+	// HookRuleStrategyFillEmpty injects hook only when target hook is not configured
+	HookRuleStrategyFillEmpty = "fillEmpty"
+	// HookRuleStrategyOverride always overrides target hook when source hook is configured
+	HookRuleStrategyOverride = "override"
+)
+
+// HookRule defines one conditional hook injection rule.
+type HookRule struct {
+	Name     string       `yaml:"name" json:"name" mapstructure:"name"`
+	When     HookRuleWhen `yaml:"when" json:"when" mapstructure:"when"`
+	Strategy string       `yaml:"strategy" json:"strategy" mapstructure:"strategy"`
+	Hooks    HooksConfig  `yaml:"hooks" json:"hooks" mapstructure:"hooks"`
+}
+
+// HookRuleWhen defines conditions for matching repository context.
+type HookRuleWhen struct {
+	// RepoNameGlob matches repository name (without .git), e.g. tektoncd-*
+	RepoNameGlob string `yaml:"repoNameGlob" json:"repoNameGlob" mapstructure:"repoNameGlob"`
 }
 
 // ConfigReader handles reading and merging configuration files
@@ -331,6 +357,9 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		if config.Hooks.PostCommit != nil {
 			merged.Hooks.PostCommit = config.Hooks.PostCommit
 		}
+		if len(config.Hooks.Rules) > 0 {
+			merged.Hooks.Rules = config.Hooks.Rules
+		}
 		if config.Updater.Go != nil {
 			merged.Updater.Go = config.Updater.Go
 		}
@@ -340,6 +369,144 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 	}
 
 	return merged
+}
+
+// ApplyHookRules applies conditional hook rules based on repository context.
+func (c *ConfigReader) ApplyHookRules(config *DependaBotConfig) error {
+	if config == nil || len(config.Hooks.Rules) == 0 {
+		return nil
+	}
+
+	repoName, err := extractRepoName(config.Repo.URL)
+	if err != nil {
+		return fmt.Errorf("failed to apply hook rules: %w", err)
+	}
+
+	for i, rule := range config.Hooks.Rules {
+		matched, err := rule.matchesRepoName(repoName)
+		if err != nil {
+			return fmt.Errorf("invalid hooks.rules[%d] (%s): %w", i, rule.Name, err)
+		}
+		if !matched {
+			continue
+		}
+
+		strategy, err := normalizeHookRuleStrategy(rule.Strategy)
+		if err != nil {
+			return fmt.Errorf("invalid hooks.rules[%d] (%s) strategy: %w", i, rule.Name, err)
+		}
+
+		logrus.Debugf("Applying hook rule %q for repository %q with strategy %q", rule.Name, repoName, strategy)
+		applyHookByStrategy(&config.Hooks.PreVerifyScan, rule.Hooks.PreVerifyScan, strategy)
+		applyHookByStrategy(&config.Hooks.PostVerifyScan, rule.Hooks.PostVerifyScan, strategy)
+		applyHookByStrategy(&config.Hooks.PreScan, rule.Hooks.PreScan, strategy)
+		applyHookByStrategy(&config.Hooks.PostScan, rule.Hooks.PostScan, strategy)
+		applyHookByStrategy(&config.Hooks.PreCommit, rule.Hooks.PreCommit, strategy)
+		applyHookByStrategy(&config.Hooks.PostCommit, rule.Hooks.PostCommit, strategy)
+	}
+
+	return nil
+}
+
+func (r *HookRule) matchesRepoName(repoName string) (bool, error) {
+	if r == nil {
+		return false, nil
+	}
+
+	glob := strings.TrimSpace(r.When.RepoNameGlob)
+	if glob == "" {
+		return true, nil
+	}
+
+	matched, err := path.Match(glob, repoName)
+	if err != nil {
+		return false, fmt.Errorf("invalid repoNameGlob %q: %w", glob, err)
+	}
+	return matched, nil
+}
+
+func normalizeHookRuleStrategy(strategy string) (string, error) {
+	normalized := strings.TrimSpace(strategy)
+	if normalized == "" {
+		return HookRuleStrategyFillEmpty, nil
+	}
+
+	switch normalized {
+	case HookRuleStrategyFillEmpty, HookRuleStrategyOverride:
+		return normalized, nil
+	default:
+		return "", fmt.Errorf("unsupported strategy %q", strategy)
+	}
+}
+
+func applyHookByStrategy(target **HookConfig, source *HookConfig, strategy string) {
+	if source == nil || target == nil {
+		return
+	}
+
+	switch strategy {
+	case HookRuleStrategyFillEmpty:
+		if *target == nil {
+			*target = cloneHook(source)
+		}
+	case HookRuleStrategyOverride:
+		*target = cloneHook(source)
+	}
+}
+
+func cloneHook(source *HookConfig) *HookConfig {
+	if source == nil {
+		return nil
+	}
+
+	cloned := *source
+	return &cloned
+}
+
+func extractRepoName(repoURL string) (string, error) {
+	cleaned := strings.TrimSpace(repoURL)
+	if cleaned == "" {
+		return "", fmt.Errorf("repository URL is empty")
+	}
+
+	if strings.Contains(cleaned, "://") {
+		parsedURL, err := url.Parse(cleaned)
+		if err != nil {
+			return "", fmt.Errorf("invalid repository URL %q: %w", repoURL, err)
+		}
+		repoName := repoNameFromPath(parsedURL.Path)
+		if repoName == "" {
+			return "", fmt.Errorf("cannot extract repository name from URL %q", repoURL)
+		}
+		return repoName, nil
+	}
+
+	// Support SCP-like SSH URL: git@host:group/repo.git
+	if idx := strings.LastIndex(cleaned, ":"); idx >= 0 && idx < len(cleaned)-1 {
+		repoName := repoNameFromPath(cleaned[idx+1:])
+		if repoName == "" {
+			return "", fmt.Errorf("cannot extract repository name from URL %q", repoURL)
+		}
+		return repoName, nil
+	}
+
+	// Fallback for plain path-like values
+	repoName := repoNameFromPath(cleaned)
+	if repoName == "" {
+		return "", fmt.Errorf("cannot extract repository name from URL %q", repoURL)
+	}
+	return repoName, nil
+}
+
+func repoNameFromPath(pathValue string) string {
+	trimmedPath := strings.Trim(strings.TrimSpace(pathValue), "/")
+	if trimmedPath == "" {
+		return ""
+	}
+
+	segments := strings.Split(trimmedPath, "/")
+	lastSegment := strings.TrimSpace(segments[len(segments)-1])
+	return strings.TrimSuffix(lastSegment, ".git")
 }
 
 // ApplyDefaults applies default values to configuration

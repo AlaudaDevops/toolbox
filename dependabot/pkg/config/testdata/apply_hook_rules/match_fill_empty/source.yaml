@@ -1,0 +1,30 @@
+description: apply default verify hooks for tektoncd repositories when hooks are empty
+
+repoURL: https://github.com/alauda/tektoncd-pipeline.git
+
+existingHooks:
+  preVerifyScan:
+    enabled: false
+
+  postVerifyScan:
+    enabled: false
+
+rules:
+  - name: tektoncd verify hooks
+    when:
+      repoNameGlob: "tektoncd-*"
+    strategy: fillEmpty
+    hooks:
+      preVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          set -ex
+          make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+
+      postVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          set -ex
+          make clean-patches-default
