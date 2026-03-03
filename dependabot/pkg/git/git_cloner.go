@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/settings"
 	"github.com/sirupsen/logrus"
 )
 
@@ -127,6 +128,11 @@ func (g *GitCloner) CloneRepository() (string, error) {
 // Cleanup removes the temporary directory and all its contents
 func (g *GitCloner) Cleanup() error {
 	if g.tempDir == "" {
+		return nil
+	}
+
+	if !settings.CleanupTempDirsEnabled() {
+		logrus.Debugf("Skipping cloned repository cleanup due to global setting: %s", g.tempDir)
 		return nil
 	}
 

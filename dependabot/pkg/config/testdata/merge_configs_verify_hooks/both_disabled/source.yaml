@@ -1,0 +1,27 @@
+description: both repo and cli keep verify hooks disabled
+
+repo:
+  preVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false
+
+  postVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false
+
+cli:
+  preVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false
+
+  postVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false

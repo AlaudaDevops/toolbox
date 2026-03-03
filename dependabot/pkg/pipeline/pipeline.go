@@ -55,26 +55,25 @@ func NewPipeline(config *Config) *Pipeline {
 func (p *Pipeline) Run() error {
 	logrus.Infof("Starting dependency update pipeline for project: %s", p.config.ProjectPath)
 
-	// Execute pre-scan script if configured
 	scriptExecutor := NewScriptExecutor(p.config.ProjectPath)
+
+	shouldSkipUpdate, err := p.runVerifyScanStage(scriptExecutor, p.runSecurityScan)
+	if err != nil {
+		return fmt.Errorf("verify-scan stage failed: %w", err)
+	}
+	if shouldSkipUpdate {
+		logrus.Info("No vulnerabilities found after verify-scan stage, skipping update workflow")
+		return nil
+	}
+
+	// Execute pre-scan script if configured
 	if err := scriptExecutor.ExecuteScript("Pre-scan", p.config.Hooks.PreScan); err != nil {
 		return fmt.Errorf("pre-scan script failed: %w", err)
 	}
 
 	logrus.Info("Running Security Scanning...")
 
-	scannerInstance, err := scanner.NewScanner(p.config.ProjectPath, p.config.Scanner)
-	if err != nil {
-		return fmt.Errorf("failed to create scanner: %w", err)
-	}
-
-	defer func() {
-		if cleanupErr := scannerInstance.Cleanup(); cleanupErr != nil {
-			logrus.Warnf("Warning: failed to cleanup scanner resources: %v", cleanupErr)
-		}
-	}()
-
-	vulnerabilities, err := scannerInstance.Scan()
+	vulnerabilities, err := p.runSecurityScan()
 	if err != nil {
 		return fmt.Errorf("failed to run security scan: %w", err)
 	}
@@ -171,6 +170,64 @@ func (p *Pipeline) Run() error {
 
 	logrus.Info("✅ Pipeline completed successfully!")
 	return nil
+}
+
+func (p *Pipeline) runVerifyScanStage(scriptExecutor *ScriptExecutor, scanFn func() ([]types.Vulnerability, error)) (shouldSkipUpdate bool, err error) {
+	if p.config.Hooks.PreVerifyScan == nil && p.config.Hooks.PostVerifyScan == nil {
+		return false, nil
+	}
+
+	defer func() {
+		if cleanupErr := scriptExecutor.ExecuteScript("Post-verify-scan", p.config.Hooks.PostVerifyScan); cleanupErr != nil {
+			shouldSkipUpdate = false
+			if err == nil {
+				err = fmt.Errorf("post-verify-scan script failed: %w", cleanupErr)
+				return
+			}
+			err = fmt.Errorf("%w; post-verify-scan script failed: %v", err, cleanupErr)
+		}
+	}()
+
+	if preVerifyErr := scriptExecutor.ExecuteScript("Pre-verify-scan", p.config.Hooks.PreVerifyScan); preVerifyErr != nil {
+		logrus.Warnf("Warning: pre-verify-scan script failed, falling back to regular flow: %v", preVerifyErr)
+		return false, nil
+	}
+
+	logrus.Info("Running verification security scan...")
+	vulnerabilities, scanErr := scanFn()
+	if scanErr != nil {
+		logrus.Warnf("Warning: verification scan failed, falling back to regular flow: %v", scanErr)
+		return false, nil
+	}
+
+	if len(vulnerabilities) == 0 {
+		logrus.Info("No vulnerabilities found in verification scan")
+		return true, nil
+	}
+
+	logrus.Infof("Verification scan found %d vulnerabilities, continuing with regular update flow", len(vulnerabilities))
+	logrus.Debugf("Verification scan results: %s", vulnerabilities)
+	return false, nil
+}
+
+func (p *Pipeline) runSecurityScan() ([]types.Vulnerability, error) {
+	scannerInstance, err := scanner.NewScanner(p.config.ProjectPath, p.config.Scanner)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create scanner: %w", err)
+	}
+
+	defer func() {
+		if cleanupErr := scannerInstance.Cleanup(); cleanupErr != nil {
+			logrus.Warnf("Warning: failed to cleanup scanner resources: %v", cleanupErr)
+		}
+	}()
+
+	vulnerabilities, err := scannerInstance.Scan()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute scanner: %w", err)
+	}
+
+	return vulnerabilities, nil
 }
 
 // sendNotification sends a notification about the vulnerability updates

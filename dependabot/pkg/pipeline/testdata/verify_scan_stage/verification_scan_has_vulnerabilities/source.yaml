@@ -1,0 +1,21 @@
+description: verification scan still finds vulnerabilities
+
+preVerify:
+  enabled: true
+  continueOnError: false
+  scriptTemplate: |
+    #!/bin/bash
+    set -ex
+    echo "pre" > "${PRE_MARKER}"
+
+postVerify:
+  enabled: true
+  continueOnError: false
+  scriptTemplate: |
+    #!/bin/bash
+    set -ex
+    echo "post" > "${POST_MARKER}"
+
+scan:
+  vulnerabilityCount: 2
+  error: ""

@@ -1,0 +1,5 @@
+description: temp directory should be cleaned up
+
+wantError: false
+expectDirExists: false
+expectTempDirEmpty: true

@@ -1,0 +1,6 @@
+description: should fallback without scan invocation
+shouldSkipUpdate: false
+wantError: false
+expectPreMarker: true
+expectPostMarker: true
+expectScanInvoked: false

@@ -1,0 +1,27 @@
+description: cli config contains both verify hooks
+
+repo:
+  preVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false
+
+  postVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false
+
+cli:
+  preVerifyScan:
+    enabled: true
+    script: "echo cli pre verify"
+    timeout: "18m"
+    continueOnError: false
+
+  postVerifyScan:
+    enabled: true
+    script: "echo cli post verify"
+    timeout: "12m"
+    continueOnError: true

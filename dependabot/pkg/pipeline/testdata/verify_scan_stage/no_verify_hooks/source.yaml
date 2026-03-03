@@ -1,0 +1,15 @@
+description: no verify hooks configured
+
+preVerify:
+  enabled: false
+  continueOnError: false
+  scriptTemplate: ""
+
+postVerify:
+  enabled: false
+  continueOnError: false
+  scriptTemplate: ""
+
+scan:
+  vulnerabilityCount: 0
+  error: ""

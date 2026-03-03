@@ -1,0 +1,13 @@
+description: merged config keeps verify hooks empty
+
+preVerifyScan:
+  enabled: false
+  script: ""
+  timeout: ""
+  continueOnError: false
+
+postVerifyScan:
+  enabled: false
+  script: ""
+  timeout: ""
+  continueOnError: false

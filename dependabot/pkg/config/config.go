@@ -43,6 +43,8 @@ type DependaBotConfig struct {
 	Hooks HooksConfig `yaml:"hooks" json:"hooks" mapstructure:"hooks"`
 	// Updater contains updater-specific configuration
 	Updater UpdaterConfig `yaml:"updater" json:"updater" mapstructure:"updater"`
+	// Runtime contains runtime behavior configuration
+	Runtime RuntimeConfig `yaml:"runtime" json:"runtime" mapstructure:"runtime"`
 }
 
 type NoticeConfig struct {
@@ -87,6 +89,12 @@ type UpdaterConfig struct {
 	Go *GoUpdaterConfig `yaml:"go" json:"go" mapstructure:"go"`
 }
 
+// RuntimeConfig contains runtime behavior configuration
+type RuntimeConfig struct {
+	// CleanupTempDirs controls whether temporary directories are cleaned up after execution
+	CleanupTempDirs *bool `yaml:"cleanupTempDirs" json:"cleanupTempDirs" mapstructure:"cleanupTempDirs"`
+}
+
 // GoUpdaterConfig contains Go-specific updater configuration
 type GoUpdaterConfig struct {
 	// CommandOutputFile is the file path to output successful go get commands
@@ -124,6 +132,12 @@ type PipelineScannerConfig = ScannerConfig
 
 // HooksConfig contains custom script configuration for pipeline hooks
 type HooksConfig struct {
+	// PreVerifyScan contains script to execute before verification scanning
+	// Use case: apply existing remediation commands to verify if vulnerabilities are already fixed
+	PreVerifyScan *HookConfig `yaml:"preVerifyScan" json:"preVerifyScan" mapstructure:"preVerifyScan"`
+	// PostVerifyScan contains script to execute after verification scanning
+	// Use case: cleanup workspace after verification stage, regardless of verification outcome
+	PostVerifyScan *HookConfig `yaml:"postVerifyScan" json:"postVerifyScan" mapstructure:"postVerifyScan"`
 	// PreScan contains script to execute before security scanning
 	PreScan *HookConfig `yaml:"preScan" json:"preScan" mapstructure:"preScan"`
 	// PostScan contains script to execute after security scanning
@@ -299,6 +313,12 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 			merged.Notice.Params = config.Notice.Params
 		}
 		// Merge Hooks configuration
+		if config.Hooks.PreVerifyScan != nil {
+			merged.Hooks.PreVerifyScan = config.Hooks.PreVerifyScan
+		}
+		if config.Hooks.PostVerifyScan != nil {
+			merged.Hooks.PostVerifyScan = config.Hooks.PostVerifyScan
+		}
 		if config.Hooks.PreScan != nil {
 			merged.Hooks.PreScan = config.Hooks.PreScan
 		}
@@ -313,6 +333,9 @@ func (c *ConfigReader) MergeConfigs(configs ...*DependaBotConfig) *DependaBotCon
 		}
 		if config.Updater.Go != nil {
 			merged.Updater.Go = config.Updater.Go
+		}
+		if config.Runtime.CleanupTempDirs != nil {
+			merged.Runtime.CleanupTempDirs = config.Runtime.CleanupTempDirs
 		}
 	}
 
@@ -334,6 +357,12 @@ func (c *ConfigReader) ApplyDefaults(config *DependaBotConfig) *DependaBotConfig
 	if config.Repo.IncludeSubmodules == nil {
 		defaultIncludeSubmodules := false
 		config.Repo.IncludeSubmodules = &defaultIncludeSubmodules
+	}
+
+	// Apply default for runtime temporary directory cleanup if not set
+	if config.Runtime.CleanupTempDirs == nil {
+		defaultCleanupTempDirs := true
+		config.Runtime.CleanupTempDirs = &defaultCleanupTempDirs
 	}
 
 	return config

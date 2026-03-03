@@ -1,0 +1,6 @@
+description: should short circuit update flow
+shouldSkipUpdate: true
+wantError: false
+expectPreMarker: true
+expectPostMarker: true
+expectScanInvoked: true
