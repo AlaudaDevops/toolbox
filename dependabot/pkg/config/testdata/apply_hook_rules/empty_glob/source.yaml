@@ -1,0 +1,25 @@
+description: return error when repoNameGlob is empty
+
+repoURL: "https://github.com/example/repo.git"
+expectErrorContains: repoNameGlob cannot be empty
+
+existingHooks:
+  preVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false
+
+rules:
+  - name: empty glob rule
+    when:
+      repoNameGlob: ""
+    strategy: fillEmpty
+    hooks:
+      preVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          echo "should not be applied"
+        timeout: "10m"
+        continueOnError: false

@@ -126,6 +126,7 @@ var _ = Describe("ConfigReader ApplyHookRules", func() {
 		}
 
 		Expect(err).NotTo(HaveOccurred())
+		Expect(cfg.Hooks.Rules).To(BeEmpty())
 
 		var golden goldenSpec
 		testings.MustLoadYaml(tc.goldenFile, &golden)
@@ -165,6 +166,10 @@ var _ = Describe("ConfigReader ApplyHookRules", func() {
 		Entry("invalid repository glob", testCase{
 			description: "should return error when repoNameGlob pattern is invalid",
 			sourceFile:  "./testdata/apply_hook_rules/invalid_glob/source.yaml",
+		}),
+		Entry("empty repository glob", testCase{
+			description: "should return error when repoNameGlob is empty",
+			sourceFile:  "./testdata/apply_hook_rules/empty_glob/source.yaml",
 		}),
 	)
 })

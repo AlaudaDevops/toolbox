@@ -405,6 +405,9 @@ func (c *ConfigReader) ApplyHookRules(config *DependaBotConfig) error {
 		applyHookByStrategy(&config.Hooks.PostCommit, rule.Hooks.PostCommit, strategy)
 	}
 
+	// Rules are only used as an input for hook injection and should not be kept in final runtime config.
+	config.Hooks.Rules = nil
+
 	return nil
 }
 
@@ -415,7 +418,7 @@ func (r *HookRule) matchesRepoName(repoName string) (bool, error) {
 
 	glob := strings.TrimSpace(r.When.RepoNameGlob)
 	if glob == "" {
-		return true, nil
+		return false, fmt.Errorf("repoNameGlob cannot be empty")
 	}
 
 	matched, err := path.Match(glob, repoName)
