@@ -32,6 +32,7 @@ func init() {
 	rootCmd.Flags().Bool("pr.pushBranch", false, "enable automatic push branch (automatically enabled when pr.autoCreate is true)")
 	rootCmd.Flags().StringSlice("pr.labels", []string{}, "labels to add to the PR")
 	rootCmd.Flags().StringSlice("pr.assignees", []string{}, "assignees to add to the PR")
+	rootCmd.Flags().Bool("runtime.cleanupTempDirs", true, "cleanup temporary directories after execution")
 	rootCmd.Flags().Bool("debug", false, "enable debug log output")
 	viper.BindPFlags(rootCmd.Flags())
 }

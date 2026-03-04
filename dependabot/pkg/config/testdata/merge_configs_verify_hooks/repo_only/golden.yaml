@@ -1,0 +1,13 @@
+description: merged config keeps repo verify hooks
+
+preVerifyScan:
+  enabled: true
+  script: "echo repo pre verify"
+  timeout: "15m"
+  continueOnError: false
+
+postVerifyScan:
+  enabled: true
+  script: "echo repo post verify"
+  timeout: "10m"
+  continueOnError: true

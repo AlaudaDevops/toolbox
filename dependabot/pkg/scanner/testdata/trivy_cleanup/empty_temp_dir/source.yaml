@@ -1,0 +1,4 @@
+description: cleanup should be no-op for empty temp dir
+
+cleanupTempDirs: false
+withTempDir: false

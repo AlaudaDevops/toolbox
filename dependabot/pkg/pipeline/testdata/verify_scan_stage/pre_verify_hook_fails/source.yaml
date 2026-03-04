@@ -1,0 +1,22 @@
+description: pre verify hook fails and falls back
+
+preVerify:
+  enabled: true
+  continueOnError: false
+  scriptTemplate: |
+    #!/bin/bash
+    set -ex
+    echo "pre" > "${PRE_MARKER}"
+    exit 1
+
+postVerify:
+  enabled: true
+  continueOnError: false
+  scriptTemplate: |
+    #!/bin/bash
+    set -ex
+    echo "post" > "${POST_MARKER}"
+
+scan:
+  vulnerabilityCount: 0
+  error: ""

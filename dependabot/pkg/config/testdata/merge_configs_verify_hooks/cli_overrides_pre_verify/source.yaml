@@ -1,0 +1,27 @@
+description: cli overrides only pre verify hook
+
+repo:
+  preVerifyScan:
+    enabled: true
+    script: "echo repo pre verify"
+    timeout: "15m"
+    continueOnError: false
+
+  postVerifyScan:
+    enabled: true
+    script: "echo repo post verify"
+    timeout: "10m"
+    continueOnError: false
+
+cli:
+  preVerifyScan:
+    enabled: true
+    script: "echo cli pre verify"
+    timeout: "20m"
+    continueOnError: true
+
+  postVerifyScan:
+    enabled: false
+    script: ""
+    timeout: ""
+    continueOnError: false

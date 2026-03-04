@@ -1,0 +1,6 @@
+description: should return error when cleanup fails
+shouldSkipUpdate: false
+wantError: true
+expectPreMarker: true
+expectPostMarker: true
+expectScanInvoked: true

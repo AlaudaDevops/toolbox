@@ -1,0 +1,13 @@
+description: merged config prefers cli pre verify and keeps repo post verify
+
+preVerifyScan:
+  enabled: true
+  script: "echo cli pre verify"
+  timeout: "20m"
+  continueOnError: true
+
+postVerifyScan:
+  enabled: true
+  script: "echo repo post verify"
+  timeout: "10m"
+  continueOnError: false

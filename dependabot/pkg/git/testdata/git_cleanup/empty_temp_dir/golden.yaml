@@ -1,0 +1,5 @@
+description: no-op cleanup should succeed
+
+wantError: false
+expectDirExists: false
+expectTempDirEmpty: true

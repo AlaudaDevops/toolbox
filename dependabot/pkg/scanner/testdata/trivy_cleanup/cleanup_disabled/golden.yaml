@@ -1,0 +1,5 @@
+description: temp directory should remain
+
+wantError: false
+expectDirExists: true
+expectTempDirEmpty: false

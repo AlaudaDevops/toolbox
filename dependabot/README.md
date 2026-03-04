@@ -87,6 +87,7 @@ dependabot --help
 -  `--git.token`       Access token for the Git provider (used for authentication and PR creation)
 -  `--pr.autoCreate`   enable automatic PR creation
 -  `--pr.pushBranch`   enable automatic push branch (automatically enabled when --pr.autoCreate is true)
+-  `--runtime.cleanupTempDirs` cleanup temporary directories after execution (default true)
 -  `--repo.branch`     branch to clone and create PR against (default "main")
 -  `--repo.url`        repository URL to clone and analyze (alternative to dir)
 -  `--repo.includeSubmodules` include submodules when cloning repository (default: false)
@@ -161,8 +162,30 @@ scanner:
     - "--scanners"
     - "vuln,secret"
 
+# Runtime behavior configuration
+runtime:
+  cleanupTempDirs: true  # set false to keep temporary directories for troubleshooting
+
 # Custom script configuration for pipeline hooks
 hooks:
+  # Pre-verify-scan script: executed before verification security scanning
+  # Use case: apply existing remediation commands and verify whether updates are still needed
+  preVerifyScan:
+    script: |
+      #!/bin/bash
+      echo "Running pre-verify-scan setup..."
+    timeout: "15m"
+    continueOnError: false  # Verification stage falls back to regular flow if this script fails
+
+  # Post-verify-scan script: executed after verification security scanning
+  # Use case: cleanup workspace after verification stage before regular flow
+  postVerifyScan:
+    script: |
+      #!/bin/bash
+      echo "Running post-verify-scan cleanup..."
+    timeout: "10m"
+    continueOnError: false  # Pipeline stops if cleanup fails
+
   # Pre-scan script: executed before security scanning
   # Use case: prepare environment, install dependencies, run tests
   preScan:
@@ -207,6 +230,69 @@ updater:
     # Indicate the file to store the go get commands
     commandOutputFile: ".tekton/patches/dependabot-go-get-commands.sh"
 ```
+
+`runtime.cleanupTempDirs` is a global switch. When set to `false`, DependaBot keeps temporary directories created by repository cloning and scanner execution.
+
+#### Verify Existing Remediation Before Regenerating Commands
+
+If your repository already stores remediation commands (for example in `.tekton/patches/dependabot-go-get-commands.sh`), you can use `preVerifyScan`/`postVerifyScan` to avoid duplicate PRs:
+
+```yaml
+hooks:
+  preVerifyScan:
+    script: |
+      #!/bin/bash
+      set -ex
+      make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+
+  postVerifyScan:
+    script: |
+      #!/bin/bash
+      set -ex
+      make clean-patches-default
+
+  preScan:
+    script: |
+      #!/bin/bash
+      set -ex
+      SKIP_DEPENDABOT_COMMANDS=true make apply-patches upgrade-go-dependencies
+```
+
+With this setup:
+
+1. DependaBot first verifies vulnerabilities after applying existing remediation commands.
+2. If no vulnerabilities remain, it exits early and skips PR generation.
+3. If vulnerabilities remain, it cleans up and continues with the regular update flow to regenerate commands.
+
+#### Apply Hooks Conditionally in Global Config
+
+You can also configure conditional hook injection in a global config file (for example `hack/dependabot/bot.yaml`) and apply it only to matched repositories:
+
+```yaml
+hooks:
+  rules:
+    - name: tektoncd verify hooks
+      when:
+        repoNameGlob: "tektoncd-*"
+      strategy: fillEmpty # optional: fillEmpty (default) | override
+      hooks:
+        preVerifyScan:
+          script: |
+            #!/bin/bash
+            set -ex
+            make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+        postVerifyScan:
+          script: |
+            #!/bin/bash
+            set -ex
+            make clean-patches-default
+```
+
+Behavior:
+
+1. Rule matching is based on repository name (without `.git`) extracted from `repo.url`.
+2. `fillEmpty` only injects hooks when the target hook is not configured.
+3. `override` always replaces existing hooks for matched repositories.
 
 ### Git Provider Support
 
@@ -262,14 +348,18 @@ These commands can be executed manually or integrated into CI/CD pipelines to au
 DependaBot pipeline executes in the following order:
 
 1. **Git Clone** - Clone the repository
-2. **Pre-scan Hook** - Prepare environment before security scanning
-3. **Security Scanning** - Scan for vulnerabilities using configured scanner
-4. **Post-scan Hook** - Process scan results, generate reports
-5. **Package Updates** - Update vulnerable packages to fixed versions
-5. **Pre-commit Hook** - Validate changes before committing
-6. **Commit Changes** - Create branch, commit and push changes
-7. **Post-commit Hook** - Run tests, trigger CI/CD after commit
-8. **PR Creation** - Create pull request (if enabled)
-9. **Notification** - Send notification about updates (if configured)
+2. **Pre-verify-scan Hook** (Optional) - Apply existing remediation state before verification scan
+3. **Verification Security Scanning** (Optional) - Check whether existing remediation already resolves vulnerabilities
+4. **Post-verify-scan Hook** (Optional) - Cleanup workspace after verification stage
+5. **Early Exit** (Conditional) - Stop pipeline when verification scan finds no vulnerabilities
+6. **Pre-scan Hook** - Prepare environment before regular security scanning
+7. **Security Scanning** - Scan for vulnerabilities using configured scanner
+8. **Post-scan Hook** - Process scan results, generate reports
+9. **Package Updates** - Update vulnerable packages to fixed versions
+10. **Pre-commit Hook** - Validate changes before committing
+11. **Commit Changes** - Create branch, commit and push changes
+12. **Post-commit Hook** - Run tests, trigger CI/CD after commit
+13. **PR Creation** - Create pull request (if enabled)
+14. **Notification** - Send notification about updates (if configured)
 
 Each hook is optional and can be configured with custom scripts, timeout settings, and error handling behavior.

@@ -1,0 +1,24 @@
+description: return error when repoNameGlob is invalid
+
+repoURL: https://github.com/alauda/tektoncd-pipeline.git
+
+existingHooks:
+  preVerifyScan:
+    enabled: false
+
+  postVerifyScan:
+    enabled: false
+
+expectErrorContains: invalid repoNameGlob
+
+rules:
+  - name: invalid glob rule
+    when:
+      repoNameGlob: "[tektoncd-*"
+    strategy: fillEmpty
+    hooks:
+      preVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          echo "should not run"

@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/settings"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/types"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/version"
 	trivyTypes "github.com/aquasecurity/trivy/pkg/types"
@@ -65,6 +66,10 @@ func (t *TrivyScanner) Scan() ([]types.Vulnerability, error) {
 	if err := CheckTrivyInstalled(); err != nil {
 		return nil, fmt.Errorf("trivy CLI check failed: %w", err)
 	}
+
+	// Clear Trivy's scan cache to avoid stale vulnerability results between runs.
+	// This keeps repo-level and file-level scans consistent in automation workflows.
+	t.clearScanCache()
 
 	// Create temporary directory for scan results
 	tempDir, err := os.MkdirTemp("", "dependabot-trivy-")
@@ -125,9 +130,29 @@ func (t *TrivyScanner) Scan() ([]types.Vulnerability, error) {
 	return vulnerabilities, nil
 }
 
+func (t *TrivyScanner) clearScanCache() {
+	logrus.Debug("Clearing Trivy scan cache before scanning")
+
+	cmd := exec.Command("trivy", "clean", "--scan-cache")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		logrus.Warnf("Failed to clear Trivy scan cache, continuing scan: %v, output: %s", err, strings.TrimSpace(string(output)))
+		return
+	}
+
+	if len(output) > 0 {
+		logrus.Debugf("Trivy scan cache cleanup output:%s", string(output))
+	}
+}
+
 // Cleanup removes the temporary directory and all its contents
 func (t *TrivyScanner) Cleanup() error {
 	if t.tempDir == "" {
+		return nil
+	}
+
+	if !settings.CleanupTempDirsEnabled() {
+		logrus.Debugf("Skipping scanner temporary directory cleanup due to global setting: %s", t.tempDir)
 		return nil
 	}
 

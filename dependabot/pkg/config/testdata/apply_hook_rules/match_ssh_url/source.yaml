@@ -1,0 +1,30 @@
+description: match ssh style repository URL and inject verify hooks
+
+repoURL: git@gitlab.example.com:alauda/tektoncd-events.git
+
+existingHooks:
+  preVerifyScan:
+    enabled: false
+
+  postVerifyScan:
+    enabled: false
+
+rules:
+  - name: tektoncd verify hooks
+    when:
+      repoNameGlob: "tektoncd-*"
+    strategy: fillEmpty
+    hooks:
+      preVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          set -ex
+          make clean-patches-default apply-patches-default upgrade-go-dependencies-default
+
+      postVerifyScan:
+        enabled: true
+        script: |
+          #!/bin/bash
+          set -ex
+          make clean-patches-default

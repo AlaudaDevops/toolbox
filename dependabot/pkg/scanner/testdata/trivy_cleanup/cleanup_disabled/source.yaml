@@ -1,0 +1,4 @@
+description: global cleanup switch disabled
+
+cleanupTempDirs: false
+withTempDir: true

@@ -24,6 +24,7 @@ import (
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/config"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/git"
 	"github.com/AlaudaDevops/toolbox/dependabot/pkg/pipeline"
+	"github.com/AlaudaDevops/toolbox/dependabot/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -98,6 +99,9 @@ func runDependaBot() error {
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal repository configuration: %w", err)
 	}
+	// Apply runtime cleanup setting early so clone-stage temp directory handling has an initial value.
+	applyCleanupSetting(cfg.Runtime)
+
 	// Get values directly from cobra flags
 	projectDirPath := viper.GetString("dir")
 
@@ -162,7 +166,12 @@ func runDependaBot() error {
 
 	// CLI config has highest priority
 	finalConfig := configReader.MergeConfigs(repoConfig, &cfg)
+	if err := configReader.ApplyHookRules(finalConfig); err != nil {
+		return fmt.Errorf("failed to apply conditional hook rules: %w", err)
+	}
 	finalConfig = configReader.ApplyDefaults(finalConfig)
+	// Re-apply using merged config so repository/runtime config takes effect for the remaining stages.
+	applyCleanupSetting(finalConfig.Runtime)
 	logrus.Debug("Final config:", finalConfig.String())
 
 	// Step 2: Convert to pipeline configuration
@@ -175,4 +184,13 @@ func runDependaBot() error {
 	logrus.Info("Starting dependency update pipeline...")
 	p := pipeline.NewPipeline(pipelineConfig)
 	return p.Run()
+}
+
+func applyCleanupSetting(runtimeConfig config.RuntimeConfig) {
+	if runtimeConfig.CleanupTempDirs == nil {
+		settings.SetCleanupTempDirsEnabled(true)
+		return
+	}
+
+	settings.SetCleanupTempDirsEnabled(*runtimeConfig.CleanupTempDirs)
 }

@@ -1,0 +1,6 @@
+description: should continue with regular update flow
+shouldSkipUpdate: false
+wantError: false
+expectPreMarker: true
+expectPostMarker: true
+expectScanInvoked: true

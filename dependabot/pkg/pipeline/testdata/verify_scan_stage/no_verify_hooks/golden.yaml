@@ -1,0 +1,6 @@
+description: should bypass verify stage without hooks
+shouldSkipUpdate: false
+wantError: false
+expectPreMarker: false
+expectPostMarker: false
+expectScanInvoked: false

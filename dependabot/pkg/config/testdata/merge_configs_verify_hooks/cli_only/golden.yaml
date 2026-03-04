@@ -1,0 +1,13 @@
+description: merged config keeps cli verify hooks
+
+preVerifyScan:
+  enabled: true
+  script: "echo cli pre verify"
+  timeout: "18m"
+  continueOnError: false
+
+postVerifyScan:
+  enabled: true
+  script: "echo cli post verify"
+  timeout: "12m"
+  continueOnError: true
