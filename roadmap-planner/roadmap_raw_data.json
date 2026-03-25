@@ -1,0 +1,417 @@
+{
+  "quarter": "2026Q2",
+  "jira_url": "https://jira.alauda.cn",
+  "title": "Global DevOps Roadmap",
+  "pillars": [
+    {
+      "name": "Tool Integration",
+      "milestones": [
+        {
+          "milestone_name": "2026Q2：Artifact Promotion and Cleanup throught connectors",
+          "epics": [
+            {
+              "key": "DEVOPS-43352",
+              "name": "镜像晋级需求和产品规划",
+              "components": [],
+              "description": "* 原始客户问题场景描述：\r\n1、客户期望了解后续镜像晋级能力规划\r\n2、客户关于镜像晋级的产品需求（基于Devops1.0）：\r\n1）添加制品按钮在最下面，期望放到最上面\r\n2）选择制品页面没有搜索，而且制品多了之后很卡\r\n3）选择制品Tag版本当前默认展示sha256，应该显示版本号\r\n4）制品晋级单编辑添加映射按钮在最下面，而且加载很慢\r\n5）需要对接harbor的漏扫，严重漏洞的不允许晋级（当前harbor对接了青藤安全扫描，扫描结果返回到Harbor）\r\n\r\n * 客户期望的解决方案、需求描述：\r\n\r\n * 是否有ACP版本号的明确诉求，是否可谈，以及原因：\r\n\r\n * 是否有硬性的 Due Date，如果有，说明理由：\r\n\r\n * 其他信息："
+            },
+            {
+              "key": "DEVOPS-42732",
+              "name": "Artifact Cleanup - Harbor Cleanup - Best Practice [KB]",
+              "components": [],
+              "description": " \r\n * 最佳实践：SDLC 中如何实现构建 + Harbor自动清理配置 （使用harbor原生的功能）\r\n\r\n \r\n\r\n*Goal*: Generate KB instructing on how to effectively implement best practices in artifact management using only Harbor\r\n\r\n \r\n\r\nBased on DEVOPS-42607 best practices design, apply the same design using only Harbor's functionality for effective artifact management\r\n\r\n \r\n\r\n*Stories*:\r\n * Using Harbor to effectively manage artifact lifecycle"
+            },
+            {
+              "key": "DEVOPS-42608",
+              "name": "Artifact Promotion - Pipeline Template +  ApprovalRequest + Docs",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": "* 流水线 Task  + 审批 + Kyverno 约束 （解决如何在connectors中限制往哪个仓库可以同步制品的方式？）\r\n * Connector 如何临时授权 或者 如何解决 往生产环境级别的制品仓库同步制品（平时不能同步，流水线审批后才行）\r\n\r\n*Goals*: Offer out-of-the-box artifact promotion solution with approvals and policies support\r\n\r\n \r\n\r\n*Initial thoughts:*\r\n\r\nWith Connector Approvals support, we can add support for OCI Artifact Promotion using the following parts:\r\n * Skopeo Copy task: executes copy of the artifact\r\n * Target connector with approval\r\n * Pipeline (TektonHub)\r\n * Documentation with optional kyverno policy: Enable users to use with restricted rules, i.e target path should be the same as source path\r\n\r\nThis pipeline main objective is to copy one or more OCI artifacts from one registry to another. For complex scenarios like Chart or Bundle copying, a different template should be generated\r\n\r\n \r\n\r\n*Stories*:\r\n * Skopeo Copy task\r\n * Pipeline template\r\n * Documentation + Kyverno example\r\n\r\n "
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Connectors security enhancement",
+          "epics": [
+            {
+              "key": "DEVOPS-43567",
+              "name": "Connector Operator Out-of-the-box deployment",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-42720",
+              "name": "Connector end-to-end encryption",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": "*Goals*: Improve security between connector components to avoid malicious attacks.\r\n\r\n \r\n\r\nCurrent implementation of connectors services are all unencrypted and prone to attacks without any validation.\r\n\r\n \r\n\r\n \r\n\r\n*Steps*:\r\n * Technical research and design: Do research on possible solutions, propose a design with details on pros and cons, how it can prevent attacks\r\n * Security testing design: Create attack test cases based on modern security standards and tooling. The test case should be standardized and independent of the technical design.\r\n * Stories:\r\n ** Implementation on Core Services: Implement minimal requirement in connectors SDK, enable only in two core services  for quick iteration and testing. \r\n ** Enable customizing certificates (if applicable): Enable administrator to Bring Your Own Certificates (BYOC) with related documentation.\r\n ** Upgrade Other connectors: Implement new sdk in other connector extensions\r\n ** NFR Testing: Stability and performance, calculating performance and stability difference between both operating methods.\r\n\r\n \r\n\r\n*PS*: Feature flag / Enable/disable configuration required \r\n\r\n \r\n\r\n*References*:\r\n * [https://www.cloudflare.com/learning/access-management/what-is-mutual-tls/] \r\n * https://owasp.org/"
+            },
+            {
+              "key": "DEVOPS-41818",
+              "name": "oAuth2 App support for Authentication",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": null
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Container Platform - Connectors Integration",
+          "epics": [
+            {
+              "key": "DEVOPS-43573",
+              "name": "Container Platform - Code repository integration",
+              "components": [],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43572",
+              "name": "Container Platform - Image repository integration",
+              "components": [],
+              "description": null
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：v3 to v4 Integrations Migration",
+          "epics": [
+            {
+              "key": "DEVOPS-43559",
+              "name": "Automatic Project, Connector and Secret creation (Nexus, SonarQube)",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43544",
+              "name": "v3 to v4 integrations migration",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": "Goals:\r\n * Evaluate the possibility and use cases for providing migration CLI or script. Report any cases that are not possible to cover together with a plan on design and implementation.\r\n * Enable importing old integrations into new connectors (with or without new Project Automation)\r\n * Validate migrated connectors work as expected\r\n * Provide instructions on how to stop or disable current integration after migration is complete\r\n * Output: Documentation and CLI tooling / scripts for automated migration\r\n\r\n \r\n\r\nNon-goals:\r\n * Provide new integration method: Uses current connectors functionality\r\n * Artifact Promotion and Artifact Cleanup migration: *Should be handled separately* \r\n\r\n "
+            },
+            {
+              "key": "DEVOPS-43562",
+              "name": "Artifact Promotion migration",
+              "components": [],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43584",
+              "name": "Jira, S3 Connectors",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CI/CD",
+      "milestones": [
+        {
+          "milestone_name": "2026Q2：Tekton Pipelines - Restricted 安全策略适配/Tekton Hub下线",
+          "epics": [
+            {
+              "key": "DEVOPS-43599",
+              "name": "Tekton Pipelines - Restricted 安全策略适配-Buildah Task",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43600",
+              "name": "Tekton Pipelines - 替换 Tekton Hub -> Artifact Hub",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43601",
+              "name": "Tekton Pipelines - New Web Console迁移",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43602",
+              "name": "Tekton Pipelines - 提升流水线操作易用性(梳理UI优化)",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Tekton Pipelines - 增强与DevOps v3对齐能力，满足内部v3->v4迁移场景",
+          "epics": [
+            {
+              "key": "DEVOPS-43595",
+              "name": "Tekton Pipelines - v3-v4迁移调研（内部edage环境迁移）",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-37058",
+              "name": "Tekton Pipelines - 制品版本生成策略（git-version task）",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": "Milestone：https://jira.alauda.cn/browse/DEVOPS-37042\r\n\r\n \r\n\r\nEpic 覆盖\r\n * 对齐构建功能：\r\n\r\n ** 组件版本策略"
+            },
+            {
+              "key": "DEVOPS-43596",
+              "name": "Tekton Pipelines - 增强动态表单，提升流水线编排体验",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-41826",
+              "name": "Tekton Pipelines - 流水线约束策略",
+              "components": [],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-42698",
+              "name": "Tekton Pipelines - 流水线串并执行策略",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43597",
+              "name": "Tekton Pipelines - 流水线策略约束（Docs，基于kyverno）",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Tekton Pipelines - 增强与ocp对齐能力",
+          "epics": [
+            {
+              "key": "DEVOPS-43591",
+              "name": "Tekton Pipelines - PAC-Repository 管理",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43592",
+              "name": "Tekton Pipelines - Tekton 升级 v1.12",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-42731",
+              "name": "Tekton Pipelines - 支持镜像同步（skopeo）",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": "Milestone：https://jira.alauda.cn/browse/DEVOPS-37043\r\n\r\n \r\n\r\nEpic 覆盖\r\n * 对齐 发布的 Task 和莫板\r\n ** GitOps 模板"
+            },
+            {
+              "key": "DEVOPS-43593",
+              "name": "Tekton Pipelines - PAC 对接 GitHub（Docs）",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43594",
+              "name": "Tekton Pipelines - tkn CLI 使用文档（Docs）",
+              "components": [
+                "tektoncd-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-42717",
+              "name": "Tekton Pipelines - 流水线缓存（Tekton cache）",
+              "components": [],
+              "description": "https://docs.redhat.com/en/documentation/red_hat_openshift_pipelines/1.19/html/release_notes/op-release-notes#tekton-cache-new-features-1-19_op-release-notes"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tool Deployment",
+      "milestones": [
+        {
+          "milestone_name": "2026Q2：AI-Augmented Toolchain Incident Resolution",
+          "epics": [
+            {
+              "key": "DEVOPS-43578",
+              "name": "Gitlab Skills",
+              "components": [
+                "gitlab-ce-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43579",
+              "name": "Harbor Skills",
+              "components": [
+                "harbor-ce-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43580",
+              "name": "SonarQube skills",
+              "components": [
+                "sonarqube-ce-operator"
+              ],
+              "description": null
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：OCP Toolchain",
+          "epics": [
+            {
+              "key": "DEVOPS-43570",
+              "name": "Harbor vs Quay - Capabilities comparison",
+              "components": [
+                "harbor-ce-operator"
+              ],
+              "description": null
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Production Ready - SonarQube baseline storage and network",
+          "epics": [
+            {
+              "key": "DEVOPS-41443",
+              "name": "明确 SonarQube 在生产环境的存储, 网络，CPU 的需求基线",
+              "components": [
+                "sonarqube-ce-operator"
+              ],
+              "description": "*验收标准*\r\n - 明确 SonarQube 在生产环境中， 不同的用户规模下，对存储， 网络， CPU 的 性能基线。\r\n - 输出 SonarQube 对接其他存储时，需要满足的 基线  （性能 ， 存储类型等等）， 用户可以参考对应的文档， 判断自己的存储是否支持。\r\n\r\n "
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Toolchain Upgrades",
+          "epics": [
+            {
+              "key": "DEVOPS-43575",
+              "name": "Gitlab Upgrade to 18.8",
+              "components": [
+                "gitlab-ce-operator"
+              ],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43574",
+              "name": "Harbor Update to 2.16",
+              "components": [
+                "harbor-ce-operator"
+              ],
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI-Augmented SDLC",
+      "milestones": [
+        {
+          "milestone_name": "2026Q2：SRE Agent 1.0 - DBS Design Partner",
+          "epics": [
+            {
+              "key": "DEVOPS-43535",
+              "name": "SRE Agent pre-alpha - DBS 客户成为 Design Partner 落地",
+              "components": [],
+              "description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DevOps - RFEs & NFR",
+      "milestones": [
+        {
+          "milestone_name": "2026Q2：DevOps AI-Augmented processes",
+          "epics": [
+            {
+              "key": "DEVOPS-43547",
+              "name": "DevOps AI-Augmented Processes",
+              "components": [],
+              "description": "Goals:\r\n * Increase productivity by effectively using AI in the workflow while contributing with AI native tooling, processes, skills etc.\r\n * Enhance DevOps team's process in an AI-Native era\r\n * Enable individuals to generate value end-to-end by quickly incubating a new AI-Augmented process."
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Devops L5插件发版",
+          "epics": [
+            {
+              "key": "DEVOPS-43515",
+              "name": "DevOps插件发版",
+              "components": [],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43566",
+              "name": "DORA+发版效率基本指标统计",
+              "components": [],
+              "description": "描述：\r\n\r\n统计发版实际的指标：\r\n\r\n1、 从候选版本到实际发布的真实具体的时间。\r\n2、 收集发版过程中各阶段的具体时间消耗以，辅助改进。\r\n3、 尽量做到能收集人在发版阶段的时间成本。"
+            }
+          ]
+        },
+        {
+          "milestone_name": "2026Q2：Engineering improvements",
+          "epics": [
+            {
+              "key": "DEVOPS-43588",
+              "name": "Connectors-Extensions 代码仓库结构重构",
+              "components": [
+                "connectors-operator"
+              ],
+              "description": "背景\r\n\r\n当前 connectors-extensions 仓库各个类型的 project  比较重， 有些没有组件，只有 yaml 和 测试。 可考虑按照有无组件进行重构，减少不必要的流水线运行以及降低增加新类型的交付成本"
+            },
+            {
+              "key": "DEVOPS-43521",
+              "name": "Devops L5插件自动化覆盖率补齐90%",
+              "components": [],
+              "description": null
+            },
+            {
+              "key": "DEVOPS-43581",
+              "name": "工具NFR自动化",
+              "components": [],
+              "description": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
