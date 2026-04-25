@@ -91,57 +91,55 @@ const AssigneeSelect = ({
   // Find selected option
   const selectedOption = value ? users.find(user => user.value === value.name) : null;
 
-  // Custom styles for react-select
+  // Custom styles for react-select — Atlas theme via CSS variables
   const customStyles = {
     control: (provided, state) => ({
       ...provided,
-      borderColor: error ? '#ef4444' : state.isFocused ? '#667eea' : '#d1d5db',
-      boxShadow: error
-        ? '0 0 0 3px rgba(239, 68, 68, 0.1)'
-        : state.isFocused
-          ? '0 0 0 3px rgba(102, 126, 234, 0.1)'
-          : 'none',
-      '&:hover': {
-        borderColor: error ? '#ef4444' : '#667eea',
-      },
-      minHeight: '42px',
-      fontSize: '0.875rem',
+      borderRadius: 0,
+      borderColor: error ? 'var(--crimson)' : state.isFocused ? 'var(--fg)' : 'var(--border)',
+      boxShadow: state.isFocused ? `inset 0 0 0 1px ${error ? 'var(--crimson)' : 'var(--fg)'}` : 'none',
+      backgroundColor: 'var(--bg-elevated)',
+      '&:hover': { borderColor: error ? 'var(--crimson)' : 'var(--fg-faint)' },
+      minHeight: '40px',
+      fontSize: '14px',
+      fontFamily: 'var(--font-ui)',
+      cursor: 'pointer',
     }),
-    placeholder: (provided) => ({
-      ...provided,
-      color: '#9ca3af',
-    }),
+    valueContainer: (provided) => ({ ...provided, padding: '0 0.625rem' }),
+    placeholder: (provided) => ({ ...provided, color: 'var(--fg-faint)' }),
+    input: (provided) => ({ ...provided, color: 'var(--fg)', fontSize: '14px' }),
+    singleValue: (provided) => ({ ...provided, color: 'var(--fg)', fontSize: '14px' }),
     option: (provided, state) => ({
       ...provided,
-      backgroundColor: state.isSelected
-        ? '#667eea'
-        : state.isFocused
-          ? '#f3f4f6'
-          : 'white',
-      color: state.isSelected ? 'white' : '#374151',
-      fontSize: '0.875rem',
-      '&:hover': {
-        backgroundColor: state.isSelected ? '#667eea' : '#f3f4f6',
-      },
+      backgroundColor: state.isSelected ? 'var(--ink)' : state.isFocused ? 'var(--bg-sunken)' : 'var(--bg-elevated)',
+      color: state.isSelected ? 'var(--paper)' : 'var(--fg)',
+      fontSize: '13px',
+      cursor: 'pointer',
+      padding: '0.5rem 0.75rem',
+      borderBottom: '1px solid var(--border)',
     }),
     menu: (provided) => ({
       ...provided,
+      borderRadius: 0,
+      border: '1px solid var(--fg-faint)',
+      boxShadow: '-3px 3px 0 var(--ink), -3px 3px 0 1px var(--fg)',
+      backgroundColor: 'var(--bg-elevated)',
       zIndex: 9999,
+      marginTop: 4,
     }),
-    menuPortal: (provided) => ({
+    menuPortal: (provided) => ({ ...provided, zIndex: 9999 }),
+    loadingMessage: (provided) => ({ ...provided, fontSize: '13px', color: 'var(--fg-muted)' }),
+    noOptionsMessage: (provided) => ({ ...provided, fontSize: '13px', color: 'var(--fg-muted)', fontStyle: 'italic' }),
+    indicatorSeparator: (provided) => ({ ...provided, backgroundColor: 'var(--border)' }),
+    dropdownIndicator: (provided, state) => ({
       ...provided,
-      zIndex: 9999,
+      color: 'var(--fg-faint)',
+      transform: state.selectProps.menuIsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+      transition: 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)',
+      '&:hover': { color: 'var(--fg)' },
     }),
-    loadingMessage: (provided) => ({
-      ...provided,
-      fontSize: '0.875rem',
-      color: '#6b7280',
-    }),
-    noOptionsMessage: (provided) => ({
-      ...provided,
-      fontSize: '0.875rem',
-      color: '#6b7280',
-    }),
+    clearIndicator: (provided) => ({ ...provided, color: 'var(--fg-faint)', '&:hover': { color: 'var(--fg)' } }),
+    loadingIndicator: (provided) => ({ ...provided, color: 'var(--accent)' }),
   };
 
   // Handle selection change

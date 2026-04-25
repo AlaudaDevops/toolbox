@@ -47,43 +47,60 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-// Custom select styles
+// Custom select styles — Atlas theme
 const selectStyles = {
   control: (provided, state) => ({
     ...provided,
-    borderColor: state.isFocused ? '#667eea' : '#d1d5db',
-    boxShadow: state.isFocused ? '0 0 0 3px rgba(102, 126, 234, 0.1)' : 'none',
-    '&:hover': { borderColor: '#9ca3af' },
-    minHeight: '38px',
-    fontSize: '0.875rem',
+    borderRadius: 0,
+    borderColor: state.isFocused ? 'var(--fg)' : 'var(--border)',
+    boxShadow: state.isFocused ? 'inset 0 0 0 1px var(--fg)' : 'none',
+    backgroundColor: 'var(--bg-elevated)',
+    '&:hover': { borderColor: 'var(--fg-faint)' },
+    minHeight: '40px',
+    fontSize: '14px',
+    fontFamily: 'var(--font-ui)',
   }),
+  valueContainer: (provided) => ({ ...provided, padding: '0 0.5rem' }),
   multiValue: (provided) => ({
     ...provided,
-    backgroundColor: '#e0e7ff',
-    borderRadius: '4px',
+    backgroundColor: 'var(--ink)',
+    color: 'var(--paper)',
+    borderRadius: 0,
   }),
   multiValueLabel: (provided) => ({
     ...provided,
-    color: '#4338ca',
-    fontSize: '0.75rem',
+    color: 'var(--paper)',
+    fontSize: '11px',
+    fontFamily: 'var(--font-mono)',
+    letterSpacing: '0.04em',
+    padding: '2px 6px',
   }),
   multiValueRemove: (provided) => ({
     ...provided,
-    color: '#6366f1',
-    '&:hover': {
-      backgroundColor: '#c7d2fe',
-      color: '#4338ca',
-    },
+    color: 'var(--paper)',
+    '&:hover': { backgroundColor: 'var(--accent)', color: 'white' },
   }),
-  placeholder: (provided) => ({
+  input: (provided) => ({ ...provided, color: 'var(--fg)' }),
+  placeholder: (provided) => ({ ...provided, color: 'var(--fg-faint)', fontSize: '13px' }),
+  option: (provided, state) => ({
     ...provided,
-    color: '#9ca3af',
-    fontSize: '0.875rem',
+    backgroundColor: state.isSelected ? 'var(--ink)' : state.isFocused ? 'var(--bg-sunken)' : 'var(--bg-elevated)',
+    color: state.isSelected ? 'var(--paper)' : 'var(--fg)',
+    fontSize: '13px',
+    padding: '0.5rem 0.75rem',
+    borderBottom: '1px solid var(--border)',
   }),
   menu: (provided) => ({
     ...provided,
+    borderRadius: 0,
+    border: '1px solid var(--fg-faint)',
+    boxShadow: '-3px 3px 0 var(--ink)',
+    backgroundColor: 'var(--bg-elevated)',
     zIndex: 100,
   }),
+  indicatorSeparator: (provided) => ({ ...provided, backgroundColor: 'var(--border)' }),
+  dropdownIndicator: (provided) => ({ ...provided, color: 'var(--fg-faint)' }),
+  clearIndicator: (provided) => ({ ...provided, color: 'var(--fg-faint)' }),
 };
 
 // Metric order for display
@@ -158,34 +175,36 @@ const MetricsDashboardContent = () => {
   const metricsData = metrics?.metrics || {};
 
   return (
-    <div className="metrics-dashboard">
-      {/* Header */}
-      <header className="metrics-dashboard__header">
+    <div className="metrics-dashboard fade-in">
+      <div className="metrics-dashboard__masthead">
         <div className="metrics-dashboard__title-section">
-          <h1 className="metrics-dashboard__title">DORA Metrics Dashboard</h1>
+          <span className="metrics-dashboard__chapter mono">CHAPTER 02</span>
+          <h1 className="metrics-dashboard__title">
+            <span className="serif">A study in</span> DORA <span className="serif">— five gauges, told in numbers.</span>
+          </h1>
           {status && (
             <div className="metrics-dashboard__status">
               <StatusBadge status={status.status} />
               <span className="metrics-dashboard__last-updated">
-                Last updated: {formatRelativeTime(status.last_collected)}
+                <span className="serif">Updated</span> {formatRelativeTime(status.last_collected)}
               </span>
               {status.releases_count !== undefined && (
-                <span className="metrics-dashboard__counts">
-                  {status.releases_count} releases, {status.epics_count} epics, {status.issues_count || 0} issues
+                <span className="metrics-dashboard__counts mono">
+                  {status.releases_count} releases · {status.epics_count} epics · {status.issues_count || 0} issues
                 </span>
               )}
             </div>
           )}
         </div>
         <button
-          className="btn btn-secondary metrics-dashboard__refresh"
+          className="btn btn-sm metrics-dashboard__refresh"
           onClick={handleRefresh}
           disabled={isRefreshing || isLoading}
         >
-          <RefreshCw size={16} className={isRefreshing ? 'spinning' : ''} />
+          <RefreshCw size={13} strokeWidth={1.75} className={isRefreshing ? 'spinning' : ''} />
           <span>Refresh</span>
         </button>
-      </header>
+      </div>
 
       {/* Filters */}
       <div className="metrics-dashboard__filters">
@@ -196,7 +215,7 @@ const MetricsDashboardContent = () => {
             options={componentOptions}
             value={selectedComponents}
             onChange={handleComponentChange}
-            placeholder="Filter by component..."
+            placeholder="Filter by component…"
             styles={selectStyles}
             isClearable
             className="metrics-dashboard__select"
@@ -205,28 +224,26 @@ const MetricsDashboardContent = () => {
 
         {hasActiveFilters && (
           <button
-            className="btn btn-secondary metrics-dashboard__clear-filters"
+            className="btn btn-sm btn-ghost metrics-dashboard__clear-filters"
             onClick={handleClearFilters}
           >
-            <X size={14} />
-            <span>Clear Filters</span>
+            <X size={14} strokeWidth={1.75} />
+            <span>Clear filters</span>
           </button>
         )}
       </div>
 
-      {/* Error State */}
       {error && (
         <div className="metrics-dashboard__error">
-          <AlertCircle size={20} />
+          <AlertCircle size={18} strokeWidth={1.75} />
           <span>{error}</span>
         </div>
       )}
 
-      {/* Loading State */}
       {isLoading && !metrics && (
         <div className="metrics-dashboard__loading">
-          <div className="loading-spinner" />
-          <span>Loading metrics...</span>
+          <div className="atlas-spinner" />
+          <span className="serif">Reading the dials…</span>
         </div>
       )}
 
@@ -260,10 +277,10 @@ const MetricsDashboardContent = () => {
       {/* Empty State */}
       {!isLoading && !error && (!metrics || Object.keys(metricsData).length === 0) && (
         <div className="metrics-dashboard__empty">
-          <AlertCircle size={40} />
-          <h3>No Metrics Available</h3>
+          <AlertCircle size={32} strokeWidth={1.5} />
+          <h3 className="serif">No metrics yet</h3>
           <p>
-            Metrics data is not yet available. This could be because:
+            The collector hasn't reported anything yet. Likely culprits:
           </p>
           <ul>
             <li>The metrics collector is still initializing</li>

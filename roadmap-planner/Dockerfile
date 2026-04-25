@@ -10,13 +10,13 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (Vite + React; build deps required)
+RUN npm install --no-audit --no-fund
 
 # Copy frontend source
 COPY frontend/ ./
 
-# Build the frontend
+# Build the frontend (Vite outputs to ./build via vite.config.js)
 RUN npm run build
 
 ARG GO_IMAGE=golang:1.26.2-alpine

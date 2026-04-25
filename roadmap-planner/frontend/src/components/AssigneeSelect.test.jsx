@@ -1,50 +1,37 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import '@testing-library/jest-dom';
 import AssigneeSelect from './AssigneeSelect';
 
-// Mock the useRoadmap hook
-jest.mock('../hooks/useRoadmap', () => ({
+vi.mock('../hooks/useRoadmap', () => ({
   useRoadmap: () => ({
-    getAssignableUsers: jest.fn(() => Promise.resolve({ success: true, data: [] }))
-  })
+    getAssignableUsers: vi.fn(() => Promise.resolve({ success: true, data: [] })),
+  }),
 }));
 
 describe('AssigneeSelect', () => {
   const defaultProps = {
     issueKey: 'TEST-123',
     value: null,
-    onChange: jest.fn(),
+    onChange: vi.fn(),
     placeholder: 'Select assignee',
-    isRequired: false
+    isRequired: false,
   };
 
   beforeEach(() => {
-    // Clear all mocks before each test
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
-  test('renders without crashing', async () => {
+  it('renders with placeholder', async () => {
     render(<AssigneeSelect {...defaultProps} />);
-    // Wait for the component to load
     await waitFor(() => {
-      expect(screen.getByText(/Select assignee/i)).toBeInTheDocument();
+      expect(screen.getByText(/select assignee/i)).toBeInTheDocument();
     });
   });
 
-  test('renders with placeholder', async () => {
+  it('renders with custom placeholder', async () => {
     render(<AssigneeSelect {...defaultProps} placeholder="Choose user" />);
     await waitFor(() => {
-      expect(screen.getByText(/Choose user/i)).toBeInTheDocument();
-    });
-  });
-
-  test('calls onChange when selection changes', async () => {
-    const mockOnChange = jest.fn();
-    render(<AssigneeSelect {...defaultProps} onChange={mockOnChange} />);
-
-    // Component should render
-    await waitFor(() => {
-      expect(screen.getByText(/Select assignee/i)).toBeInTheDocument();
+      expect(screen.getByText(/choose user/i)).toBeInTheDocument();
     });
   });
 });

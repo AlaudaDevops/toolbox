@@ -1,8 +1,11 @@
 import axios from 'axios';
 
 // Create axios instance with default configuration
+// In development with Vite, leave baseURL empty so the dev-server proxy handles /api → http://localhost:8080
+const apiBaseURL = import.meta.env?.VITE_API_URL ?? '';
+
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8080'),
+  baseURL: apiBaseURL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

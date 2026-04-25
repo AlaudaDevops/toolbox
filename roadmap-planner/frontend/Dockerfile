@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -7,13 +7,13 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (Vite + React; build deps required)
+RUN npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (Vite outputs to ./build)
 RUN npm run build
 
 # Production stage

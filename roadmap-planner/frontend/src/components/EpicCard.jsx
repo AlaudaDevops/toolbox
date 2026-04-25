@@ -1,133 +1,105 @@
 import React from 'react';
-import { ExternalLink, ArrowRightLeft, Edit, Tag } from 'lucide-react';
+import { ExternalLink, ArrowRightLeft, Pencil, Tag } from 'lucide-react';
 import { getJiraIssueUrl } from '../utils/jiraUtils';
 import './EpicCard.css';
 
+const STATUS_KIND = {
+  done: ['done', 'closed', 'resolved', '已完成', '已取消'],
+  progress: ['in progress', 'in-progress', '调研中', '调研完成', '设计完成', '开发完成', '测试完成', '验收完成'],
+  todo: ['to do', 'todo', 'open', '待处理'],
+};
+
+const PRIORITY_KIND = {
+  critical: ['highest', 'l0 - critical'],
+  high: ['l1 - high'],
+  medium: ['l2 - medium'],
+  low: ['l3 - low'],
+  lowest: ['lowest'],
+};
+
+const matchKind = (value, table) => {
+  if (!value) return null;
+  const v = value.toLowerCase();
+  for (const [kind, list] of Object.entries(table)) {
+    if (list.includes(v)) return kind;
+  }
+  return null;
+};
+
 const EpicCard = ({ epic, isDragging, onMoveEpic, onUpdateEpic, currentMilestone }) => {
-
-  const getStatusColor = (status) => {
-    switch (status?.toLowerCase()) {
-      case '已完成':
-      case '已取消':
-      case 'done':
-      case 'closed':
-      case 'resolved':
-        return 'status-done';
-      case '调研中':
-      case '调研完成':
-      case '设计完成':
-      case '开发完成':
-      case '测试完成':
-      case '验收完成':
-      case 'in progress':
-      case 'in-progress':
-        return 'status-progress';
-      case '待处理':
-      case 'to do':
-      case 'todo':
-      case 'open':
-        return 'status-todo';
-      default:
-        return 'status-default';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'highest':
-      case 'l0 - critical':
-        return 'priority-critical';
-      case 'l1 - high':
-        return 'priority-high';
-      case 'l2 - medium':
-        return 'priority-medium';
-      case 'l3 - low':
-        return 'priority-low';
-      case 'lowest':
-        return 'priority-lowest';
-      default:
-        return 'priority-default';
-    }
-  };
-
+  const statusKind = matchKind(epic.status, STATUS_KIND) || 'default';
+  const priorityKind = matchKind(epic.priority, PRIORITY_KIND) || 'default';
   const jiraUrl = getJiraIssueUrl(epic.key);
 
-  const handleCardClick = (e) => {
-    // Only prevent default if we're actually opening a link
-    if (jiraUrl) {
-      e.stopPropagation(); // Prevent event bubbling
-      window.open(jiraUrl, '_blank', 'noopener,noreferrer');
-    }
+  const handleOpenJira = (e) => {
+    e.stopPropagation();
+    if (jiraUrl) window.open(jiraUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleMoveClick = (e) => {
-    e.stopPropagation(); // Prevent card click and drag
-    if (onMoveEpic && currentMilestone) {
-      onMoveEpic(epic, currentMilestone);
-    }
+    e.stopPropagation();
+    if (onMoveEpic && currentMilestone) onMoveEpic(epic, currentMilestone);
   };
 
   const handleEditClick = (e) => {
-    e.stopPropagation(); // Prevent card click and drag
-    if (onUpdateEpic) {
-      onUpdateEpic(epic);
-    }
+    e.stopPropagation();
+    if (onUpdateEpic) onUpdateEpic(epic);
   };
 
+  const versionsLabel = epic.versions && epic.versions.length ? epic.versions.join(', ') : null;
+
   return (
-    <div className={`epic-card-content ${isDragging ? 'dragging' : ''}`} >
-      {/* First Row: Name and Priority */}
-      <div className="epic-row-1">
-        <div className="epic-name-container">
-          <span className="epic-title">{epic.name}</span>
-          {jiraUrl && <ExternalLink size={12} className="epic-link-icon" onClick={handleCardClick} />}
-        </div>
-        {epic.priority && (
-          <div className={`epic-priority ${getPriorityColor(epic.priority)}`}>
-            {epic.priority}
-          </div>
+    <div className={`epic-card-content${isDragging ? ' is-dragging' : ''}`}>
+      <div className="epic-row epic-row--top">
+        <span className={`epic-key mono epic-key--${statusKind}`}>{epic.key}</span>
+        <span className="epic-title" title={epic.name}>{epic.name}</span>
+        {jiraUrl && (
+          <button
+            type="button"
+            className="epic-icon-btn"
+            onClick={handleOpenJira}
+            title="Open in Jira"
+            aria-label="Open in Jira"
+          >
+            <ExternalLink size={11} strokeWidth={1.75} />
+          </button>
         )}
       </div>
 
-      {/* Second Row: ID, Status, and Actions */}
-      <div className="epic-row-2">
-        <div className="epic-row-2-left">
-        <span className={`epic-key epic-status ${getStatusColor(epic.status)}`}>{epic.key}</span>
-        {epic.status && (
-            <div className={`epic-status ${getStatusColor(epic.status)}`}>
-              {/* <span>{epic.status}</span> */}
-            </div>
+      <div className="epic-row epic-row--bottom">
+        <div className="epic-row__left">
+          {epic.priority && (
+            <span className={`epic-priority epic-priority--${priorityKind}`} title={`Priority: ${epic.priority}`}>
+              <span className="epic-priority__dot" aria-hidden />
+              <span className="epic-priority__label">{epic.priority?.replace(/^L\d - /i, '')}</span>
+            </span>
           )}
-        <Tag size={13}/>
-        {(epic.versions && (
-          <span className="epic-versions">{epic.versions.join(', ')}</span>
-        )) || (
-          <span className="epic-versions">-</span>
-        )}
+          <span className="epic-versions" title={versionsLabel ? `Versions: ${versionsLabel}` : 'No versions'}>
+            <Tag size={10} strokeWidth={1.75} />
+            <span className="mono">{versionsLabel || '—'}</span>
+          </span>
         </div>
-        <div className="epic-row-2-right">
-          {/* {epic.status && (
-            <div className={`epic-status ${getStatusColor(epic.status)}`}>
-              {getStatusIcon(epic.status)}
-              <span>{epic.status}</span>
-            </div>
-          )} */}
+        <div className="epic-row__right">
           {onUpdateEpic && (
             <button
+              type="button"
               onClick={handleEditClick}
-              className="epic-edit-btn"
-              title="Edit epic details"
+              className="epic-icon-btn"
+              title="Edit epic"
+              aria-label="Edit epic"
             >
-              <Edit size={12} />
+              <Pencil size={11} strokeWidth={1.75} />
             </button>
           )}
           {onMoveEpic && (
             <button
+              type="button"
               onClick={handleMoveClick}
-              className="epic-move-btn"
+              className="epic-icon-btn"
               title="Move epic to another milestone"
+              aria-label="Move epic"
             >
-              <ArrowRightLeft size={12} />
+              <ArrowRightLeft size={11} strokeWidth={1.75} />
             </button>
           )}
         </div>
