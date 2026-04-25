@@ -10,8 +10,9 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install dependencies (Vite + React; build deps required)
-RUN npm install --no-audit --no-fund
+# Install dependencies (Vite + React; devDeps required for the build).
+# `npm ci` (not --only=production) keeps the lockfile authoritative.
+RUN npm ci --no-audit --no-fund
 
 # Copy frontend source
 COPY frontend/ ./
