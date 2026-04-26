@@ -92,6 +92,7 @@
   padding: 0.625rem 0.875rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
 }
 .controls-bar__group {
   display: flex;
@@ -131,6 +132,7 @@
   background: var(--bg);
   color: var(--fg-muted);
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -142,11 +144,16 @@
   color: var(--fg);
 }
 .quarter-chip.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+[data-theme='atlas'] .quarter-chip.is-active {
   background: var(--ink);
   color: var(--paper);
   border-color: var(--ink);
 }
-[data-theme='dark'] .quarter-chip.is-active {
+[data-theme='atlas'][data-mode='dark'] .quarter-chip.is-active {
   background: var(--paper);
   color: var(--ink);
   border-color: var(--paper);
@@ -164,8 +171,9 @@
   grid-template-columns: minmax(220px, 240px) repeat(var(--col-count, 1), minmax(260px, 1fr));
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
 }
 
 /* HEADER ROW */
@@ -177,10 +185,14 @@
   background: var(--bg);
   padding: 0.625rem 0.875rem;
   border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--fg);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 5;
+}
+[data-theme='atlas'] .kanban-pillar-header,
+[data-theme='atlas'] .kanban-quarter-header {
+  border-bottom-color: var(--fg);
 }
 .kanban-pillar-header__label {
   font-size: 18px;
@@ -303,9 +315,14 @@
   padding: 0.625rem;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-left: 2px solid var(--ink);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-default);
 }
-[data-theme='dark'] .milestone-wrapper {
+[data-theme='atlas'] .milestone-wrapper {
+  border-left-color: var(--ink);
+  border-radius: 0;
+}
+[data-theme='atlas'][data-mode='dark'] .milestone-wrapper {
   border-left-color: var(--paper);
   background: var(--bg-elevated);
 }
@@ -401,6 +418,7 @@
   padding: 3rem 1.5rem;
   text-align: center;
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
   background: var(--bg-elevated);
 }
 .kanban-state svg { color: var(--fg-muted); }

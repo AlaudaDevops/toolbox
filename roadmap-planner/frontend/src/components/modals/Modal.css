@@ -18,20 +18,14 @@
 
 .modal-content {
   background: var(--bg-elevated);
-  border: 1px solid var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-default);
   width: 100%;
   max-width: 540px;
   max-height: 92vh;
   overflow-y: auto;
-  box-shadow:
-    -6px 6px 0 var(--ink),
-    -6px 6px 0 1px var(--fg);
+  box-shadow: var(--shadow-plate);
   animation: modalSlideIn 280ms var(--ease-out) both;
-}
-[data-theme='dark'] .modal-content {
-  box-shadow:
-    -6px 6px 0 var(--paper-3),
-    -6px 6px 0 1px var(--fg);
 }
 
 @keyframes modalSlideIn {
@@ -46,18 +40,25 @@
   align-items: flex-start;
   gap: 1rem;
   padding: 1.25rem 1.5rem 1rem;
-  border-bottom: 1px solid var(--fg);
+  border-bottom: 1px solid var(--border);
 }
+[data-theme='atlas'] .modal-header { border-bottom-color: var(--fg); }
 .modal-header > div:first-child { flex: 1; min-width: 0; }
 .modal-header h2 {
   font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 400;
+  font-style: var(--display-style);
+  font-weight: var(--display-weight);
+  font-size: 22px;
+  line-height: 1.1;
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  margin-bottom: 0.375rem;
+}
+[data-theme='atlas'] .modal-header h2 {
   font-size: 28px;
   line-height: 1;
-  color: var(--fg);
   letter-spacing: -0.01em;
-  margin-bottom: 0.375rem;
+  font-weight: 400;
 }
 .modal-header p {
   font-size: 13px;

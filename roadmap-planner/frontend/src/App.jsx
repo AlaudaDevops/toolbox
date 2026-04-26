@@ -5,42 +5,108 @@ import MetricsDashboard from './components/MetricsDashboard';
 import LoginModal from './components/modals/LoginModal';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { RoadmapProvider } from './hooks/useRoadmap';
-import { LogOut, LayoutGrid, Activity, Sun, Moon } from 'lucide-react';
+import { LogOut, LayoutGrid, Activity, Sun, Moon, BookOpen, Layers } from 'lucide-react';
 import './App.css';
 
-const THEME_KEY = 'roadmap-planner-theme';
+const THEME_KEY = 'roadmap-planner-theme';   // 'platform' | 'atlas'
+const MODE_KEY = 'roadmap-planner-mode';     // 'light' | 'dark'
+const LEGACY_THEME_KEY = 'roadmap-planner-theme';
+
+function readStored(key, allowed, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const v = window.localStorage.getItem(key);
+    if (allowed.includes(v)) return v;
+  } catch { /* ignore */ }
+  return fallback;
+}
 
 function getInitialTheme() {
+  return readStored(THEME_KEY, ['platform', 'atlas'], 'platform');
+}
+
+function getInitialMode() {
+  // Migrate the v1 theme key (which stored 'light'/'dark' under THEME_KEY).
+  if (typeof window !== 'undefined') {
+    try {
+      const legacy = window.localStorage.getItem(LEGACY_THEME_KEY);
+      if (legacy === 'light' || legacy === 'dark') {
+        window.localStorage.setItem(MODE_KEY, legacy);
+        window.localStorage.setItem(THEME_KEY, 'atlas'); // legacy users were on Atlas
+      }
+    } catch { /* ignore */ }
+  }
+  const stored = readStored(MODE_KEY, ['light', 'dark'], null);
+  if (stored) return stored;
   if (typeof window === 'undefined') return 'light';
-  try {
-    const stored = window.localStorage.getItem(THEME_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch { /* ignore */ }
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function useTheme() {
+function applyAttributes(theme, mode) {
+  const html = document.documentElement;
+  html.setAttribute('data-theme', theme);
+  html.setAttribute('data-mode', mode);
+}
+
+function useThemeAndMode() {
   const [theme, setTheme] = useState(getInitialTheme);
+  const [mode, setMode] = useState(getInitialMode);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    try { window.localStorage.setItem(THEME_KEY, theme); } catch { /* ignore */ }
-  }, [theme]);
+    applyAttributes(theme, mode);
+    try {
+      window.localStorage.setItem(THEME_KEY, theme);
+      window.localStorage.setItem(MODE_KEY, mode);
+    } catch { /* ignore */ }
+  }, [theme, mode]);
 
-  const toggle = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'));
-  return [theme, toggle];
+  return {
+    theme,
+    mode,
+    setTheme,
+    toggleMode: () => setMode((m) => (m === 'light' ? 'dark' : 'light')),
+  };
+}
+
+function ThemePicker({ theme, setTheme }) {
+  return (
+    <div className="theme-picker" role="radiogroup" aria-label="Theme">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={theme === 'platform'}
+        className={`theme-picker__opt${theme === 'platform' ? ' is-active' : ''}`}
+        onClick={() => setTheme('platform')}
+        title="Platform — matches the Alauda console"
+      >
+        <Layers size={13} strokeWidth={1.75} />
+        <span>Platform</span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={theme === 'atlas'}
+        className={`theme-picker__opt${theme === 'atlas' ? ' is-active' : ''}`}
+        onClick={() => setTheme('atlas')}
+        title="Atlas — editorial alternate"
+      >
+        <BookOpen size={13} strokeWidth={1.75} />
+        <span>Atlas</span>
+      </button>
+    </div>
+  );
 }
 
 function AppContent() {
   const { isAuthenticated, isLoading, logout, user, project } = useAuth();
   const [currentView, setCurrentView] = useState('roadmap');
-  const [theme, toggleTheme] = useTheme();
+  const { theme, mode, setTheme, toggleMode } = useThemeAndMode();
 
   if (isLoading) {
     return (
       <div className="app-loading">
         <div className="atlas-spinner" />
-        <p className="serif app-loading__text">Loading the atlas…</p>
+        <p className="serif app-loading__text">Loading…</p>
       </div>
     );
   }
@@ -54,7 +120,7 @@ function AppContent() {
       <div className="app">
         <header className="app-header">
           <div className="app-header__brand">
-            <div className="app-header__mark">
+            <div className="app-header__mark" data-editorial>
               <span className="app-header__bracket">[</span>
               <span className="app-header__index mono">N° 01</span>
               <span className="app-header__bracket">]</span>
@@ -63,7 +129,7 @@ function AppContent() {
               <span className="serif app-header__display">Roadmap</span>
               <span className="app-header__display-stacked mono">PLANNER</span>
             </div>
-            <div className="app-header__meta">
+            <div className="app-header__meta" data-editorial>
               <span className="app-header__rule" aria-hidden />
               <span className="serif app-header__edition">Atlas Edition · Vol. II</span>
             </div>
@@ -99,14 +165,15 @@ function AppContent() {
                 <span className="serif">by</span>&nbsp;{user.display_name}
               </span>
             )}
+            <ThemePicker theme={theme} setTheme={setTheme} />
             <button
               type="button"
-              onClick={toggleTheme}
+              onClick={toggleMode}
               className="btn btn-icon btn-ghost"
-              aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-              title={theme === 'light' ? 'Dark mode' : 'Light mode'}
+              aria-label={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+              title={mode === 'light' ? 'Dark mode' : 'Light mode'}
             >
-              {theme === 'light' ? <Moon size={16} strokeWidth={1.75} /> : <Sun size={16} strokeWidth={1.75} />}
+              {mode === 'light' ? <Moon size={16} strokeWidth={1.75} /> : <Sun size={16} strokeWidth={1.75} />}
             </button>
             <button
               type="button"
@@ -124,7 +191,7 @@ function AppContent() {
           {currentView === 'roadmap' ? <KanbanBoard /> : <MetricsDashboard />}
         </main>
 
-        <footer className="app-footer">
+        <footer className="app-footer" data-editorial>
           <span className="serif">Issue 02 · </span>
           <span className="mono">EST. 2024</span>
           <span className="app-footer__dot" aria-hidden>·</span>
@@ -137,7 +204,7 @@ function AppContent() {
 
 function App() {
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', getInitialTheme());
+    applyAttributes(getInitialTheme(), getInitialMode());
   }, []);
 
   return (
@@ -148,20 +215,20 @@ function App() {
         toastOptions={{
           duration: 3500,
           style: {
-            background: 'var(--ink)',
-            color: 'var(--paper)',
-            borderRadius: 0,
-            border: '1px solid var(--ink-2)',
+            background: 'var(--fg)',
+            color: 'var(--bg-elevated)',
+            borderRadius: 'var(--radius-default)',
+            border: '1px solid var(--border)',
             fontFamily: 'var(--font-ui)',
             fontSize: '13px',
             padding: '10px 14px',
           },
           success: {
-            iconTheme: { primary: '#4ade80', secondary: 'var(--ink)' },
+            iconTheme: { primary: '#22c55e', secondary: 'var(--fg)' },
           },
           error: {
             duration: 5000,
-            iconTheme: { primary: '#f87171', secondary: 'var(--ink)' },
+            iconTheme: { primary: '#ef4444', secondary: 'var(--fg)' },
           },
         }}
       />

@@ -7,7 +7,8 @@
   grid-template-columns: 18px 1fr;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  border-radius: var(--radius-default);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
   position: relative;
 }
 .epic-card-with-handle:hover {
@@ -17,6 +18,9 @@
 .epic-card-with-handle.is-dragging {
   border-color: var(--accent);
   background: var(--bg-elevated);
+  box-shadow: var(--shadow-popper);
+}
+[data-theme='atlas'] .epic-card-with-handle.is-dragging {
   box-shadow:
     -2px 2px 0 var(--ink),
     0 8px 16px rgba(0, 0, 0, 0.18);
@@ -97,9 +101,10 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   padding: 0.0625rem 0.25rem;
-  background: var(--ink);
-  color: var(--paper);
+  background: var(--fg);
+  color: var(--bg-elevated);
   text-transform: uppercase;
+  border-radius: var(--radius-sm);
 }
 .epic-key--done { background: var(--forest); color: white; }
 .epic-key--progress { background: var(--ocean); color: white; }

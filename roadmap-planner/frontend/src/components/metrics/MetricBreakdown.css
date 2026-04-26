@@ -1,6 +1,7 @@
 .metric-breakdown {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
   padding: 1.125rem 1.25rem;
   margin-top: 1rem;
   animation: slideDown 240ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -61,7 +62,7 @@
   text-align: left;
   padding: 0.5rem 0.75rem;
   background: var(--bg-sunken);
-  border-bottom: 1px solid var(--fg);
+  border-bottom: 1px solid var(--border);
   font-weight: 600;
   font-size: 10px;
   letter-spacing: 0.16em;
@@ -69,6 +70,7 @@
   color: var(--fg-muted);
   white-space: nowrap;
 }
+[data-theme='atlas'] .metric-breakdown__table th { border-bottom-color: var(--fg); }
 
 .metric-breakdown__table td {
   padding: 0.5rem 0.75rem;

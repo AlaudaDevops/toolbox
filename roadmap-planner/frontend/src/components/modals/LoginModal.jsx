@@ -34,7 +34,7 @@ const LoginModal = () => {
       <div className="login-page__plate">
         <aside className="login-page__editorial">
           <div className="login-page__pretitle">
-            <span className="serif">An almanac for</span>
+            <span className="serif">A workspace for</span>
             <span className="mono">DEVOPS · 2026</span>
           </div>
           <h1 className="login-page__title">
@@ -53,7 +53,7 @@ const LoginModal = () => {
           <div className="login-page__signature">
             <span className="login-page__rule" />
             <Compass size={14} strokeWidth={1.5} />
-            <span className="serif">Atlas Edition · Vol. II</span>
+            <span>Roadmap Planner · Alauda DevOps</span>
           </div>
         </aside>
 

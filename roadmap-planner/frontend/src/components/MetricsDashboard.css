@@ -97,6 +97,7 @@
   padding: 0.875rem 1rem;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
 }
 
 .metrics-dashboard__filter-group {
@@ -121,9 +122,11 @@
 .metrics-dashboard__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 0;
+  gap: 1px;
   border: 1px solid var(--border);
+  border-radius: var(--radius-default);
   background: var(--border);
+  overflow: hidden;
 }
 @media (min-width: 1200px) {
   .metrics-dashboard__grid { grid-template-columns: repeat(3, 1fr); }
@@ -149,6 +152,7 @@
   padding: 0.75rem 0.875rem;
   background: var(--crimson-tint);
   border: 1px solid var(--crimson-soft);
+  border-radius: var(--radius-default);
   color: var(--crimson);
   font-size: 13px;
 }
@@ -161,6 +165,7 @@
   padding: 3rem 1.5rem;
   background: var(--bg-elevated);
   border: 1px dashed var(--border);
+  border-radius: var(--radius-default);
   gap: 0.75rem;
 }
 .metrics-dashboard__empty svg { color: var(--fg-faint); }
