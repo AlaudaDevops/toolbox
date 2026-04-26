@@ -153,9 +153,11 @@
 .milestone-info strong,
 .epic-info strong { font-weight: 600; }
 
-.pillar-key-display,
-.milestone-key-display,
-.epic-key {
+/* Scoped to modal contexts so the rule doesn't bleed onto the
+   kanban EpicCard badge, which has its own color treatment. */
+.pillar-info .pillar-key-display,
+.milestone-info .milestone-key-display,
+.epic-info .epic-key {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--fg-faint);

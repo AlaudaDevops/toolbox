@@ -92,24 +92,27 @@
   min-width: 0;
 }
 
-/* Key — leading mono badge, color-coded by status */
-.epic-key {
+/* Key — leading mono badge, color-coded by status.
+   Backgrounds are theme-invariant so white text always has high contrast
+   in both light and dark modes (small 10px font; we can't rely on
+   semantic vars that flip between themes). */
+.epic-card-content .epic-key {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  padding: 0.0625rem 0.25rem;
-  background: var(--fg);
-  color: var(--bg-elevated);
+  padding: 0.0625rem 0.3125rem;
+  background: #475569;            /* slate-600 — theme-invariant */
+  color: #ffffff;
   text-transform: uppercase;
   border-radius: var(--radius-sm);
 }
-.epic-key--done { background: var(--forest); color: white; }
-.epic-key--progress { background: var(--ocean); color: white; }
-.epic-key--todo { background: var(--ink-3); color: var(--paper); }
-.epic-key--default { background: var(--amber); color: white; }
+.epic-card-content .epic-key--done     { background: #15803d; color: #ffffff; } /* green-700 */
+.epic-card-content .epic-key--progress { background: #1d4ed8; color: #ffffff; } /* blue-700 */
+.epic-card-content .epic-key--todo     { background: #475569; color: #ffffff; } /* slate-600 */
+.epic-card-content .epic-key--default  { background: #b45309; color: #ffffff; } /* amber-700, AA-safe with white */
 
 /* Icon buttons */
 .epic-icon-btn {
