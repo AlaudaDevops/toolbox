@@ -10,7 +10,6 @@ import './App.css';
 
 const THEME_KEY = 'roadmap-planner-theme';   // 'platform' | 'atlas'
 const MODE_KEY = 'roadmap-planner-mode';     // 'light' | 'dark'
-const LEGACY_THEME_KEY = 'roadmap-planner-theme';
 
 function readStored(key, allowed, fallback) {
   if (typeof window === 'undefined') return fallback;
@@ -21,21 +20,28 @@ function readStored(key, allowed, fallback) {
   return fallback;
 }
 
+// In v1 of this app, THEME_KEY stored 'light' | 'dark' (single-axis dark mode).
+// In v2, the same key stores 'platform' | 'atlas'. Migrate during the read so
+// the migration result becomes the actual initial state — otherwise the
+// useEffect that persists state would immediately overwrite it.
 function getInitialTheme() {
-  return readStored(THEME_KEY, ['platform', 'atlas'], 'platform');
+  if (typeof window === 'undefined') return 'platform';
+  let stored;
+  try { stored = window.localStorage.getItem(THEME_KEY); } catch { return 'platform'; }
+  if (stored === 'platform' || stored === 'atlas') return stored;
+  if (stored === 'light' || stored === 'dark') {
+    try {
+      // Preserve the v1 user's mode preference under MODE_KEY,
+      // and treat them as Atlas users (they only had Atlas).
+      window.localStorage.setItem(MODE_KEY, stored);
+      window.localStorage.setItem(THEME_KEY, 'atlas');
+    } catch { /* ignore */ }
+    return 'atlas';
+  }
+  return 'platform';
 }
 
 function getInitialMode() {
-  // Migrate the v1 theme key (which stored 'light'/'dark' under THEME_KEY).
-  if (typeof window !== 'undefined') {
-    try {
-      const legacy = window.localStorage.getItem(LEGACY_THEME_KEY);
-      if (legacy === 'light' || legacy === 'dark') {
-        window.localStorage.setItem(MODE_KEY, legacy);
-        window.localStorage.setItem(THEME_KEY, 'atlas'); // legacy users were on Atlas
-      }
-    } catch { /* ignore */ }
-  }
   const stored = readStored(MODE_KEY, ['light', 'dark'], null);
   if (stored) return stored;
   if (typeof window === 'undefined') return 'light';
