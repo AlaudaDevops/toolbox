@@ -1,5 +1,5 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Build stage — keep aligned with the root Dockerfile's NODE_IMAGE default.
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
