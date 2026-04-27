@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/handlers"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/middleware"
@@ -95,24 +96,33 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 
 	// Check if static files directory exists
 	if _, err := os.Stat(staticPath); err == nil {
-		// Serve static assets
+		// Serve hashed static asset bundles. Vite outputs to `assets/`;
+		// CRA used `static/`. Register both so a Dockerfile that switches
+		// build tools doesn't need a backend change.
+		router.Static("/assets", filepath.Join(staticPath, "assets"))
 		router.Static("/static", filepath.Join(staticPath, "static"))
 
-		// Serve other static files (manifest.json, etc.)
+		// Top-level static files
 		router.StaticFile("/manifest.json", filepath.Join(staticPath, "manifest.json"))
 		router.StaticFile("/asset-manifest.json", filepath.Join(staticPath, "asset-manifest.json"))
+		if _, err := os.Stat(filepath.Join(staticPath, "favicon.ico")); err == nil {
+			router.StaticFile("/favicon.ico", filepath.Join(staticPath, "favicon.ico"))
+		}
 
-		// Serve index.html for all non-API routes (SPA routing)
+		// SPA fallback. Returns the HTML shell for page-like requests so
+		// react-router (or similar) can take over. Returns 404 for missing
+		// API routes and missing asset-shaped requests (anything with a
+		// file extension) instead of silently serving HTML — that was
+		// masking the missing /assets/* route in v2.
 		router.NoRoute(func(c *gin.Context) {
-			// Don't serve index.html for API routes
-			if c.Request.URL.Path != "/" &&
-				c.Request.URL.Path != "/health" &&
-				!gin.IsDebugging() {
-				// For API routes, return 404
-				if len(c.Request.URL.Path) > 4 && c.Request.URL.Path[:4] == "/api" {
-					c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
-					return
-				}
+			p := c.Request.URL.Path
+			if strings.HasPrefix(p, "/api/") {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Not found"})
+				return
+			}
+			if filepath.Ext(p) != "" {
+				c.Status(http.StatusNotFound)
+				return
 			}
 			c.File(filepath.Join(staticPath, "index.html"))
 		})
