@@ -241,21 +241,70 @@ jobs:
 
       - name: Test Docker image
         run: |
-          # Start the container in background
+          set -eu
+
           docker run -d --name roadmap-planner-test \
             -p 8080:8080 \
             -e DEBUG=true \
             roadmap-planner:ci-${{ github.sha }}
 
-          # Wait for container to start
-          sleep 10
+          # Wait for /health to come up (cap at ~30s)
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/health > /dev/null 2>&1; then
+              echo "container ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
 
-          # Test health endpoint
-          curl -f http://localhost:8080/health || exit 1
+          fail() {
+            echo "::error::$1"
+            echo "--- container logs ---"
+            docker logs roadmap-planner-test || true
+            docker stop roadmap-planner-test >/dev/null 2>&1 || true
+            docker rm   roadmap-planner-test >/dev/null 2>&1 || true
+            exit 1
+          }
 
-          # Clean up
+          # 1. /health (basic readiness)
+          curl -fsS http://localhost:8080/health > /dev/null \
+            || fail "/health is not responding"
+
+          # 2. /api/auth/status returns 401 when unauthenticated
+          status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/auth/status)
+          [ "$status" = "401" ] || fail "Expected 401 from /api/auth/status, got $status"
+
+          # 3. / returns the SPA shell as HTML containing the React mount point
+          ct=$(curl -s -o /tmp/index.html -w '%{content_type}' http://localhost:8080/)
+          echo "$ct" | grep -qi 'text/html' \
+            || fail "Expected text/html on /, got '$ct'"
+          grep -q 'id="root"' /tmp/index.html \
+            || fail '/ does not contain the React root div'
+
+          # 4. The hashed JS bundle linked from index.html must be served as
+          #    JavaScript — NOT the SPA fallback. This is the assertion that
+          #    would have caught the v0.2.0-gc1e6208 deploy: when the backend
+          #    has no /assets/* route, every JS request returns the HTML shell
+          #    with HTTP 200, so the page renders blank.
+          asset=$(grep -oE '/assets/[^"]+\.js' /tmp/index.html | head -1)
+          [ -n "$asset" ] || fail 'No /assets/*.js script tag in index.html (build layout changed?)'
+          echo "probing asset: $asset"
+          asset_ct=$(curl -s -o /tmp/asset.js -w '%{content_type}' "http://localhost:8080$asset")
+          echo "$asset_ct" | grep -qi 'javascript' \
+            || fail "Expected JavaScript Content-Type on $asset, got '$asset_ct' (likely served as HTML SPA fallback)"
+          asset_size=$(wc -c < /tmp/asset.js)
+          [ "$asset_size" -gt 1024 ] \
+            || fail "Asset $asset is suspiciously small (${asset_size} bytes)"
+
+          # 5. Missing assets must 404, not return the HTML shell. Without this
+          #    assertion, future static-route bugs are silent again.
+          missing=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/assets/__should-not-exist.js)
+          [ "$missing" = "404" ] || fail "Expected 404 for missing /assets/* file, got $missing"
+
+          echo "all SPA smoke assertions passed"
+
           docker stop roadmap-planner-test
-          docker rm roadmap-planner-test
+          docker rm   roadmap-planner-test
 
       - name: Scan Docker image for vulnerabilities
         uses: aquasecurity/trivy-action@master
