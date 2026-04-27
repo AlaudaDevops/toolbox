@@ -1,72 +1,44 @@
 {
   "name": "roadmap-planner-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Frontend for the Roadmap Planner application",
   "private": true,
+  "type": "module",
   "dependencies": {
-    "@testing-library/jest-dom": "^6.7.0",
-    "@testing-library/react": "^16.3.0",
-    "@testing-library/user-event": "^14.6.1",
-    "axios": "^1.11.0",
+    "@hello-pangea/dnd": "^17.0.0",
+    "axios": "^1.7.7",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.539.0",
+    "lucide-react": "^0.460.0",
     "react": "^18.3.1",
-    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.3.1",
-    "react-hook-form": "^7.62.0",
-    "react-hot-toast": "^2.6.0",
-    "react-modal": "^3.16.3",
-    "react-scripts": "5.0.1",
-    "react-select": "^5.10.2",
-    "recharts": "^3.6.0",
-    "web-vitals": "^5.1.0"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "jest": {
-    "transformIgnorePatterns": [
-      "node_modules/(?!(axios)/)"
-    ],
-    "moduleNameMapper": {
-      "^axios$": "<rootDir>/node_modules/axios/dist/node/axios.cjs"
-    }
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "react-hook-form": "^7.53.2",
+    "react-hot-toast": "^2.4.1",
+    "react-select": "^5.8.3",
+    "recharts": "^2.13.3"
   },
   "devDependencies": {
-    "@types/react": "^18.3.23",
-    "@types/react-beautiful-dnd": "^13.1.8",
-    "@types/react-dom": "^18.3.7",
-    "@types/react-modal": "^3.16.3"
+    "@eslint/js": "^9.39.4",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "eslint": "^9.15.0",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.5"
   },
-  "overrides": {
-    "nth-check": "^2.1.1",
-    "postcss": "^8.4.31",
-    "svgo": "^3.0.0",
-    "css-select": "^5.1.0",
-    "@svgr/plugin-svgo": "^6.0.0",
-    "@svgr/webpack": "^6.0.0",
-    "resolve-url-loader": "^5.0.0"
-  },
-  "proxy": "http://localhost:8080"
+  "scripts": {
+    "start": "vite --host 0.0.0.0",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .js,.jsx"
+  }
 }

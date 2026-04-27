@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import React, { useEffect, useMemo, useState } from 'react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useRoadmap } from '../hooks/useRoadmap';
 import { useAuth } from '../hooks/useAuth';
 import MilestoneCard from './MilestoneCard';
@@ -9,15 +9,17 @@ import CreateEpicModal from './modals/CreateEpicModal';
 import UpdateMilestoneModal from './modals/UpdateMilestoneModal';
 import EpicMoveModal from './modals/EpicMoveModal';
 import UpdateEpicModal from './modals/UpdateEpicModal';
-import { Plus, RefreshCw, GripVertical } from 'lucide-react';
+import { Plus, RefreshCw, GripVertical, Compass } from 'lucide-react';
 import {
   saveSelectedQuarters,
   loadSelectedQuarters,
   validateQuarterSelection,
-  getDefaultQuarters
+  getDefaultQuarters,
 } from '../utils/quarterStorage';
 import { sortQuarters, validateAndSortSelectedQuarters } from '../utils/sortingUtils';
 import './KanbanBoard.css';
+
+const MAX_QUARTERS = 4;
 
 const KanbanBoard = () => {
   const { onProjectChange } = useAuth();
@@ -33,31 +35,22 @@ const KanbanBoard = () => {
   const [selectedQuarter, setSelectedQuarter] = useState(null);
   const [selectedQuarters, setSelectedQuarters] = useState([]);
 
-  // Initialize selected quarters when roadmap data loads
-  React.useEffect(() => {
+  useEffect(() => {
     if (roadmapData?.quarters && selectedQuarters.length === 0) {
-      // Try to load from localStorage first
       const storedQuarters = loadSelectedQuarters(roadmapData.quarters);
-
       if (storedQuarters && storedQuarters.length > 0) {
-        // Use stored quarters if available and valid
         setSelectedQuarters(storedQuarters);
       } else {
-        // Fall back to default (first 3 quarters)
         const defaultQuarters = getDefaultQuarters(roadmapData.quarters);
         setSelectedQuarters(defaultQuarters);
-        // Save the default selection
         saveSelectedQuarters(defaultQuarters);
       }
     }
   }, [roadmapData?.quarters, selectedQuarters.length]);
 
-  // Validate and update selected quarters when available quarters change
-  React.useEffect(() => {
+  useEffect(() => {
     if (roadmapData?.quarters && selectedQuarters.length > 0) {
       const validatedQuarters = validateQuarterSelection(selectedQuarters, roadmapData.quarters);
-
-      // Only update if the validated selection is different
       if (JSON.stringify(validatedQuarters) !== JSON.stringify(selectedQuarters)) {
         setSelectedQuarters(validatedQuarters);
         saveSelectedQuarters(validatedQuarters);
@@ -65,37 +58,21 @@ const KanbanBoard = () => {
     }
   }, [roadmapData?.quarters, selectedQuarters]);
 
-  // Register refresh the Roadmap data on project change
-  React.useEffect(() => {
+  useEffect(() => {
     const unsubscribe = onProjectChange((newProject, prevProject) => {
-      if (newProject !== prevProject) {
-        loadRoadmap();
-      }
+      if (newProject !== prevProject) loadRoadmap();
     });
-
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [onProjectChange, loadRoadmap]);
 
   const handleDragEnd = async (result) => {
     const { destination, source, draggableId } = result;
-
-    // If dropped outside a droppable area
     if (!destination) return;
-
-    // If dropped in the same position
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
-    ) {
-      return;
-    }
-
-    // Extract milestone ID from droppable ID (format: "milestone-{id}")
+    ) return;
     const newMilestoneId = destination.droppableId.replace('milestone-', '');
-
-    // Move the epic
     await moveEpic(draggableId, newMilestoneId);
   };
 
@@ -104,23 +81,19 @@ const KanbanBoard = () => {
     setSelectedQuarter(preselectedQuarter);
     setShowCreateMilestone(true);
   };
-
   const handleCreateEpic = (milestone) => {
     setSelectedMilestone(milestone);
     setShowCreateEpic(true);
   };
-
   const handleUpdateMilestone = (milestone) => {
     setSelectedMilestone(milestone);
     setShowUpdateMilestone(true);
   };
-
   const handleMoveEpic = (epic, currentMilestone) => {
     setSelectedEpic(epic);
     setSelectedMilestone(currentMilestone);
     setShowEpicMove(true);
   };
-
   const handleUpdateEpic = (epic) => {
     setSelectedEpic(epic);
     setShowUpdateEpic(true);
@@ -128,46 +101,48 @@ const KanbanBoard = () => {
 
   const handleQuarterToggle = (quarter) => {
     if (!roadmapData?.quarters) return;
-
     const isSelected = selectedQuarters.includes(quarter);
-    let newSelectedQuarters;
-
+    let next;
     if (isSelected) {
-      // Remove quarter if it's selected
-      newSelectedQuarters = selectedQuarters.filter(q => q !== quarter);
+      next = selectedQuarters.filter(q => q !== quarter);
+    } else if (selectedQuarters.length < MAX_QUARTERS) {
+      next = [...selectedQuarters, quarter];
     } else {
-      // Add quarter if not selected, but limit to 3 quarters max
-      if (selectedQuarters.length < 4) {
-        newSelectedQuarters = [...selectedQuarters, quarter];
-      } else {
-        // Replace the first selected quarter with the new one
-        newSelectedQuarters = [...selectedQuarters.slice(1), quarter];
-      }
+      next = [...selectedQuarters.slice(1), quarter];
     }
-
-    // Sort the new selection and update state
-    const sortedNewSelection = sortQuarters(newSelectedQuarters);
-    setSelectedQuarters(sortedNewSelection);
-    saveSelectedQuarters(sortedNewSelection);
+    const sorted = sortQuarters(next);
+    setSelectedQuarters(sorted);
+    saveSelectedQuarters(sorted);
   };
+
+  const sortedQuarters = useMemo(
+    () => sortQuarters(roadmapData?.quarters || []),
+    [roadmapData?.quarters]
+  );
+  const sortedSelectedQuarters = useMemo(
+    () => validateAndSortSelectedQuarters(selectedQuarters, sortedQuarters),
+    [selectedQuarters, sortedQuarters]
+  );
 
   if (isLoading) {
     return (
-      <div className="kanban-loading">
-        <div className="loading-spinner"></div>
-        <p>Loading roadmap...</p>
+      <div className="kanban-state">
+        <div className="atlas-spinner" />
+        <p className="serif kanban-state__title">Drawing the chart…</p>
+        <p className="kanban-state__sub">Pillars, milestones &amp; epics, fetched from Jira.</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="kanban-error">
-        <h3>Error loading roadmap</h3>
-        <p>{error}</p>
+      <div className="kanban-state kanban-state--error">
+        <Compass size={28} strokeWidth={1.5} />
+        <h3 className="serif kanban-state__title">Lost the trail</h3>
+        <p className="kanban-state__sub">{error}</p>
         <button onClick={loadRoadmap} className="btn btn-primary">
-          <RefreshCw size={16} />
-          Retry
+          <RefreshCw size={14} strokeWidth={1.75} />
+          Try again
         </button>
       </div>
     );
@@ -175,10 +150,12 @@ const KanbanBoard = () => {
 
   if (!roadmapData || !roadmapData.pillars) {
     return (
-      <div className="kanban-empty">
-        <h3>No roadmap data available</h3>
+      <div className="kanban-state">
+        <Compass size={28} strokeWidth={1.5} />
+        <h3 className="serif kanban-state__title">No pillars yet</h3>
+        <p className="kanban-state__sub">Configure pillars in Jira and refresh.</p>
         <button onClick={loadRoadmap} className="btn btn-primary">
-          <RefreshCw size={16} />
+          <RefreshCw size={14} strokeWidth={1.75} />
           Refresh
         </button>
       </div>
@@ -186,86 +163,118 @@ const KanbanBoard = () => {
   }
 
   const { pillars, quarters } = roadmapData;
-
-  // Debug logging
-  console.log('KanbanBoard roadmapData:', roadmapData);
-  console.log('Pillars:', pillars);
-  console.log('Quarters:', quarters);
-  console.log('Selected quarters:', selectedQuarters);
-
-  // Use selected quarters for display, fallback to all quarters if none selected
-  // Ensure quarters are sorted chronologically
-  const sortedQuarters = sortQuarters(quarters || []);
-  const sortedSelectedQuarters = validateAndSortSelectedQuarters(selectedQuarters, sortedQuarters);
   const displayQuarters = sortedSelectedQuarters.length > 0 ? sortedSelectedQuarters : sortedQuarters;
+  const totalEpics = pillars.reduce(
+    (acc, p) => acc + (p.milestones || []).reduce((s, m) => s + (m.epics?.length || 0), 0),
+    0
+  );
+  const totalMilestones = pillars.reduce((acc, p) => acc + (p.milestones || []).length, 0);
 
   return (
-    <div className="kanban-container">
-      {/* Compact Controls Bar */}
-      <div className="controls-bar">
-        <div className="quarter-selection-compact">
-          <span className="quarter-label">Quarters:</span>
-          <div className="quarter-checkboxes-compact">
-            {sortedQuarters.map((quarter) => (
-              <label key={quarter} className="quarter-checkbox-compact">
-                <input
-                  type="checkbox"
-                  checked={selectedQuarters.includes(quarter)}
-                  onChange={() => handleQuarterToggle(quarter)}
-                  disabled={!selectedQuarters.includes(quarter) && selectedQuarters.length >= 4}
-                />
-                <span className="quarter-label-compact">{quarter}</span>
-              </label>
-            ))}
+    <div className="kanban-container fade-in">
+      {/* Section masthead */}
+      <div className="kanban-masthead">
+        <div className="kanban-masthead__head">
+          <span className="kanban-masthead__chapter mono">CHAPTER 01</span>
+          <h2 className="kanban-masthead__title">
+            <span className="serif">The </span>
+            <span>Roadmap</span>
+            <span className="serif"> — by quarter, by pillar.</span>
+          </h2>
+          <p className="kanban-masthead__sub">
+            Drag epics across milestones; reshape the future without leaving the page.
+          </p>
+        </div>
+        <dl className="kanban-stats">
+          <div className="kanban-stat">
+            <dt>Pillars</dt>
+            <dd className="mono tnum">{String(pillars.length).padStart(2, '0')}</dd>
           </div>
-          <div><button onClick={loadRoadmap} className="btn btn-sm" title="Refresh data">
-            <RefreshCw size={16} />
-          </button></div>
+          <div className="kanban-stat">
+            <dt>Milestones</dt>
+            <dd className="mono tnum">{String(totalMilestones).padStart(2, '0')}</dd>
+          </div>
+          <div className="kanban-stat">
+            <dt>Epics</dt>
+            <dd className="mono tnum">{String(totalEpics).padStart(2, '0')}</dd>
+          </div>
+        </dl>
+      </div>
 
+      {/* Controls */}
+      <div className="controls-bar">
+        <div className="controls-bar__group">
+          <span className="controls-bar__label">Quarters in view</span>
+          <div className="quarter-chips">
+            {sortedQuarters.length === 0 && (
+              <span className="quarter-empty">No quarters available</span>
+            )}
+            {sortedQuarters.map((quarter) => {
+              const active = selectedQuarters.includes(quarter);
+              const disabled = !active && selectedQuarters.length >= MAX_QUARTERS;
+              return (
+                <button
+                  key={quarter}
+                  type="button"
+                  onClick={() => handleQuarterToggle(quarter)}
+                  disabled={disabled}
+                  className={`quarter-chip mono${active ? ' is-active' : ''}${disabled ? ' is-disabled' : ''}`}
+                  aria-pressed={active}
+                >
+                  {quarter}
+                </button>
+              );
+            })}
+          </div>
+          <span className="controls-bar__hint">{selectedQuarters.length}/{MAX_QUARTERS}</span>
         </div>
-
-        {/* Future: Add more controls here like pending epics filter */}
-        <div className="future-controls">
-          {/* Placeholder for future functionality */}
-        </div>
+        <button onClick={loadRoadmap} className="btn btn-sm btn-ghost" title="Refresh data">
+          <RefreshCw size={13} strokeWidth={1.75} />
+          Refresh
+        </button>
       </div>
 
       {/* Kanban Board */}
       <DragDropContext onDragEnd={handleDragEnd}>
-        <div className="kanban-board">
-          {/* Header Row with Quarters */}
+        <div
+          className="kanban-board"
+          style={{ '--col-count': displayQuarters.length || 1 }}
+        >
           <div className="kanban-quarters-header">
-            <div className="kanban-pillar-header">Pillars</div>
+            <div className="kanban-pillar-header">
+              <span className="serif kanban-pillar-header__label">Pillars</span>
+              <span className="mono kanban-pillar-header__rule">/ rows</span>
+            </div>
             {displayQuarters.map((quarter) => (
               <div key={quarter} className="kanban-quarter-header">
-                {quarter}
+                <span className="mono">{quarter}</span>
               </div>
             ))}
           </div>
 
-          {/* Pillar Rows */}
-          {pillars.map((pillar) => (
+          {pillars.map((pillar, idx) => (
             <div key={pillar.id} className="kanban-pillar-row">
-              {/* Pillar Info */}
               <div className="kanban-pillar-info">
-                <h3>{pillar.name}</h3>
-                <p className="pillar-key">{pillar.key}</p>
-                {pillar.component && (
-                  <span className="pillar-component">{pillar.component}</span>
-                )}
+                <div className="kanban-pillar-info__num mono">{String(idx + 1).padStart(2, '0')}</div>
+                <div className="kanban-pillar-info__main">
+                  <h3 className="kanban-pillar-info__name">{pillar.name}</h3>
+                  <span className="kanban-pillar-info__key mono">{pillar.key}</span>
+                  {pillar.component && (
+                    <span className="kanban-pillar-info__component">{pillar.component}</span>
+                  )}
+                </div>
                 <button
                   onClick={() => handleCreateMilestone(pillar)}
-                  className="btn btn-sm btn-primary"
-                  title="Create Milestone"
+                  className="btn btn-sm btn-icon btn-ghost kanban-pillar-info__add"
+                  title="Create milestone"
+                  aria-label={`Create milestone in ${pillar.name}`}
                 >
-                  <Plus size={14} />
+                  <Plus size={14} strokeWidth={1.75} />
                 </button>
               </div>
 
-              {/* Quarter Columns */}
               {displayQuarters.map((quarter) => {
-                const milestones = pillar.milestones.filter(m => m.quarter === quarter);
-
+                const milestones = (pillar.milestones || []).filter(m => m.quarter === quarter);
                 return (
                   <div key={`${pillar.id}-${quarter}`} className="kanban-quarter-cell">
                     {milestones.length > 0 ? (
@@ -283,9 +292,7 @@ const KanbanBoard = () => {
                                   <div
                                     ref={provided.innerRef}
                                     {...provided.droppableProps}
-                                    className={`epics-container ${
-                                      snapshot.isDraggingOver ? 'drag-over' : ''
-                                    }`}
+                                    className={`epics-container${snapshot.isDraggingOver ? ' is-drag-over' : ''}`}
                                   >
                                     {milestone.epics.map((epic, index) => (
                                       <Draggable
@@ -297,17 +304,15 @@ const KanbanBoard = () => {
                                           <div
                                             ref={provided.innerRef}
                                             {...provided.draggableProps}
-                                            className={`epic-draggable ${
-                                              snapshot.isDragging ? 'dragging' : ''
-                                            }`}
+                                            className={`epic-draggable${snapshot.isDragging ? ' is-dragging' : ''}`}
                                           >
-                                            <div className={`epic-card-with-handle ${snapshot.isDragging ? 'dragging' : ''}`}>
+                                            <div className={`epic-card-with-handle${snapshot.isDragging ? ' is-dragging' : ''}`}>
                                               <div
                                                 className="epic-drag-handle"
                                                 {...provided.dragHandleProps}
                                                 title="Drag to move epic"
                                               >
-                                                <GripVertical size={14} />
+                                                <GripVertical size={12} strokeWidth={1.5} />
                                               </div>
                                               <EpicCard
                                                 epic={epic}
@@ -328,26 +333,26 @@ const KanbanBoard = () => {
 
                               <button
                                 onClick={() => handleCreateEpic(milestone)}
-                                className="btn btn-sm btn-outline create-epic-btn"
-                                title="Add Epic"
+                                className="create-epic-btn"
+                                title="Add epic to milestone"
                               >
-                                <Plus size={14} />
-                                Add Epic
+                                <Plus size={12} strokeWidth={1.75} />
+                                Add epic
                               </button>
                             </div>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <div className="empty-quarter">
-                        <button
-                          onClick={() => handleCreateMilestone(pillar, quarter)}
-                          className="btn btn-sm btn-secondary create-milestone-btn"
-                        >
-                          <Plus size={14} />
-                          Add Milestone
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleCreateMilestone(pillar, quarter)}
+                        className="empty-quarter"
+                        title={`Create a milestone in ${quarter}`}
+                      >
+                        <Plus size={14} strokeWidth={1.75} />
+                        <span>Add milestone</span>
+                        <span className="empty-quarter__hint mono">{quarter}</span>
+                      </button>
                     )}
                   </div>
                 );
@@ -396,7 +401,7 @@ const KanbanBoard = () => {
         <EpicMoveModal
           epic={selectedEpic}
           currentMilestone={selectedMilestone}
-          availableMilestones={roadmapData?.pillars?.flatMap(p => p.milestones) || []}
+          availableMilestones={(roadmapData?.pillars || []).flatMap(p => p.milestones || [])}
           onClose={() => {
             setShowEpicMove(false);
             setSelectedEpic(null);

@@ -1,0 +1,618 @@
+/* ============================================================
+   THEMES — two design systems × two modes:
+     [data-theme='platform'] (default) — matches Alauda Container
+       Platform's --aui-* token system. Flat, system fonts, blue
+       primary, small radii, subtle shadows.
+     [data-theme='atlas']             — editorial-grade alternate.
+       Instrument Serif + JetBrains Mono, warm paper, ink offset
+       shadow plates, dot-grid backdrop, burnt-orange signal.
+     [data-mode='light' | 'dark']      — light / dark variant.
+
+   Components consume only semantic tokens (--bg, --fg, --accent,
+   --shadow-plate, --radius-default, --font-display, …) so the
+   look swaps with no JSX changes.
+   ============================================================ */
+
+:root {
+  /* === PLATFORM (Alauda --aui-*) — RAW RGB TRIPLETS ===========
+     Stored as triplets so callers can wrap with rgb()/rgba(_, a). */
+
+  /* Default theme = platform light. Mirrors --aui-color-* exactly. */
+  --aui-color-blue: 0, 122, 245;
+  --aui-color-b-0: 0, 103, 208;
+  --aui-color-b-1: 38, 141, 246;
+  --aui-color-b-5: 204, 228, 253;
+  --aui-color-b-6: 229, 241, 254;
+  --aui-color-b-7: 242, 248, 254;
+  --aui-color-green: 0, 194, 97;
+  --aui-color-g-6: 230, 249, 239;
+  --aui-color-g-7: 242, 251, 246;
+  --aui-color-yellow: 245, 163, 0;
+  --aui-color-y-0: 220, 146, 0;
+  --aui-color-y-7: 254, 250, 243;
+  --aui-color-red: 235, 0, 39;
+  --aui-color-r-7: 254, 243, 244;
+  --aui-color-n-1: 50, 52, 55;
+  --aui-color-n-2: 100, 102, 105;
+  --aui-color-n-3: 124, 126, 129;
+  --aui-color-n-4: 150, 152, 155;
+  --aui-color-n-5: 174, 176, 179;
+  --aui-color-n-6: 200, 202, 205;
+  --aui-color-n-7: 212, 214, 217;
+  --aui-color-n-8: 237, 239, 242;
+  --aui-color-n-9: 247, 249, 252;
+  --aui-color-n-10: 255, 255, 255;
+  --aui-color-primary: var(--aui-color-blue);
+
+  /* === ATLAS palette (kept under different names; activated when
+        [data-theme='atlas'] sets the semantic vars below) ======= */
+  --atlas-paper: #faf7f0;
+  --atlas-paper-2: #f3ede0;
+  --atlas-rule: #d9cfb8;
+  --atlas-ink: #0c0a09;
+  --atlas-ink-2: #1c1917;
+  --atlas-ink-3: #44403c;
+  --atlas-ink-4: #78716c;
+  --atlas-ink-5: #a8a29e;
+  --atlas-signal: #c2410c;
+  --atlas-signal-soft: #fed7aa;
+  --atlas-signal-tint: #fff7ed;
+  --atlas-forest: #15803d;
+  --atlas-forest-tint: #f0fdf4;
+  --atlas-ocean: #1d4ed8;
+  --atlas-ocean-tint: #eff6ff;
+  --atlas-amber: #b45309;
+  --atlas-amber-tint: #fffbeb;
+  --atlas-crimson: #b91c1c;
+  --atlas-crimson-tint: #fef2f2;
+
+  /* === SEMANTIC TOKENS (default = platform / light) ============
+     Component CSS reads ONLY these semantic vars. */
+
+  --bg: rgb(var(--aui-color-n-9));               /* main app bg */
+  --bg-elevated: rgb(var(--aui-color-n-10));     /* cards, inputs */
+  --bg-sunken: rgb(var(--aui-color-n-8));        /* subtle wells */
+
+  --fg: rgb(var(--aui-color-n-1));
+  --fg-muted: rgb(var(--aui-color-n-2));
+  --fg-subtle: rgb(var(--aui-color-n-3));
+  --fg-faint: rgb(var(--aui-color-n-4));
+
+  --border: rgb(var(--aui-color-n-7));
+  --border-soft: rgb(var(--aui-color-n-8));
+
+  --accent: rgb(var(--aui-color-primary));
+  --accent-soft: rgba(var(--aui-color-primary), 0.18);
+  --accent-tint: rgba(var(--aui-color-primary), 0.08);
+
+  --forest: rgb(var(--aui-color-green));
+  --forest-soft: rgba(var(--aui-color-green), 0.25);
+  --forest-tint: rgba(var(--aui-color-green), 0.08);
+
+  --ocean: rgb(var(--aui-color-blue));
+  --ocean-soft: rgba(var(--aui-color-blue), 0.25);
+  --ocean-tint: rgba(var(--aui-color-blue), 0.08);
+
+  --crimson: rgb(var(--aui-color-red));
+  --crimson-soft: rgba(var(--aui-color-red), 0.25);
+  --crimson-tint: rgba(var(--aui-color-red), 0.08);
+
+  --amber: rgb(var(--aui-color-yellow));
+  --amber-soft: rgba(var(--aui-color-yellow), 0.3);
+  --amber-tint: rgba(var(--aui-color-yellow), 0.1);
+
+  /* "ink" alias used by Atlas-flavored markup; mapped to fg under platform. */
+  --ink: var(--fg);
+  --ink-2: var(--fg-muted);
+  --ink-3: var(--fg-subtle);
+  --paper: var(--bg-elevated);
+  --paper-2: var(--bg-sunken);
+  --paper-3: var(--bg);
+
+  /* === LOOK TOKENS — the structural choices that swap per theme = */
+
+  --font-ui: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', Arial, 'Microsoft YaHei', sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'PingFang SC', monospace;
+
+  /* `.serif` decorator flourishes — neutralized in platform mode */
+  --display-style: normal;
+  --display-weight: 600;
+
+  /* radii */
+  --radius-default: 4px;
+  --radius-sm: 2px;
+  --radius-pill: 9999px;
+
+  /* shadow vocabulary */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 0 1px var(--border);
+  --shadow-plate: 0 8px 24px -6px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--border);
+  --shadow-popper: 0 8px 24px -8px rgba(0, 0, 0, 0.2);
+
+  /* page backdrop pattern */
+  --bg-pattern: none;
+
+  /* Editorial flourishes — hidden in platform, revealed in atlas */
+  --editorial-display: none;
+
+  /* === SPACING / SIZING (mostly invariant; mirrors --aui-spacing-*) */
+  --space-xs: 2px;
+  --space-s: 4px;
+  --space-m: 8px;
+  --space-l: 12px;
+  --space-xl: 16px;
+  --space-xxl: 20px;
+  --space-xxxl: 24px;
+  --space-xxxxl: 32px;
+
+  --inline-h-xs: 24px;
+  --inline-h-s: 28px;
+  --inline-h-m: 32px;
+  --inline-h-l: 40px;
+
+  --font-size-s: 12px;
+  --font-size-m: 14px;
+  --font-size-l: 16px;
+  --font-size-xl: 18px;
+  --font-size-xxl: 20px;
+
+  --line-height-s: 16px;
+  --line-height-m: 20px;
+  --line-height-l: 22px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --dur-slow: 360ms;
+
+  /* Layering */
+  --z-header: 50;
+  --z-overlay: 900;
+  --z-modal: 1000;
+  --z-toast: 1100;
+
+  /* Decorative dot color (used only in Atlas) */
+  --dot: rgba(12, 10, 9, 0.06);
+}
+
+/* ============================================================
+   PLATFORM × DARK — explicit data-mode='dark' under platform.
+   Mirrors the platform's dark `--aui-*` overrides exactly.
+   ============================================================ */
+[data-theme='platform'][data-mode='dark'],
+:root[data-mode='dark']:not([data-theme='atlas']) {
+  --aui-color-blue: 61, 142, 255;
+  --aui-color-b-0: 54, 116, 204;
+  --aui-color-b-1: 109, 170, 255;
+  --aui-color-b-5: 40, 54, 81;
+  --aui-color-b-6: 42, 64, 102;
+  --aui-color-b-7: 44, 74, 122;
+  --aui-color-green: 17, 182, 113;
+  --aui-color-g-6: 31, 74, 66;
+  --aui-color-g-7: 28, 88, 72;
+  --aui-color-yellow: 237, 172, 44;
+  --aui-color-y-0: 186, 138, 45;
+  --aui-color-y-7: 105, 85, 48;
+  --aui-color-red: 226, 50, 79;
+  --aui-color-r-7: 101, 42, 60;
+  --aui-color-n-1: 238, 239, 243;
+  --aui-color-n-2: 200, 201, 205;
+  --aui-color-n-3: 184, 186, 194;
+  --aui-color-n-4: 152, 154, 162;
+  --aui-color-n-5: 144, 147, 159;
+  --aui-color-n-6: 120, 123, 135;
+  --aui-color-n-7: 92, 95, 107;
+  --aui-color-n-8: 67, 70, 82;
+  --aui-color-n-9: 24, 27, 39;
+  --aui-color-n-10: 36, 39, 51;
+  --aui-color-primary: var(--aui-color-blue);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border);
+  --shadow-plate: 0 12px 32px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--border);
+  --shadow-popper: 0 12px 32px -8px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================================
+   ATLAS — editorial alternate, light variant.
+   Activated by [data-theme='atlas'] (with default light mode).
+   ============================================================ */
+[data-theme='atlas'] {
+  --bg: var(--atlas-paper);
+  --bg-elevated: #fffdf7;
+  --bg-sunken: var(--atlas-paper-2);
+
+  --fg: var(--atlas-ink);
+  --fg-muted: var(--atlas-ink-3);
+  --fg-subtle: var(--atlas-ink-3);
+  --fg-faint: var(--atlas-ink-4);
+
+  --border: var(--atlas-rule);
+  --border-soft: #ebe3d0;
+
+  --accent: var(--atlas-signal);
+  --accent-soft: var(--atlas-signal-soft);
+  --accent-tint: var(--atlas-signal-tint);
+
+  --forest: var(--atlas-forest);
+  --forest-soft: #bbf7d0;
+  --forest-tint: var(--atlas-forest-tint);
+
+  --ocean: var(--atlas-ocean);
+  --ocean-soft: #bfdbfe;
+  --ocean-tint: var(--atlas-ocean-tint);
+
+  --crimson: var(--atlas-crimson);
+  --crimson-soft: #fecaca;
+  --crimson-tint: var(--atlas-crimson-tint);
+
+  --amber: var(--atlas-amber);
+  --amber-soft: #fde68a;
+  --amber-tint: var(--atlas-amber-tint);
+
+  --ink: var(--atlas-ink);
+  --ink-2: var(--atlas-ink-2);
+  --ink-3: var(--atlas-ink-3);
+  --paper: #fffdf7;
+  --paper-2: var(--atlas-paper-2);
+  --paper-3: var(--atlas-paper);
+
+  /* Look — editorial */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: 'Instrument Serif', 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  --display-style: italic;
+  --display-weight: 400;
+
+  --radius-default: 0;
+  --radius-sm: 0;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-plate: -6px 6px 0 var(--atlas-ink), -6px 6px 0 1px var(--atlas-ink);
+  --shadow-popper: -3px 3px 0 var(--atlas-ink);
+
+  --bg-pattern: radial-gradient(var(--dot) 1px, transparent 1px);
+
+  --editorial-display: inline-flex;
+
+  --dot: rgba(12, 10, 9, 0.06);
+}
+
+/* Atlas dark — burnished bronze on charcoal */
+[data-theme='atlas'][data-mode='dark'] {
+  --bg: #14110d;
+  --bg-elevated: #1a1612;
+  --bg-sunken: #100d0a;
+
+  --fg: #f5f0e3;
+  --fg-muted: #c4bca8;
+  --fg-subtle: #8a8270;
+  --fg-faint: #6b6354;
+
+  --border: #3a322a;
+  --border-soft: #2a241f;
+
+  --accent: #fb923c;
+  --accent-soft: #7c2d12;
+  --accent-tint: #2a1407;
+
+  --forest: #4ade80;
+  --forest-tint: #062e16;
+  --ocean: #60a5fa;
+  --ocean-tint: #0b1830;
+  --crimson: #f87171;
+  --crimson-tint: #2b0a0a;
+  --amber: #fbbf24;
+  --amber-tint: #2a1c08;
+
+  --ink: var(--fg);
+  --ink-2: var(--fg-muted);
+  --ink-3: var(--fg-subtle);
+  --paper: var(--bg-elevated);
+  --paper-2: var(--bg-sunken);
+  --paper-3: var(--bg);
+
+  --shadow-plate: -6px 6px 0 #28221d, -6px 6px 0 1px var(--fg);
+  --dot: rgba(245, 240, 227, 0.05);
+}
+
+/* ============================================================
+   GLOBALS
+   ============================================================ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-m);
+  line-height: 1.43;
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv11', 'ss01', 'tnum';
+  background-image: var(--bg-pattern);
+  background-size: 24px 24px;
+}
+
+/* Selection */
+::selection { background: var(--fg); color: var(--bg-elevated); }
+[data-mode='dark'][data-theme='atlas'] ::selection { background: var(--accent); color: var(--ink); }
+
+/* Scrollbars — minimal */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border: 3px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--fg-faint); }
+
+/* Type primitives — work in both themes */
+.serif {
+  font-family: var(--font-display);
+  font-style: var(--display-style);
+  font-weight: var(--display-weight);
+}
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: 'tnum';
+}
+
+h1, h2, h3, h4, h5 { color: var(--fg); font-weight: 600; line-height: 1.15; }
+button, input, select, textarea { font-family: inherit; color: inherit; }
+
+/* Editorial-only markup (brackets, indices, magazine bits) is hidden
+   in platform theme and shown only when [data-theme='atlas']. */
+[data-editorial] { display: var(--editorial-display); }
+
+/* === BUTTONS ===================================================== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: var(--inline-h-m);
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-default);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: var(--bg-sunken);
+  border-color: var(--fg-faint);
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled, .btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.btn-primary:hover {
+  filter: brightness(0.92);
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+[data-theme='atlas'] .btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+[data-theme='atlas'] .btn-primary:hover {
+  background: var(--ink-2);
+  border-color: var(--ink-2);
+  color: var(--paper);
+  filter: none;
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.btn-accent:hover { filter: brightness(0.92); color: white; }
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.btn-secondary:hover {
+  background: var(--bg-sunken);
+  border-color: var(--fg-faint);
+}
+
+.btn-success { background: var(--forest); color: white; border-color: var(--forest); }
+.btn-success:hover { filter: brightness(0.92); color: white; }
+
+.btn-danger { background: var(--crimson); color: white; border-color: var(--crimson); }
+.btn-danger:hover { filter: brightness(0.92); color: white; }
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-muted);
+}
+.btn-ghost:hover {
+  background: var(--bg-sunken);
+  color: var(--fg);
+}
+
+.btn-sm {
+  height: var(--inline-h-s);
+  padding: 0 10px;
+  font-size: 12px;
+  gap: 0.375rem;
+}
+
+.btn-lg {
+  height: var(--inline-h-l);
+  padding: 0 20px;
+  font-size: 14px;
+}
+
+.btn-icon { width: var(--inline-h-m); padding: 0; flex-shrink: 0; }
+.btn-icon.btn-sm { width: var(--inline-h-s); }
+
+.btn-block, .w-full { width: 100%; }
+
+/* === FORMS ======================================================= */
+.form-group { display: flex; flex-direction: column; gap: 0.375rem; margin-bottom: 1rem; }
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  font-family: var(--font-ui);
+}
+[data-theme='atlas'] .form-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  height: var(--inline-h-l);
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-default);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  font-size: 14px;
+  font-family: var(--font-ui);
+  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+}
+
+.form-textarea {
+  height: auto;
+  min-height: 96px;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.form-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3e%3cpath stroke='%23766F60' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='m3 5 3 3 3-3'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  padding-right: 32px;
+  cursor: pointer;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+[data-theme='atlas'] .form-input:focus,
+[data-theme='atlas'] .form-select:focus,
+[data-theme='atlas'] .form-textarea:focus {
+  border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+.form-input.error,
+.form-select.error,
+.form-textarea.error {
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 3px var(--crimson-tint);
+}
+
+.form-error {
+  font-size: 12px;
+  color: var(--crimson);
+  margin-top: 0.125rem;
+}
+[data-theme='atlas'] .form-error { font-style: italic; }
+
+/* === UTILITIES =================================================== */
+.tnum { font-variant-numeric: tabular-nums; }
+
+.kbd, .key-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--fg-muted);
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.divider-rule { height: 1px; background: var(--border); width: 100%; }
+.divider-rule.dotted { background: none; border-top: 1px dotted var(--border); height: 0; }
+
+/* Loading spinner */
+.atlas-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: atlas-spin 0.8s linear infinite;
+}
+.atlas-spinner.sm { width: 16px; height: 16px; border-width: 2px; }
+@keyframes atlas-spin { to { transform: rotate(360deg); } }
+
+/* Stagger fade-in */
+@keyframes atlas-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: atlas-fade-up 360ms var(--ease-out) both; }
+
+/* Subtle pulse */
+@keyframes atlas-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.pulse { animation: atlas-pulse 2s ease-in-out infinite; }
+
+/* Layout helpers */
+.text-center { text-align: center; }
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.items-baseline { align-items: baseline; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.mb-0 { margin-bottom: 0; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.mb-4 { margin-bottom: 1rem; }

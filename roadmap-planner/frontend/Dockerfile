@@ -1,5 +1,5 @@
-# Build stage
-FROM node:18-alpine AS builder
+# Build stage — keep aligned with the root Dockerfile's NODE_IMAGE default.
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -7,13 +7,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (Vite + React; devDeps required for the build).
+# `npm ci` (not --only=production) keeps the lockfile authoritative.
+RUN npm ci --no-audit --no-fund
 
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (Vite outputs to ./build)
 RUN npm run build
 
 # Production stage

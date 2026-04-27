@@ -1,8 +1,11 @@
 # Multi-stage build for roadmap planner
-# Stage 1: Build frontend
+# Build args (all declared once, at the top of the file).
+# CI overrides these via `--build-arg`; locals use these defaults.
 ARG NODE_IMAGE=node:24-alpine
-ARG GO_IMAGE=golang:1.25.4-alpine
+ARG GO_IMAGE=golang:1.26.2-alpine
 ARG RUNTIME_IMAGE=alpine:latest
+
+# Stage 1: Build frontend
 FROM ${NODE_IMAGE} AS frontend-builder
 
 WORKDIR /app/frontend
@@ -10,16 +13,16 @@ WORKDIR /app/frontend
 # Copy frontend package files
 COPY frontend/package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies (Vite + React; devDeps required for the build).
+# `npm ci` (not --only=production) keeps the lockfile authoritative.
+RUN npm ci --no-audit --no-fund
 
 # Copy frontend source
 COPY frontend/ ./
 
-# Build the frontend
+# Build the frontend (Vite outputs to ./build via vite.config.js)
 RUN npm run build
 
-ARG GO_IMAGE=golang:1.26.2-alpine
 # Stage 2: Build backend
 FROM ${GO_IMAGE} AS backend-builder
 
@@ -40,7 +43,6 @@ COPY backend/ ./
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/server
 
-ARG RUNTIME_IMAGE=alpine:latest
 # Stage 3: Final production image
 FROM ${RUNTIME_IMAGE}
 
