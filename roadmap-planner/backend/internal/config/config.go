@@ -79,12 +79,20 @@ type Logger struct {
 }
 
 // Jira represents Jira configuration settings
+//
+// Sync* fields are consumed by the team-analytics jirasync package; they
+// are ignored when storage.enabled is false.
 type Jira struct {
-	BaseURL  string   `mapstructure:"base_url"`
-	Username string   `mapstructure:"username"`
-	Password string   `mapstructure:"password"`
-	Project  string   `mapstructure:"project"`
-	Quarters []string `mapstructure:"quarters"`
+	BaseURL          string   `mapstructure:"base_url"`
+	Username         string   `mapstructure:"username"`
+	Password         string   `mapstructure:"password"`
+	Project          string   `mapstructure:"project"`
+	Quarters         []string `mapstructure:"quarters"`
+	SyncEnabled      bool     `mapstructure:"sync_enabled"`
+	SyncInterval     string   `mapstructure:"sync_interval"`      // e.g. "30m"
+	BackfillDays     int      `mapstructure:"backfill_days"`      // first-run window; 0 = inherit storage.backfill_days
+	StoryPointsField string   `mapstructure:"story_points_field"` // optional Jira customfield id
+	SprintField      string   `mapstructure:"sprint_field"`       // optional Jira customfield id
 }
 
 // Server represents server configuration settings
@@ -240,6 +248,11 @@ func Load() (*Config, error) {
 	viper.SetDefault("server.cors.allowed_origins", []string{"http://localhost:3000"})
 	viper.SetDefault("jira.project", "DEVOPS")
 	viper.SetDefault("jira.quarters", []string{"2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q4"})
+	viper.SetDefault("jira.sync_enabled", false)
+	viper.SetDefault("jira.sync_interval", "30m")
+	viper.SetDefault("jira.backfill_days", 0)
+	viper.SetDefault("jira.story_points_field", "")
+	viper.SetDefault("jira.sprint_field", "")
 	viper.SetDefault("cache.ttl", "5m")
 	viper.SetDefault("cache.refresh_interval", "1m")
 
@@ -274,6 +287,11 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("jira.base_url", "JIRA_BASE_URL")
 	_ = viper.BindEnv("jira.username", "JIRA_USERNAME")
 	_ = viper.BindEnv("jira.password", "JIRA_PASSWORD")
+	_ = viper.BindEnv("jira.sync_enabled", "JIRA_SYNC_ENABLED")
+	_ = viper.BindEnv("jira.sync_interval", "JIRA_SYNC_INTERVAL")
+	_ = viper.BindEnv("jira.backfill_days", "JIRA_BACKFILL_DAYS")
+	_ = viper.BindEnv("jira.story_points_field", "JIRA_STORY_POINTS_FIELD")
+	_ = viper.BindEnv("jira.sprint_field", "JIRA_SPRINT_FIELD")
 	_ = viper.BindEnv("server.static_files_path", "STATIC_FILES_PATH")
 	_ = viper.BindEnv("server.port", "SERVER_PORT")
 	_ = viper.BindEnv("debug", "DEBUG")

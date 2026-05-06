@@ -378,25 +378,36 @@ they're in:
 github sync starting  mode=backfill  since=2025-11-07T00:00:00Z  repos=4
 ```
 
-**Jira (B2, snapshot writer not yet wired).**
-Three flavours of historical fetch are needed; we'll execute them in
-order on first run:
+**Jira (delivered in this branch via `internal/jirasync`).**
+Two JQL passes on first run; subsequent runs do an incremental pull:
 
-| Pass | JQL | Purpose |
-|---|---|---|
-| 1 | `project = X AND resolved >= -180d` | "Issues completed in window" — populates `issue_snapshots` with their *current* state, dated by `resolved_at`. |
-| 2 | `project = X AND created >= -180d AND resolved is EMPTY` | "Open work that started in window" — captures live WIP without forcing a re-snapshot of every old open ticket. |
-| 3 | for each issue from (1)+(2): `/issue/{key}/changelog` | Status timeline so cycle-time per resolved issue is computable. |
+| Pass | JQL | Purpose | Changelog? |
+|---|---|---|---|
+| 1 | `project = X AND resolved >= "<cutoff>"` | "Issues completed in window" — populates `issue_snapshots` with their *current* state, dated by `resolved_at`. | yes (`expand=changelog`, single round-trip) |
+| 2 | `project = X AND created >= "<cutoff>" AND resolution is EMPTY` | "Open work that started in window" — captures live WIP without re-snapshotting every old open ticket. | no |
+| Incremental | `project = X AND updated >= "<since>"` | Subsequent cycles. Re-fetches issues touched since the previous run, with a 1h overlap to absorb clock skew. | no |
 
-Pass 3 is the expensive one; we batch with the Jira REST `expand=changelog`
-parameter on the search endpoint to avoid N+1 round-trips. For our
-project (~3k issues / 6 mo), that's a single bulk fetch in < 1 minute.
+For our project (~3k issues / 6 mo), passes 1+2 typically complete in
+< 1 minute. Pagination is via `startAt`/`maxResults`, default 200 per
+page, with a `MaxBackfillIssues` safety cap.
 
 We deliberately do **not** try to reconstruct snapshots at every
 historical week boundary — only the resolution-time state. The rollup
 table places the issue in the week of its `resolved_at`, which is the
 right shape for "Jira done per week" without paying the
 state-reconstruction tax.
+
+**Member identity.** Every assignee seen during a Jira pass becomes
+(or updates) a row in `members` via `MemberIDFromUser` (priority:
+`email` → `accountID` → `name` → display-name hash). The same id is
+reused later when GitHub login is attached, so PR throughput and
+Jira completions land on the same member row.
+
+**Aggregator hookup.** After every successful Jira *or* GitHub sync
+the contributions aggregator runs `RebuildRecent` over a 187-day
+window (matches the default backfill, plus one week of slack). This
+keeps the rollup table consistent with the snapshot/PR tables without
+the operator triggering anything by hand.
 
 ### Failure modes & guardrails
 
@@ -515,15 +526,25 @@ roadmap-planner/
 │   └── prototype.html           <- interactive mock
 ├── backend/internal/storage/
 │   ├── store.go                 <- Store interface
-│   ├── sqlite.go                <- modernc.org/sqlite implementation
-│   ├── migrations.go            <- embedded SQL migrations
-│   ├── migrations/0001_init.sql <- schema from §6
-│   └── store_test.go            <- round-trip test
+│   ├── dialect.go               <- Dialect interface + sqlite & postgres dialects
+│   ├── generic.go               <- single Store impl, parameterised by Dialect
+│   ├── sqlite.go                <- OpenSQLite factory (modernc.org/sqlite)
+│   ├── postgres.go              <- OpenPostgres factory (jackc/pgx/v5)
+│   ├── migrations.go            <- dialect-aware migrations runner
+│   ├── migrations/0001_init.sql <- shared schema (§6)
+│   ├── store_test.go            <- SQLite round-trip
+│   └── dialect_test.go          <- rebind + week-start expressions
 ├── backend/internal/github/
-│   ├── client.go                <- minimal GitHub PR + review client
-│   └── sync.go                  <- incremental fetcher + Linker hooks
+│   ├── client.go                <- stdlib-only GitHub PR + review client
+│   └── sync.go                  <- incremental fetcher + Linker + backfill
+├── backend/internal/jira/
+│   └── snapshot_search.go       <- paginating JQL search → SnapshotIssue
+├── backend/internal/jirasync/
+│   ├── sync.go                  <- 3-pass backfill + incremental + member upsert
+│   └── sync_test.go             <- backfill→incremental round-trip + slug lock-down
 ├── backend/internal/contributions/
-│   ├── aggregator.go            <- member_week_metrics builder
+│   ├── aggregator.go            <- member_week_metrics builder (PRs + reviews + Jira)
+│   ├── aggregator_test.go       <- latest-snapshot dedup verified
 │   └── service.go               <- query layer behind the API
 ├── backend/internal/api/handlers/
 │   └── contributions.go         <- /api/contributions/* endpoints
@@ -536,24 +557,47 @@ What ships compiling and tested:
 
 - ✅ `storage` package: dialect-aware `genericStore` + `OpenSQLite` +
   `OpenPostgres` + migrations runner + read-back, with round-trip and
-  rebind tests.
+  rebind tests. SQLite DSN sets `_time_format=sqlite` so the date
+  functions in the aggregator parse stored timestamps correctly.
 - ✅ `github` package: `ListPullRequests(repo, since)`, `ListReviews(pr)`
   + Syncer with **first-run backfill** (default 180 days, configurable).
+- ✅ `jira.SearchSnapshots` — paginating, customfield-aware JQL search
+  returning `[]SnapshotIssue`. Story-points and sprint extraction work
+  for both Cloud (object) and GreenHopper (string) shapes.
+- ✅ `jirasync` package — first-run 3-pass backfill, incremental sync,
+  member identity resolution. Round-trip test against a fake Searcher
+  exercises both modes; a separate test locks down the slug priority.
+- ✅ `contributions.Aggregator` — PRs merged/reviewed + Jira issues
+  done + story points, with window-function deduplication across
+  multiple snapshot rows of the same issue. Round-trip test asserts
+  the latest-snapshot wins across two runs.
+- ✅ Auto-trigger: each successful Jira/GitHub sync runs
+  `RebuildRecent`, so the rollup table is consistent without manual
+  intervention.
 - ✅ Config wiring (`storage.{type,path,dsn,backfill_days}`,
-  `github.{token,repos,backfill_days}`); env-var overrides.
+  `github.{token,repos,backfill_days}`,
+  `jira.{sync_enabled,sync_interval,backfill_days,story_points_field,sprint_field}`);
+  env-var overrides.
 - ✅ Contributions handler — `/api/contributions/{members,team,members/:id,status}`
   registered behind AuthMiddleware.
 - ✅ Frontend **Team** tab and member-overview view, fed by the new endpoints.
 
-What's intentionally stubbed (TODOs marked in code, see B2/B3):
+What's intentionally stubbed (TODOs marked in code, see B3):
 
-- ⏳ Linker: only branch-name regex implemented; PR-title and commit-message
-  strategies are interfaces with TODOs.
-- ⏳ Aggregator: writes nothing yet — service queries hit the snapshot tables
-  directly. B2 will materialise the rollup table.
-- ⏳ Sprint awareness: Jira sprint custom-field reader is wired but not
-  emitting `sprint_id` into snapshots yet.
+- ⏳ Linker: branch-name + PR-title regex implemented (default Linker);
+  commit-message scan is in the interface but unimplemented.
+- ⏳ `review_latency_p50_hours`: the column exists and the field flows
+  through the read API, but the aggregator does not populate it yet.
+  B3 derives p50 from `pull_requests.first_review_at - created_at`
+  per (reviewer, week).
+- ⏳ Pillar / component slicing on rollups: the schema supports it
+  (rollup primary key includes both), but the aggregator currently
+  writes empty strings. B3 joins issue_snapshots against a
+  pillar→component map to fill them.
 - ⏳ Auth: GitHub token comes from config / env only; no per-user OAuth.
+- ⏳ Member-merge UI: identities currently rely on email matching
+  between Jira and GitHub. A future PATCH endpoint lets ops merge
+  identities when emails differ across systems.
 
 ---
 

@@ -31,6 +31,7 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/contributions"
 	ghclient "github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/github"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/jira"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/jirasync"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/calculators"
@@ -204,8 +205,45 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 		zap.Int("backfill_days", cfg.Storage.BackfillDays))
 
 	service := contributions.NewService(store)
+	aggregator := contributions.NewAggregator(store)
 	api.AddContributionsRoutes(router, store, service)
 	logger.Info("Contributions API routes added")
+
+	// Optional Jira sync goroutine.
+	//
+	// Jira credentials are required (we reuse the same Basic auth that
+	// the metrics collector uses). On the first run with no
+	// `collection_runs` row for source=jira, jirasync.Run does the
+	// 3-pass JQL backfill described in PROPOSAL.md §6.5. After each
+	// successful run the aggregator rebuilds the rollup window so the
+	// dashboards see the new data.
+	if cfg.Jira.SyncEnabled {
+		if cfg.Jira.BaseURL != "" && cfg.Jira.Username != "" && cfg.Jira.Password != "" {
+			jc, err := jira.NewClient(cfg.Jira.BaseURL, cfg.Jira.Username, cfg.Jira.Password, cfg.Jira.Project)
+			if err != nil {
+				logger.Error("jira sync: failed to build client", zap.Error(err))
+			} else {
+				backfill := cfg.Jira.BackfillDays
+				if backfill <= 0 {
+					backfill = cfg.Storage.BackfillDays
+				}
+				syncer := jirasync.NewSyncer(jc, store, jirasync.Config{
+					Project:          cfg.Jira.Project,
+					BackfillDays:     backfill,
+					StoryPointsField: cfg.Jira.StoryPointsField,
+					SprintField:      cfg.Jira.SprintField,
+				})
+				interval, err := time.ParseDuration(cfg.Jira.SyncInterval)
+				if err != nil {
+					interval = 30 * time.Minute
+				}
+				go runJiraSync(ctx, syncer, aggregator, interval)
+				logger.Info("Jira sync started", zap.Duration("interval", interval), zap.Int("backfill_days", backfill))
+			}
+		} else {
+			logger.Warn("jira.sync_enabled but credentials missing; skipping")
+		}
+	}
 
 	// Optional GitHub sync goroutine.
 	if cfg.GitHub.Enabled {
@@ -228,7 +266,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 			if err != nil {
 				interval = 30 * time.Minute
 			}
-			go runGitHubSync(ctx, syncer, interval)
+			go runGitHubSync(ctx, syncer, aggregator, interval)
 			logger.Info("GitHub sync started", zap.Duration("interval", interval), zap.Int("repos", len(repos)))
 		}
 	}
@@ -282,10 +320,17 @@ func parseRepos(specs []string) []ghclient.RepoConfig {
 	return out
 }
 
-func runGitHubSync(ctx context.Context, s *ghclient.Syncer, interval time.Duration) {
-	if err := s.Sync(ctx); err != nil {
-		logger.Error("Initial GitHub sync failed", zap.Error(err))
+func runGitHubSync(ctx context.Context, s *ghclient.Syncer, agg *contributions.Aggregator, interval time.Duration) {
+	doOne := func(label string) {
+		if err := s.Sync(ctx); err != nil {
+			logger.Error(label+" GitHub sync failed", zap.Error(err))
+			return
+		}
+		if err := agg.RebuildRecent(ctx, 0); err != nil {
+			logger.Warn("aggregator rebuild after GitHub sync failed", zap.Error(err))
+		}
 	}
+	doOne("Initial")
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	for {
@@ -293,9 +338,39 @@ func runGitHubSync(ctx context.Context, s *ghclient.Syncer, interval time.Durati
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			if err := s.Sync(ctx); err != nil {
-				logger.Error("GitHub sync failed", zap.Error(err))
-			}
+			doOne("Periodic")
+		}
+	}
+}
+
+// runJiraSync mirrors runGitHubSync: one initial cycle, then a ticker.
+// Each successful run triggers an aggregator rebuild so the rollups
+// stay in step with the snapshot data.
+func runJiraSync(ctx context.Context, s *jirasync.Syncer, agg *contributions.Aggregator, interval time.Duration) {
+	doOne := func(label string) {
+		res, err := s.Run(ctx)
+		if err != nil {
+			logger.Error(label+" Jira sync failed", zap.Error(err))
+			return
+		}
+		logger.Info(label+" Jira sync complete",
+			zap.String("mode", res.Mode),
+			zap.Int("issues", res.IssuesWritten),
+			zap.Int("members", res.MembersSeen),
+			zap.Int64("duration_ms", res.DurationMs))
+		if err := agg.RebuildRecent(ctx, 0); err != nil {
+			logger.Warn("aggregator rebuild after Jira sync failed", zap.Error(err))
+		}
+	}
+	doOne("Initial")
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			doOne("Periodic")
 		}
 	}
 }

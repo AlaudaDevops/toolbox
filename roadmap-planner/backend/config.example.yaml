@@ -11,6 +11,15 @@ jira:
   password: "your-api-token"  # Use API token for better security
   project: "DEVOPS"
 
+  # Team-analytics Jira ingestion. Independent of metrics.enabled —
+  # this drives the issue_snapshots table and the Team dashboard.
+  # Requires storage.enabled = true.
+  sync_enabled: false
+  sync_interval: "30m"
+  backfill_days: 0             # 0 = inherit storage.backfill_days
+  story_points_field: ""       # e.g. "customfield_10016" — leave empty to skip
+  sprint_field: ""             # e.g. "customfield_10020" — leave empty to skip
+
 # Server configuration
 server:
   port: 8080

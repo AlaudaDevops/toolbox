@@ -28,12 +28,20 @@ import (
 //     throughput; any single lost cycle is reconstructable from Jira.
 //   - busy_timeout=5000 — back off short lock collisions instead of failing.
 //   - foreign_keys=ON — we declare FKs in the schema; let the DB enforce.
+//
+// The `_time_format=sqlite` driver flag is critical and easy to miss:
+// modernc.org/sqlite's default stores time.Time using Go's String()
+// format ("2026-05-04 12:00:00 +0000 UTC"), which SQLite's date/time
+// functions cannot parse — DATE(col, 'weekday 1', '-7 days') silently
+// returns NULL. With `_time_format=sqlite` the value is stored as
+// "2026-05-04 12:00:00+00:00", which all date functions accept and
+// time.Time still scans back from cleanly.
 func OpenSQLite(path string) (Store, error) {
 	if path == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
 	dsn := fmt.Sprintf(
-		"file:%s?_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)",
+		"file:%s?_time_format=sqlite&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(ON)",
 		path,
 	)
 	db, err := sql.Open("sqlite", dsn)

@@ -132,14 +132,76 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		return fmt.Errorf("aggregate reviews: %w", err)
 	}
 
-	// TODO(B2): jira_issues_done, jira_points_done — needs the latest
-	// run_id snapshot per (assignee_id, resolved_at) to avoid double-
-	// counting an issue that appears in N consecutive snapshots.
-	// TODO(B2): review_latency_p50_hours — derive from
+	// Jira issues done + story points, by assignee × week.
+	//
+	// Two subtleties this query handles:
+	//
+	//   1. An issue can appear in many `issue_snapshots` rows (one per
+	//      collection cycle). The window function picks the *latest*
+	//      snapshot per `issue_key` so we count each issue exactly once,
+	//      using its most-recent state.
+	//
+	//   2. We only count issues with a non-null `resolved_at` falling in
+	//      the [from, to) window. `resolved_at` is set by Jira on the
+	//      transition into a Done-class status; using it instead of a
+	//      status-name allowlist keeps the aggregator agnostic to each
+	//      project's workflow naming.
+	//
+	// "Latest" needs a temporal order on runs — `collection_runs.captured_at`
+	// is the canonical clock, not `issue_snapshots.run_id` (which is a
+	// string).
+	jiraSQL := rebind(fmt.Sprintf(`
+		INSERT INTO member_week_metrics (member_id, week_start, pillar_id, component, jira_issues_done, jira_points_done)
+		SELECT
+		    assignee_id,
+		    %s AS week_start,
+		    '' AS pillar_id,
+		    '' AS component,
+		    COUNT(*),
+		    COALESCE(SUM(story_points), 0)
+		FROM (
+		    SELECT s.assignee_id, s.resolved_at, s.story_points, s.issue_key,
+		           ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
+		    FROM issue_snapshots s
+		    JOIN collection_runs r ON s.run_id = r.id
+		    WHERE s.resolved_at IS NOT NULL
+		      AND s.resolved_at >= ?
+		      AND s.resolved_at <  ?
+		) ranked
+		WHERE rn = 1
+		  AND assignee_id IS NOT NULL
+		GROUP BY 1, 2
+		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
+		    jira_issues_done = excluded.jira_issues_done,
+		    jira_points_done = excluded.jira_points_done`, dialect.WeekStart("resolved_at")))
+
+	if _, err := db.ExecContext(ctx, jiraSQL, from, to); err != nil {
+		return fmt.Errorf("aggregate jira: %w", err)
+	}
+
+	// TODO(B3): review_latency_p50_hours — derive from
 	// pull_requests.first_review_at - pull_requests.created_at, p50 by
-	// (reviewer_id, week).
+	// (reviewer_id, week). p50 across reviews per author per week.
 
 	return nil
+}
+
+// RebuildRecent is a convenience wrapper for the auto-trigger after a
+// successful sync: it rebuilds the rollup over a recent-history window
+// large enough to cover both the backfill default and any out-of-band
+// updates we may have absorbed (e.g., a back-dated `resolved` change).
+//
+// Default window is the last (storageBackfillDays + 7) days, capped at
+// 365. Pass days=0 to use the default.
+func (a *Aggregator) RebuildRecent(ctx context.Context, days int) error {
+	if days <= 0 {
+		days = 187
+	}
+	if days > 365 {
+		days = 365
+	}
+	now := time.Now().UTC()
+	return a.Rebuild(ctx, MondayOf(now.AddDate(0, 0, -days)), MondayOf(now.AddDate(0, 0, 7)))
 }
 
 // MondayOf returns the Monday 00:00 UTC of t's week.
