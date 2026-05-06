@@ -78,3 +78,22 @@ metrics:
       enabled: true
       options:
         bug_types: ["Bug", "Vulnerability", "Security"]
+
+# Team analytics — durable store for historical Jira + GitHub data.
+# See docs/team-analytics/PROPOSAL.md for the full design.
+storage:
+  enabled: false               # set true to enable team analytics
+  type: "sqlite"               # only "sqlite" supported today; postgres planned
+  path: "./data/roadmap.db"
+
+# GitHub ingestion — pulls PRs and reviews into the storage tier.
+# Requires storage.enabled = true.
+github:
+  enabled: false
+  base_url: ""                 # empty -> api.github.com; set for GHES
+  token: ""                    # or set GITHUB_TOKEN env var
+  sync_interval: "30m"
+  project_key: ""              # for the default Linker; defaults to jira.project
+  repos:
+    - "AlaudaDevops/toolbox"
+    # - "owner/name:component"  # optional component label per repo

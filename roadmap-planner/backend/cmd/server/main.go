@@ -22,15 +22,19 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/contributions"
+	ghclient "github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/github"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/jira"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/calculators"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/storage"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -81,6 +85,18 @@ func main() {
 		err = initMetrics(ctx, router, cfg)
 		if err != nil {
 			logger.Error("Failed to initialize metrics system", zap.Error(err))
+		}
+	}
+
+	// Initialize team-analytics storage + GitHub sync if enabled.
+	//
+	// We open the store once and let it close on process exit; the
+	// GitHub syncer runs on a configurable interval in its own goroutine.
+	// Both are no-ops when the corresponding config blocks are off, so
+	// existing deployments stay unchanged.
+	if cfg.Storage.Enabled {
+		if err := initTeamAnalytics(ctx, router, cfg); err != nil {
+			logger.Error("Failed to initialize team analytics", zap.Error(err))
 		}
 	}
 
@@ -169,6 +185,91 @@ func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) er
 		go prometheusExporter.StartUpdater(ctx, 1*time.Minute)
 	}
 	return nil
+}
+
+// initTeamAnalytics opens the persistent store, runs migrations, mounts
+// the contributions REST endpoints, and (if configured) starts the
+// GitHub sync loop. Failures here are non-fatal — the rest of the app
+// continues to serve roadmap + metrics.
+func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Config) error {
+	if cfg.Storage.Type != "" && cfg.Storage.Type != "sqlite" {
+		return fmt.Errorf("storage.type %q not yet implemented", cfg.Storage.Type)
+	}
+	store, err := storage.OpenSQLite(cfg.Storage.Path)
+	if err != nil {
+		return fmt.Errorf("open store: %w", err)
+	}
+	if err := store.Migrate(ctx); err != nil {
+		return fmt.Errorf("migrate: %w", err)
+	}
+	logger.Info("Team analytics store ready", zap.String("path", cfg.Storage.Path))
+
+	service := contributions.NewService(store)
+	api.AddContributionsRoutes(router, store, service)
+	logger.Info("Contributions API routes added")
+
+	// Optional GitHub sync goroutine.
+	if cfg.GitHub.Enabled {
+		repos := parseRepos(cfg.GitHub.Repos)
+		if len(repos) == 0 {
+			logger.Warn("github.enabled but github.repos is empty; skipping sync")
+		} else {
+			projectKey := cfg.GitHub.ProjectKey
+			if projectKey == "" {
+				projectKey = cfg.Jira.Project
+			}
+			client := ghclient.New(cfg.GitHub.BaseURL, cfg.GitHub.Token, nil)
+			syncer := ghclient.NewSyncer(client, store, repos, ghclient.DefaultLinker(projectKey))
+
+			interval, err := time.ParseDuration(cfg.GitHub.SyncInterval)
+			if err != nil {
+				interval = 30 * time.Minute
+			}
+			go runGitHubSync(ctx, syncer, interval)
+			logger.Info("GitHub sync started", zap.Duration("interval", interval), zap.Int("repos", len(repos)))
+		}
+	}
+
+	go func() {
+		<-ctx.Done()
+		_ = store.Close()
+	}()
+	return nil
+}
+
+func parseRepos(specs []string) []ghclient.RepoConfig {
+	out := make([]ghclient.RepoConfig, 0, len(specs))
+	for _, raw := range specs {
+		// "owner/name" or "owner/name:component"
+		spec, comp, _ := strings.Cut(raw, ":")
+		owner, name, ok := strings.Cut(spec, "/")
+		if !ok || owner == "" || name == "" {
+			logger.Warn("malformed github repo spec, skipping", zap.String("spec", raw))
+			continue
+		}
+		out = append(out, ghclient.RepoConfig{
+			Owner: owner, Name: name, Component: comp,
+		})
+	}
+	return out
+}
+
+func runGitHubSync(ctx context.Context, s *ghclient.Syncer, interval time.Duration) {
+	if err := s.Sync(ctx); err != nil {
+		logger.Error("Initial GitHub sync failed", zap.Error(err))
+	}
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := s.Sync(ctx); err != nil {
+				logger.Error("GitHub sync failed", zap.Error(err))
+			}
+		}
+	}
 }
 
 // registerCalculators registers all metric calculators with the service

@@ -1,0 +1,162 @@
+/*
+ * Team Analytics — visual language matches the rest of the Atlas /
+ * Platform editions: serif display, mono captions, restrained palette.
+ * All colours come from the existing CSS-vars system in App.css so we
+ * inherit the dark/light + theme switches for free.
+ */
+.ta-root {
+  padding: 22px 24px 80px;
+  max-width: 1280px;
+  margin: 0 auto;
+  font-family: var(--font-ui, system-ui, sans-serif);
+  color: var(--fg, #1a1a1a);
+}
+
+.ta-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  border-bottom: 1px solid var(--border, #d8d2c4);
+  padding-bottom: 18px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.ta-eyebrow {
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #888280);
+}
+.ta-title {
+  font-family: var(--font-display, var(--font-serif, serif));
+  font-size: 28px;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 6px 0 4px;
+}
+.ta-sub {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted, #888280);
+  margin: 0;
+}
+
+.ta-status { display: flex; gap: 8px; flex-wrap: wrap; }
+.ta-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border: 1px solid var(--border, #d8d2c4);
+  border-radius: 999px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--fg-soft, #4a4a4a);
+  background: var(--bg-elevated, #fff);
+}
+.ta-badge--ok   { border-color: #6cb073; }
+.ta-badge--warn { border-color: #d6a458; color: var(--fg-soft, #4a4a4a); }
+.ta-badge--bad  { border-color: #b8443c; color: #b8443c; }
+
+/* ---------- panel + table ---------- */
+.ta-panel {
+  background: var(--bg-elevated, #fff);
+  border: 1px solid var(--border-soft, #e6e2d6);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ta-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ta-th {
+  text-align: left;
+  padding: 10px 14px;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #888280);
+  background: var(--bg-soft, #f0ede5);
+  border-bottom: 1px solid var(--border-soft, #e6e2d6);
+  user-select: none;
+  white-space: nowrap;
+}
+.ta-th--right { text-align: right; }
+.ta-th.is-sortable { cursor: pointer; }
+.ta-th.is-sortable:hover { color: var(--fg-soft, #4a4a4a); }
+.ta-th.is-sorted { color: var(--accent, #b8443c); }
+.ta-arrow { display: inline-block; margin-left: 4px; font-family: inherit; }
+
+.ta-td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-soft, #e6e2d6);
+  vertical-align: middle;
+}
+.ta-table tr:last-child .ta-td { border-bottom: 0; }
+.ta-td--right { text-align: right; }
+.ta-td--member { display: flex; align-items: center; gap: 12px; }
+.mono { font-family: var(--font-mono, monospace); font-variant-numeric: tabular-nums; }
+
+.ta-avatar {
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  background: var(--accent-soft, #efd9d4);
+  color: var(--accent, #b8443c);
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  border: 1px solid var(--border, #d8d2c4);
+  flex-shrink: 0;
+}
+
+.ta-name { font-weight: 500; font-size: 13.5px; }
+.ta-meta { font-size: 10.5px; color: var(--fg-muted, #888280); }
+
+.ta-spark { display: block; color: var(--accent, #b8443c); }
+.ta-spark--empty { font-family: var(--font-mono, monospace); color: var(--fg-muted, #888280); }
+
+.ta-loading {
+  padding: 16px; text-align: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 11px; color: var(--fg-muted, #888280);
+  border-top: 1px solid var(--border-soft, #e6e2d6);
+}
+
+/* ---------- empty + banner ---------- */
+.ta-empty {
+  padding: 48px 32px;
+  text-align: center;
+  background: var(--bg-elevated, #fff);
+  border: 1px dashed var(--border, #d8d2c4);
+  border-radius: 4px;
+}
+.ta-empty h3 { font-family: var(--font-display, var(--font-serif, serif)); font-size: 18px; margin: 0 0 8px; }
+.ta-empty p { font-size: 13px; color: var(--fg-soft, #4a4a4a); max-width: 540px; margin: 4px auto; }
+.ta-empty a { color: var(--accent, #b8443c); }
+
+.ta-banner {
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.ta-banner--bad { background: #fdf1f0; border: 1px solid #f3c8c4; color: #8d2a23; }
+
+/* ---------- footer ---------- */
+.ta-foot {
+  display: flex;
+  gap: 14px;
+  align-items: baseline;
+  padding-top: 16px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border-soft, #e6e2d6);
+  font-size: 12px;
+  color: var(--fg-muted, #888280);
+}
+.ta-foot .mono { padding: 2px 8px; border: 1px solid var(--border, #d8d2c4); border-radius: 2px; font-size: 10.5px; letter-spacing: 0.16em; }

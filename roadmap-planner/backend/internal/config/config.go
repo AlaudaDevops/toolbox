@@ -31,6 +31,33 @@ type Config struct {
 	Server  Server  `mapstructure:"server"`
 	Cache   Cache   `mapstructure:"cache"`
 	Metrics Metrics `mapstructure:"metrics"`
+	Storage Storage `mapstructure:"storage"`
+	GitHub  GitHub  `mapstructure:"github"`
+}
+
+// Storage configures the durable team-analytics store.
+//
+// Type currently supports "sqlite" only; "postgres" is intentionally
+// reserved so callers can plan for the migration without us shipping it
+// before B3.
+type Storage struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Type    string `mapstructure:"type"` // "sqlite" (default)
+	Path    string `mapstructure:"path"` // e.g. "./data/roadmap.db"
+}
+
+// GitHub configures the team-analytics GitHub ingestion.
+//
+// Repos are listed as "owner/name" strings; "owner/name:component" syntax
+// also works to attach a component label to every PR fetched from that
+// repo. The token resolves from env (GITHUB_TOKEN) or Token here.
+type GitHub struct {
+	Enabled      bool     `mapstructure:"enabled"`
+	BaseURL      string   `mapstructure:"base_url"` // empty -> api.github.com
+	Token        string   `mapstructure:"token"`
+	SyncInterval string   `mapstructure:"sync_interval"` // duration, e.g. "30m"
+	Repos        []string `mapstructure:"repos"`
+	ProjectKey   string   `mapstructure:"project_key"` // for the default Linker (defaults to Jira.Project)
 }
 
 // Logger represents logger configuration settings
@@ -214,6 +241,17 @@ func Load() (*Config, error) {
 	viper.SetDefault("metrics.prometheus.namespace", "roadmap")
 	viper.SetDefault("metrics.filters", []OptionsConfig{})
 
+	// Storage defaults
+	viper.SetDefault("storage.enabled", false)
+	viper.SetDefault("storage.type", "sqlite")
+	viper.SetDefault("storage.path", "./data/roadmap.db")
+
+	// GitHub defaults
+	viper.SetDefault("github.enabled", false)
+	viper.SetDefault("github.base_url", "")
+	viper.SetDefault("github.sync_interval", "30m")
+	viper.SetDefault("github.repos", []string{})
+
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
@@ -228,6 +266,12 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("metrics.enabled", "METRICS_ENABLED")
 	_ = viper.BindEnv("metrics.collection_interval", "METRICS_COLLECTION_INTERVAL")
 	_ = viper.BindEnv("metrics.historical_days", "METRICS_HISTORICAL_DAYS")
+	_ = viper.BindEnv("storage.enabled", "STORAGE_ENABLED")
+	_ = viper.BindEnv("storage.path", "STORAGE_PATH")
+	_ = viper.BindEnv("github.enabled", "GITHUB_ENABLED")
+	_ = viper.BindEnv("github.token", "GITHUB_TOKEN")
+	_ = viper.BindEnv("github.base_url", "GITHUB_BASE_URL")
+	_ = viper.BindEnv("github.sync_interval", "GITHUB_SYNC_INTERVAL")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

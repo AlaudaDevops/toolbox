@@ -25,7 +25,9 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/handlers"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/api/middleware"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/contributions"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/storage"
 	"github.com/gin-gonic/gin"
 )
 
@@ -129,6 +131,33 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	}
 
 	return router
+}
+
+// AddContributionsRoutes mounts the team-analytics REST surface on an
+// existing router. Wired in main.go when storage.enabled is true.
+//
+// Endpoints (all behind AuthMiddleware so the same Jira credentials gate
+// access as the rest of the app — we deliberately do not expose member
+// metrics anonymously):
+//
+//   GET /api/contributions/members            — directory of members
+//   GET /api/contributions/team               — team-overview rollups
+//   GET /api/contributions/members/:id        — single member detail
+//   GET /api/contributions/status             — last-sync timestamps
+func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service) {
+	if store == nil || service == nil {
+		return
+	}
+	h := handlers.NewContributionsHandler(store, service)
+	api := router.Group("/api")
+	g := api.Group("/contributions")
+	g.Use(middleware.AuthMiddleware())
+	{
+		g.GET("/members", h.ListMembers)
+		g.GET("/team", h.TeamOverview)
+		g.GET("/members/:id", h.MemberDetail)
+		g.GET("/status", h.CollectorStatus)
+	}
 }
 
 // AddMetricsRoutes adds metrics-related routes to an existing router

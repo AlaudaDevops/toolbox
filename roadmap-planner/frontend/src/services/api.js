@@ -198,6 +198,41 @@ export const metricsAPI = {
   },
 };
 
+export const contributionsAPI = {
+  // Directory of known members.
+  listMembers: async () => {
+    const response = await api.get('/api/contributions/members');
+    return response.data;
+  },
+
+  // Team rollup for a window. `from` / `to` are ISO YYYY-MM-DD; if
+  // omitted, the backend defaults to the last 12 weeks (matches the
+  // prototype).
+  team: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    if (filters.pillar) params.set('pillar', filters.pillar);
+    if (filters.component) params.set('component', filters.component);
+    const response = await api.get(`/api/contributions/team?${params.toString()}`);
+    return response.data;
+  },
+
+  member: async (id, filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    const response = await api.get(`/api/contributions/members/${id}?${params.toString()}`);
+    return response.data;
+  },
+
+  // Last-sync timestamps per source (jira / github).
+  status: async () => {
+    const response = await api.get('/api/contributions/status');
+    return response.data;
+  },
+};
+
 // Error handling helper
 export const handleAPIError = (error) => {
   if (error.response) {
