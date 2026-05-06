@@ -37,13 +37,19 @@ type Config struct {
 
 // Storage configures the durable team-analytics store.
 //
-// Type currently supports "sqlite" only; "postgres" is intentionally
-// reserved so callers can plan for the migration without us shipping it
-// before B3.
+// Type supports "sqlite" (default, file-based, single-binary) or
+// "postgres" (DSN in DSN, recommended for shared deployments). Path is
+// only consulted for sqlite; DSN is only consulted for postgres.
+//
+// BackfillDays controls how far back the *first* collection cycle
+// reaches. After the first run we resume incrementally from the
+// previous run's timestamp. Default 180.
 type Storage struct {
-	Enabled bool   `mapstructure:"enabled"`
-	Type    string `mapstructure:"type"` // "sqlite" (default)
-	Path    string `mapstructure:"path"` // e.g. "./data/roadmap.db"
+	Enabled      bool   `mapstructure:"enabled"`
+	Type         string `mapstructure:"type"`          // "sqlite" | "postgres"
+	Path         string `mapstructure:"path"`          // e.g. "./data/roadmap.db" (sqlite)
+	DSN          string `mapstructure:"dsn"`           // e.g. "postgres://…" (postgres)
+	BackfillDays int    `mapstructure:"backfill_days"` // first-run window, default 180
 }
 
 // GitHub configures the team-analytics GitHub ingestion.
@@ -51,13 +57,18 @@ type Storage struct {
 // Repos are listed as "owner/name" strings; "owner/name:component" syntax
 // also works to attach a component label to every PR fetched from that
 // repo. The token resolves from env (GITHUB_TOKEN) or Token here.
+//
+// BackfillDays overrides Storage.BackfillDays for the GitHub side
+// specifically. Useful when GitHub history is shorter than Jira history
+// (e.g., the repo was migrated recently).
 type GitHub struct {
 	Enabled      bool     `mapstructure:"enabled"`
 	BaseURL      string   `mapstructure:"base_url"` // empty -> api.github.com
 	Token        string   `mapstructure:"token"`
 	SyncInterval string   `mapstructure:"sync_interval"` // duration, e.g. "30m"
 	Repos        []string `mapstructure:"repos"`
-	ProjectKey   string   `mapstructure:"project_key"` // for the default Linker (defaults to Jira.Project)
+	ProjectKey   string   `mapstructure:"project_key"`   // for the default Linker (defaults to Jira.Project)
+	BackfillDays int      `mapstructure:"backfill_days"` // first-run window override; 0 = inherit Storage.BackfillDays
 }
 
 // Logger represents logger configuration settings
@@ -245,12 +256,15 @@ func Load() (*Config, error) {
 	viper.SetDefault("storage.enabled", false)
 	viper.SetDefault("storage.type", "sqlite")
 	viper.SetDefault("storage.path", "./data/roadmap.db")
+	viper.SetDefault("storage.dsn", "")
+	viper.SetDefault("storage.backfill_days", 180)
 
 	// GitHub defaults
 	viper.SetDefault("github.enabled", false)
 	viper.SetDefault("github.base_url", "")
 	viper.SetDefault("github.sync_interval", "30m")
 	viper.SetDefault("github.repos", []string{})
+	viper.SetDefault("github.backfill_days", 0) // inherit storage.backfill_days
 
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -267,11 +281,15 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("metrics.collection_interval", "METRICS_COLLECTION_INTERVAL")
 	_ = viper.BindEnv("metrics.historical_days", "METRICS_HISTORICAL_DAYS")
 	_ = viper.BindEnv("storage.enabled", "STORAGE_ENABLED")
+	_ = viper.BindEnv("storage.type", "STORAGE_TYPE")
 	_ = viper.BindEnv("storage.path", "STORAGE_PATH")
+	_ = viper.BindEnv("storage.dsn", "STORAGE_DSN")
+	_ = viper.BindEnv("storage.backfill_days", "STORAGE_BACKFILL_DAYS")
 	_ = viper.BindEnv("github.enabled", "GITHUB_ENABLED")
 	_ = viper.BindEnv("github.token", "GITHUB_TOKEN")
 	_ = viper.BindEnv("github.base_url", "GITHUB_BASE_URL")
 	_ = viper.BindEnv("github.sync_interval", "GITHUB_SYNC_INTERVAL")
+	_ = viper.BindEnv("github.backfill_days", "GITHUB_BACKFILL_DAYS")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

@@ -192,17 +192,16 @@ func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) er
 // GitHub sync loop. Failures here are non-fatal — the rest of the app
 // continues to serve roadmap + metrics.
 func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Config) error {
-	if cfg.Storage.Type != "" && cfg.Storage.Type != "sqlite" {
-		return fmt.Errorf("storage.type %q not yet implemented", cfg.Storage.Type)
-	}
-	store, err := storage.OpenSQLite(cfg.Storage.Path)
+	store, err := openStore(cfg.Storage)
 	if err != nil {
 		return fmt.Errorf("open store: %w", err)
 	}
 	if err := store.Migrate(ctx); err != nil {
 		return fmt.Errorf("migrate: %w", err)
 	}
-	logger.Info("Team analytics store ready", zap.String("path", cfg.Storage.Path))
+	logger.Info("Team analytics store ready",
+		zap.String("type", cfg.Storage.Type),
+		zap.Int("backfill_days", cfg.Storage.BackfillDays))
 
 	service := contributions.NewService(store)
 	api.AddContributionsRoutes(router, store, service)
@@ -219,7 +218,11 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 				projectKey = cfg.Jira.Project
 			}
 			client := ghclient.New(cfg.GitHub.BaseURL, cfg.GitHub.Token, nil)
-			syncer := ghclient.NewSyncer(client, store, repos, ghclient.DefaultLinker(projectKey))
+			backfill := cfg.GitHub.BackfillDays
+			if backfill <= 0 {
+				backfill = cfg.Storage.BackfillDays
+			}
+			syncer := ghclient.NewSyncer(client, store, repos, ghclient.DefaultLinker(projectKey), backfill)
 
 			interval, err := time.ParseDuration(cfg.GitHub.SyncInterval)
 			if err != nil {
@@ -235,6 +238,31 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 		_ = store.Close()
 	}()
 	return nil
+}
+
+// openStore selects the right storage backend based on cfg.Type. We
+// keep this here in main rather than in the storage package so that
+// adding new backends doesn't pull every driver into every binary.
+func openStore(cfg config.Storage) (storage.Store, error) {
+	t := cfg.Type
+	if t == "" {
+		t = "sqlite"
+	}
+	switch t {
+	case "sqlite":
+		return storage.OpenSQLite(cfg.Path)
+	case "postgres", "postgresql", "pg":
+		dsn := cfg.DSN
+		if dsn == "" {
+			dsn = os.Getenv("STORAGE_DSN")
+		}
+		if dsn == "" {
+			return nil, fmt.Errorf("storage.type=postgres but storage.dsn / STORAGE_DSN is empty")
+		}
+		return storage.OpenPostgres(dsn)
+	default:
+		return nil, fmt.Errorf("unknown storage.type %q", t)
+	}
 }
 
 func parseRepos(specs []string) []ghclient.RepoConfig {

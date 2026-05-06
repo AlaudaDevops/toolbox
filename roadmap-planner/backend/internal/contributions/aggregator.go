@@ -46,27 +46,55 @@ func NewAggregator(store storage.Store) *Aggregator {
 //
 // from / to should be week boundaries (Monday 00:00 UTC); MondayOf
 // rounds for callers that need help.
+//
+// Dialect-aware: the week-start expression and placeholder syntax both
+// route through the underlying storage.Dialect, so the same code runs on
+// SQLite and Postgres.
 func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 	if !to.After(from) {
 		return fmt.Errorf("rebuild: to must be after from (got %s, %s)", from, to)
 	}
 	a.logger.Info("rebuilding rollups", zap.Time("from", from), zap.Time("to", to))
 
+	d, ok := a.store.(interface{ Dialect() storage.Dialect })
+	if !ok {
+		return fmt.Errorf("rebuild: store does not expose a Dialect")
+	}
+	dialect := d.Dialect()
 	db := a.store.DB()
-	if _, err := db.ExecContext(ctx,
-		`DELETE FROM member_week_metrics WHERE week_start >= ? AND week_start < ?`,
+
+	rebind := func(q string) string {
+		// Local copy of storage.rebind via the dialect's placeholder.
+		// Kept here to avoid exporting rebind from the storage package.
+		if dialect.Placeholder(1) == "?" {
+			return q
+		}
+		var b []byte
+		n := 1
+		for i := 0; i < len(q); i++ {
+			if q[i] == '?' {
+				b = append(b, []byte(dialect.Placeholder(n))...)
+				n++
+			} else {
+				b = append(b, q[i])
+			}
+		}
+		return string(b)
+	}
+
+	if _, err := db.ExecContext(ctx, rebind(
+		`DELETE FROM member_week_metrics WHERE week_start >= ? AND week_start < ?`),
 		from, to); err != nil {
 		return fmt.Errorf("clear window: %w", err)
 	}
 
 	// PRs merged, by author × week. Pillar/component empty for now —
 	// requires the repos table to be populated, which B2 fixes.
-	prSQL := `
+	prSQL := rebind(fmt.Sprintf(`
 		INSERT INTO member_week_metrics (member_id, week_start, pillar_id, component, prs_merged)
 		SELECT
 		    pr.author_id AS member_id,
-		    -- Truncate merged_at to its Monday 00:00 UTC.
-		    DATE(merged_at, 'weekday 1', '-7 days') AS week_start,
+		    %s AS week_start,
 		    '' AS pillar_id,
 		    '' AS component,
 		    COUNT(*) AS prs_merged
@@ -77,18 +105,18 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		  AND pr.merged_at <  ?
 		GROUP BY 1, 2
 		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
-		    prs_merged = excluded.prs_merged`
+		    prs_merged = excluded.prs_merged`, dialect.WeekStart("merged_at")))
 
 	if _, err := db.ExecContext(ctx, prSQL, from, to); err != nil {
 		return fmt.Errorf("aggregate PRs: %w", err)
 	}
 
 	// PRs reviewed, by reviewer × week.
-	reviewSQL := `
+	reviewSQL := rebind(fmt.Sprintf(`
 		INSERT INTO member_week_metrics (member_id, week_start, pillar_id, component, prs_reviewed)
 		SELECT
 		    rv.reviewer_id AS member_id,
-		    DATE(submitted_at, 'weekday 1', '-7 days') AS week_start,
+		    %s AS week_start,
 		    '' AS pillar_id,
 		    '' AS component,
 		    COUNT(DISTINCT pr_id) AS prs_reviewed
@@ -98,7 +126,7 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		  AND rv.submitted_at <  ?
 		GROUP BY 1, 2
 		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
-		    prs_reviewed = excluded.prs_reviewed`
+		    prs_reviewed = excluded.prs_reviewed`, dialect.WeekStart("submitted_at")))
 
 	if _, err := db.ExecContext(ctx, reviewSQL, from, to); err != nil {
 		return fmt.Errorf("aggregate reviews: %w", err)

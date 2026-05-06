@@ -60,10 +60,11 @@ func loadMigrations() ([]migration, error) {
 // runMigrations applies all pending migrations on db. Idempotent.
 //
 // We split each file on `;` followed by EOL because database/sql drivers
-// vary in how they handle multi-statement Exec. SQLite (`modernc.org/sqlite`)
-// supports it; lib/pq does too. We keep this dumb-split for now and tighten
-// when we add Postgres.
-func runMigrations(ctx context.Context, db *sql.DB) error {
+// vary in how they handle multi-statement Exec. The DDL itself is
+// portable between SQLite and Postgres (see migrations/0001_init.sql);
+// only the bookkeeping insert into schema_migrations needs dialect-aware
+// placeholder rewriting.
+func runMigrations(ctx context.Context, db *sql.DB, d Dialect) error {
 	migs, err := loadMigrations()
 	if err != nil {
 		return err
@@ -96,14 +97,14 @@ func runMigrations(ctx context.Context, db *sql.DB) error {
 		if applied[m.version] {
 			continue
 		}
-		if err := applyMigration(ctx, db, m); err != nil {
+		if err := applyMigration(ctx, db, d, m); err != nil {
 			return fmt.Errorf("apply %s: %w", m.name, err)
 		}
 	}
 	return nil
 }
 
-func applyMigration(ctx context.Context, db *sql.DB, m migration) error {
+func applyMigration(ctx context.Context, db *sql.DB, d Dialect, m migration) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -118,7 +119,8 @@ func applyMigration(ctx context.Context, db *sql.DB, m migration) error {
 			return fmt.Errorf("statement %q: %w", firstLine(stmt), err)
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)`,
+	insertSQL := rebind(d, `INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)`)
+	if _, err := tx.ExecContext(ctx, insertSQL,
 		m.version, time.Now().UTC()); err != nil {
 		return err
 	}

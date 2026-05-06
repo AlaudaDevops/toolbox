@@ -83,8 +83,10 @@ metrics:
 # See docs/team-analytics/PROPOSAL.md for the full design.
 storage:
   enabled: false               # set true to enable team analytics
-  type: "sqlite"               # only "sqlite" supported today; postgres planned
-  path: "./data/roadmap.db"
+  type: "sqlite"               # "sqlite" (file-based) or "postgres"
+  path: "./data/roadmap.db"    # for type=sqlite
+  dsn: ""                      # for type=postgres, e.g. "postgres://user:pass@host:5432/roadmap?sslmode=disable"
+  backfill_days: 180           # first-run window: how far back to fetch on initial cycle
 
 # GitHub ingestion — pulls PRs and reviews into the storage tier.
 # Requires storage.enabled = true.
@@ -94,6 +96,7 @@ github:
   token: ""                    # or set GITHUB_TOKEN env var
   sync_interval: "30m"
   project_key: ""              # for the default Linker; defaults to jira.project
+  backfill_days: 0             # 0 = inherit storage.backfill_days
   repos:
     - "AlaudaDevops/toolbox"
     # - "owner/name:component"  # optional component label per repo

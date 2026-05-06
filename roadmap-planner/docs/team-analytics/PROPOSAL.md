@@ -340,6 +340,137 @@ Notes worth calling out:
 
 ---
 
+## 6.5 Initial backfill — first-run policy
+
+Persistent storage is only useful if there is data to look at. Asking
+the user to wait 12 weeks for the dashboards to fill is a non-starter,
+so the **first** collection cycle on each source reaches back into
+history before resuming incremental sync.
+
+### Configuration
+
+```yaml
+storage:
+  backfill_days: 180             # default — used by every source unless overridden
+github:
+  backfill_days: 0               # 0 = inherit storage.backfill_days
+```
+
+A single number controls the window. We deliberately keep it narrow:
+one knob, two override points (storage + per-source), no `from`/`to`
+date ranges. If someone needs surgical control they can run a one-off
+import job; the auto-pilot stays simple.
+
+### Mechanics, per source
+
+**GitHub (B1, in this branch).**
+The Syncer probes `collection_runs` for `source="github"`. If empty, it
+treats the run as backfill and pages the GitHub PR list with
+`since = now - backfill_days`. PR lists in `/repos/{o}/{r}/pulls?sort=updated`
+are O(N) in window-PR count; for our scale (max ~2k PRs / repo / 6 mo)
+that's a few minutes of API quota even with reviews fetched per PR.
+Subsequent runs resume from `latest_run.captured_at - 1h`.
+
+A status note is logged at run start so operators can tell which mode
+they're in:
+
+```
+github sync starting  mode=backfill  since=2025-11-07T00:00:00Z  repos=4
+```
+
+**Jira (B2, snapshot writer not yet wired).**
+Three flavours of historical fetch are needed; we'll execute them in
+order on first run:
+
+| Pass | JQL | Purpose |
+|---|---|---|
+| 1 | `project = X AND resolved >= -180d` | "Issues completed in window" — populates `issue_snapshots` with their *current* state, dated by `resolved_at`. |
+| 2 | `project = X AND created >= -180d AND resolved is EMPTY` | "Open work that started in window" — captures live WIP without forcing a re-snapshot of every old open ticket. |
+| 3 | for each issue from (1)+(2): `/issue/{key}/changelog` | Status timeline so cycle-time per resolved issue is computable. |
+
+Pass 3 is the expensive one; we batch with the Jira REST `expand=changelog`
+parameter on the search endpoint to avoid N+1 round-trips. For our
+project (~3k issues / 6 mo), that's a single bulk fetch in < 1 minute.
+
+We deliberately do **not** try to reconstruct snapshots at every
+historical week boundary — only the resolution-time state. The rollup
+table places the issue in the week of its `resolved_at`, which is the
+right shape for "Jira done per week" without paying the
+state-reconstruction tax.
+
+### Failure modes & guardrails
+
+- **Quota.** GitHub PAT is 5,000 req/hour. Backfill of 4 repos × ~500
+  PRs each × 1 listing + 1 reviews call = ~4k requests — comfortable
+  but tight. We log `X-RateLimit-Remaining` at end-of-batch, and if
+  it dips under 200 we sleep until the reset.
+- **Resumability.** Backfill writes a `collection_runs` row at the end,
+  so a crashed backfill leaves no state and the next process attempt
+  retries cleanly. We do not checkpoint mid-backfill — the API doesn't
+  expose stable cursors for "PRs updated since X with offset Y" anyway.
+- **No infinite scroll.** `MaxPages: 10` (≈1k PRs) caps any single
+  repo's first run; partial-fill is preferable to a 30-min boot.
+  Operators bump it manually for repos with deeper history.
+
+---
+
+## 6.6 Dialect abstraction & Postgres support
+
+The branch ships SQLite as the default and Postgres as a first-class
+peer. Both go through one `Dialect` interface; queries are written
+once, with `?` placeholders, and `rebind()` shifts to `$N` at exec
+time when the driver is `pgx`.
+
+### Why Postgres now (not deferred)
+
+The schema in §6 already runs unchanged on stock Postgres — DATE,
+TIMESTAMP, REAL, INTEGER, TEXT, partial unique indexes, ON CONFLICT
+DO UPDATE — none of it is SQLite-only. The two real differences are
+small enough that paying the abstraction cost up-front is cheaper
+than retrofitting it after the dashboards depend on the storage:
+
+| Difference | SQLite | Postgres | How we handle it |
+|---|---|---|---|
+| Placeholders | `?` | `$1, $2, …` | `rebind()` rewrites at exec time |
+| Week-start expr | `DATE(col, 'weekday 1', '-7 days')` | `date_trunc('week', col)::date` | `Dialect.WeekStart(col)` returns the right SQL fragment |
+| Driver | `modernc.org/sqlite` (pure Go) | `github.com/jackc/pgx/v5/stdlib` | both registered with `database/sql` |
+
+### When to use which
+
+- **SQLite.** Local dev; demo / single-tenant deployments; "just give
+  me the binary" installs. ~1MB of state for our workload, and the
+  WAL pragma keeps the collector goroutine happy alongside HTTP reads.
+- **Postgres.** Shared deployments, multi-replica pods, BI tooling
+  (Metabase / Superset) needing query access, or any case where
+  you'd back up the database separately from the binary. The DSN
+  goes in `storage.dsn` or `STORAGE_DSN`.
+
+The same migrations apply to both; new dialect-specific migrations
+(if any ever land — JSONB indexes are the obvious candidate) go in
+suffixed files (`0002_postgres_jsonb_indexes.sql`) gated by Dialect
+in the migration loader.
+
+### Code shape
+
+```
+backend/internal/storage/
+├── store.go        — Store interface (unchanged surface)
+├── dialect.go      — Dialect interface + sqlite & postgres impls
+├── generic.go      — single Store implementation, parameterised by Dialect
+├── sqlite.go       — OpenSQLite factory
+├── postgres.go     — OpenPostgres factory
+├── migrations.go   — dialect-aware migrations runner
+└── migrations/
+    └── 0001_init.sql   — shared schema
+```
+
+Tests cover the rebind logic (`dialect_test.go`) and the SQLite round
+trip (`store_test.go`). A Postgres round-trip test lives behind a
+`TEST_POSTGRES_DSN` env var so CI doesn't need a database — local
+runs against a docker-compose pg are documented in `DEVELOPMENT.md`.
+
+---
+
 ## 7. UI / UX direction
 
 Companion file: `prototype.html` is a working static mock — open it in a
@@ -403,13 +534,15 @@ roadmap-planner/
 
 What ships compiling and tested:
 
-- ✅ `storage` package: `Open` + `Migrate` + snapshot writer + read-back, with
-  one round-trip test.
-- ✅ `github` package: `ListMergedPRs(repo, since)`, `ListReviews(pr)`, with
-  pluggable HTTP client for tests.
-- ✅ Config wiring (`storage.path`, `github.token`, `github.repos`).
-- ✅ Contributions handler skeleton — endpoints registered, mock-data
-  responses until aggregator is fully wired in B2.
+- ✅ `storage` package: dialect-aware `genericStore` + `OpenSQLite` +
+  `OpenPostgres` + migrations runner + read-back, with round-trip and
+  rebind tests.
+- ✅ `github` package: `ListPullRequests(repo, since)`, `ListReviews(pr)`
+  + Syncer with **first-run backfill** (default 180 days, configurable).
+- ✅ Config wiring (`storage.{type,path,dsn,backfill_days}`,
+  `github.{token,repos,backfill_days}`); env-var overrides.
+- ✅ Contributions handler — `/api/contributions/{members,team,members/:id,status}`
+  registered behind AuthMiddleware.
 - ✅ Frontend **Team** tab and member-overview view, fed by the new endpoints.
 
 What's intentionally stubbed (TODOs marked in code, see B2/B3):
@@ -454,7 +587,12 @@ To unblock B2:
 - [ ] Approve schema in §6 (or specify changes).
 - [ ] Confirm GitHub org(s) and repo allow-list to ingest first.
 - [ ] Approve "opt-in per member" default for the Team view.
-- [ ] Pick: SQLite-only forever (simpler) or Postgres-ready abstraction
-      (one extra interface, what's already in this branch).
+- [x] ~~Pick: SQLite-only forever (simpler) or Postgres-ready abstraction~~
+      → **Postgres-ready abstraction shipped in this branch** (§6.6). SQLite
+      stays the default; Postgres is one config flip. No change to
+      callers.
+- [x] ~~Initial backfill window~~ → **180 days** (configurable via
+      `storage.backfill_days`; per-source override on `github.backfill_days`).
+      See §6.5. Override below if a different window is preferred.
 
 If approved as-is, B2 lands in ~8 working days.

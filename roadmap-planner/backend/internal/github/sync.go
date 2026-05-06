@@ -58,12 +58,19 @@ func (d *defaultLinker) Link(pr PullRequest) string {
 //
 // One Syncer per process; safe to call Sync from a goroutine driven by a
 // time.Ticker.
+//
+// First-run behaviour: if collection_runs has no row for source="github",
+// the Syncer treats this as the initial backfill and pulls PRs updated
+// in the last BackfillDays days. Subsequent runs resume from one hour
+// before the previous run's CapturedAt (the overlap absorbs any clock
+// skew or PRs that mutated state without bumping `updated_at`).
 type Syncer struct {
-	client *Client
-	store  storage.Store
-	repos  []RepoConfig
-	linker Linker
-	logger *zap.Logger
+	client       *Client
+	store        storage.Store
+	repos        []RepoConfig
+	linker       Linker
+	logger       *zap.Logger
+	backfillDays int
 }
 
 // RepoConfig describes one repo to track. Pillar/Component are optional
@@ -79,13 +86,19 @@ type RepoConfig struct {
 // FullName returns "owner/name".
 func (r RepoConfig) FullName() string { return r.Owner + "/" + r.Name }
 
-func NewSyncer(client *Client, store storage.Store, repos []RepoConfig, linker Linker) *Syncer {
+// NewSyncer builds a Syncer. backfillDays sets the first-run window;
+// pass 0 to use the package default (180).
+func NewSyncer(client *Client, store storage.Store, repos []RepoConfig, linker Linker, backfillDays int) *Syncer {
+	if backfillDays <= 0 {
+		backfillDays = 180
+	}
 	return &Syncer{
-		client: client,
-		store:  store,
-		repos:  repos,
-		linker: linker,
-		logger: logger.WithComponent("github-syncer"),
+		client:       client,
+		store:        store,
+		repos:        repos,
+		linker:       linker,
+		logger:       logger.WithComponent("github-syncer"),
+		backfillDays: backfillDays,
 	}
 }
 
@@ -100,11 +113,18 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		return nil
 	}
 
-	since := time.Now().AddDate(0, 0, -7) // default: last week
+	// First run: reach back BackfillDays. Subsequent runs: resume from
+	// one hour before the previous CapturedAt to absorb clock skew.
+	since := time.Now().AddDate(0, 0, -s.backfillDays)
+	mode := "backfill"
 	if last, err := s.store.LatestCollectionRun(ctx, "github"); err == nil && last != nil {
-		// Re-fetch from one hour before the previous run for safety.
 		since = last.CapturedAt.Add(-1 * time.Hour)
+		mode = "incremental"
 	}
+	s.logger.Info("github sync starting",
+		zap.String("mode", mode),
+		zap.Time("since", since),
+		zap.Int("repos", len(s.repos)))
 
 	runStart := time.Now()
 	runID := fmt.Sprintf("gh-%d", runStart.UnixNano())
