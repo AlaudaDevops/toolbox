@@ -142,8 +142,10 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 //
 //	GET   /api/contributions/members         — directory of members
 //	GET   /api/contributions/team            — team-overview rollups
-//	GET   /api/contributions/members/:id     — single member detail
+//	GET   /api/contributions/members/:id     — single member detail (+ components, sprint)
 //	PATCH /api/contributions/members/:id     — update editable identity fields
+//	GET   /api/contributions/network         — review-network density panel
+//	GET   /api/contributions/pillars         — pillar throughput stack
 //	GET   /api/contributions/status          — last-sync timestamps
 func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service, aggregator *contributions.Aggregator) {
 	if store == nil || service == nil {
@@ -158,6 +160,8 @@ func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *co
 		g.GET("/team", h.TeamOverview)
 		g.GET("/members/:id", h.MemberDetail)
 		g.PATCH("/members/:id", h.UpdateMember)
+		g.GET("/network", h.NetworkDensity)
+		g.GET("/pillars", h.PillarThroughput)
 		g.GET("/status", h.CollectorStatus)
 	}
 }

@@ -134,7 +134,58 @@ func (h *ContributionsHandler) MemberDetail(c *gin.Context) {
 	if info != nil {
 		resp["info"] = info
 	}
+	// Best-effort: components-touched + current sprint. We surface the
+	// error in logs but do not fail the whole response — the profile
+	// page is useful even without these extras.
+	if extras, xErr := h.service.MemberExtras(c.Request.Context(), id, q); xErr == nil {
+		resp["components_touched"] = extras.ComponentsTouched
+		if extras.Sprint != nil {
+			resp["sprint"] = extras.Sprint
+		}
+	} else {
+		logger.Warn("member extras failed", zap.String("member_id", id), zap.Error(xErr))
+	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// NetworkDensity — GET /api/contributions/network?from=&to=
+//
+// Aggregate review-health stats for the Team Overview "Review network
+// density" panel: orphan rate, first-review p50/p90, cross-pillar
+// review percentage.
+func (h *ContributionsHandler) NetworkDensity(c *gin.Context) {
+	q, err := h.parseQuery(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	out, err := h.service.NetworkDensity(c.Request.Context(), q)
+	if err != nil {
+		logger.Error("network density failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+// PillarThroughput — GET /api/contributions/pillars?from=&to=
+//
+// Returns weekly PR-merged + Jira-done counts grouped by member.pillar.
+// Members without a pillar are surfaced under the synthetic "Unassigned"
+// label so the dashboard can hint that pillars need to be set.
+func (h *ContributionsHandler) PillarThroughput(c *gin.Context) {
+	q, err := h.parseQuery(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	rows, err := h.service.PillarThroughput(c.Request.Context(), q)
+	if err != nil {
+		logger.Error("pillar throughput failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"buckets": rows, "from": q.From, "to": q.To})
 }
 
 // UpdateMember — PATCH /api/contributions/members/:id

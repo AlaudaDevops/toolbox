@@ -235,6 +235,26 @@ export const contributionsAPI = {
     return response.data;
   },
 
+  // Aggregate review-network density (orphan rate, p50/p90 first-review
+  // latency, cross-pillar review %). Powers the panel on the Team tab.
+  network: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    const response = await api.get(`/api/contributions/network?${params.toString()}`);
+    return response.data;
+  },
+
+  // Weekly PR-merged + Jira-done counts grouped by pillar. Powers the
+  // throughput-by-pillar stack chart on the Team tab.
+  pillars: async (filters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    const response = await api.get(`/api/contributions/pillars?${params.toString()}`);
+    return response.data;
+  },
+
   // Last-sync timestamps per source (jira / github).
   status: async () => {
     const response = await api.get('/api/contributions/status');
