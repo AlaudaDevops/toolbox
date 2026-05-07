@@ -105,16 +105,28 @@ export default function TeamAnalytics() {
 
   // Join members directory with rollups so the table has names and
   // pillars even when some members have zero activity.
+  //
+  // Field-access uses both snake_case and PascalCase fallbacks because
+  // older deploys (pre-storage-json-tags fix) returned PascalCase and
+  // we want this view to keep rendering during the rollout window.
+  const pick = (obj, ...keys) => {
+    for (const k of keys) {
+      if (obj && obj[k] !== undefined && obj[k] !== null && obj[k] !== '') return obj[k];
+    }
+    return '';
+  };
   const rows = useMemo(() => {
     const byID = new Map((team || []).map((t) => [t.member_id, t]));
     const merged = (members || []).map((m) => {
-      const t = byID.get(m.id) || {};
+      const id = pick(m, 'id', 'ID');
+      const t = byID.get(id) || {};
       const sparkValues = (t.week_totals || []).map((w) => w.prs_merged || 0);
+      const display = pick(m, 'display_name', 'DisplayName');
       return {
-        id: m.id,
-        name: m.display_name || m.id,
-        github: m.github_login,
-        pillar: m.pillar_id,
+        id,
+        name: display || id || 'unknown',
+        github: pick(m, 'github_login', 'GitHubLogin'),
+        pillar: pick(m, 'pillar_id', 'PillarID'),
         jira: t.jira_issues_done || 0,
         points: t.jira_points_done || 0,
         prs: t.prs_merged || 0,
@@ -217,25 +229,33 @@ export default function TeamAnalytics() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((m) => (
-                <tr key={m.id}>
-                  <td className="ta-td ta-td--member">
-                    <span className="ta-avatar">
-                      {m.name.split(' ').filter(Boolean).map((s) => s[0]).slice(0, 2).join('').toUpperCase()}
-                    </span>
-                    <div>
-                      <div className="ta-name">{m.name}</div>
-                      {m.github && <div className="ta-meta mono">@{m.github}</div>}
-                    </div>
-                  </td>
-                  <td className="ta-td ta-td--right mono">{m.jira}</td>
-                  <td className="ta-td ta-td--right mono">{m.points.toFixed(1)}</td>
-                  <td className="ta-td ta-td--right mono">{m.prs}</td>
-                  <td className="ta-td ta-td--right mono">{m.reviews}</td>
-                  <td className="ta-td ta-td--right mono">{formatHours(m.latency)}</td>
-                  <td className="ta-td"><Spark values={m.spark} color="var(--accent, #b8443c)" /></td>
-                </tr>
-              ))}
+              {sorted.map((m) => {
+                const initials = String(m.name || '?')
+                  .split(' ')
+                  .filter(Boolean)
+                  .map((s) => s[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || '?';
+                const points = Number.isFinite(m.points) ? m.points.toFixed(1) : '0.0';
+                return (
+                  <tr key={m.id}>
+                    <td className="ta-td ta-td--member">
+                      <span className="ta-avatar">{initials}</span>
+                      <div>
+                        <div className="ta-name">{m.name}</div>
+                        {m.github && <div className="ta-meta mono">@{m.github}</div>}
+                      </div>
+                    </td>
+                    <td className="ta-td ta-td--right mono">{m.jira}</td>
+                    <td className="ta-td ta-td--right mono">{points}</td>
+                    <td className="ta-td ta-td--right mono">{m.prs}</td>
+                    <td className="ta-td ta-td--right mono">{m.reviews}</td>
+                    <td className="ta-td ta-td--right mono">{formatHours(m.latency)}</td>
+                    <td className="ta-td"><Spark values={m.spark} color="var(--accent, #b8443c)" /></td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           {loading && <div className="ta-loading">Loading…</div>}

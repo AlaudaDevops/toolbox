@@ -120,16 +120,21 @@ type PRReview struct {
 }
 
 // Member is the join entity across Jira and GitHub.
+//
+// JSON tags use snake_case to match what the frontend (and any future
+// API consumer) expects; without them the default marshaller emits
+// PascalCase field names and the Team dashboard breaks because
+// `m.display_name` is undefined.
 type Member struct {
-	ID            string
-	DisplayName   string
-	Email         string
-	JiraAccountID string
-	GitHubLogin   string
-	PillarID      string
-	Active        bool
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID            string    `json:"id"`
+	DisplayName   string    `json:"display_name"`
+	Email         string    `json:"email,omitempty"`
+	JiraAccountID string    `json:"jira_account_id,omitempty"`
+	GitHubLogin   string    `json:"github_login,omitempty"`
+	PillarID      string    `json:"pillar_id,omitempty"`
+	Active        bool      `json:"active"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 // ----------------------------------------------------------------------
