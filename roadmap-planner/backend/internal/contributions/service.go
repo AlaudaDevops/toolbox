@@ -31,11 +31,30 @@ import (
 
 // Service is the read-only contributions API surface.
 type Service struct {
-	store storage.Store
+	store    storage.Store
+	pillarMP *PillarMap
 }
 
 func NewService(store storage.Store) *Service {
-	return &Service{store: store}
+	return &Service{store: store, pillarMP: &PillarMap{}}
+}
+
+// SetPillarMap installs the pillar attribution map. Called from main.go
+// after config load. Safe to call once at startup; not thread-safe to
+// swap at runtime.
+func (s *Service) SetPillarMap(pm *PillarMap) {
+	if pm == nil {
+		pm = &PillarMap{}
+	}
+	s.pillarMP = pm
+}
+
+// PillarMap returns the configured attribution map (never nil).
+func (s *Service) PillarMap() *PillarMap {
+	if s.pillarMP == nil {
+		return &PillarMap{}
+	}
+	return s.pillarMP
 }
 
 // MemberSummary is one row of the team-overview dashboard.

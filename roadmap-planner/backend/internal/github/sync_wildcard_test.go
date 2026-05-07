@@ -23,12 +23,12 @@ import (
 // Names chosen so a sorted assertion pins down exactly which repos
 // survive the archived/fork filter.
 var pageOneRepos = []orgRepo{
-	{Name: "alpha", Archived: false, Fork: false}, // keep
+	{Name: "alpha", Archived: false, Fork: false},        // keep
 	{Name: "beta-archived", Archived: true, Fork: false}, // drop (archived)
 	{Name: "gamma-fork", Archived: false, Fork: true},    // drop (fork)
 }
 var pageTwoRepos = []orgRepo{
-	{Name: "delta", Archived: false, Fork: false}, // keep
+	{Name: "delta", Archived: false, Fork: false},      // keep
 	{Name: "epsilon-both", Archived: true, Fork: true}, // drop (both flags)
 }
 

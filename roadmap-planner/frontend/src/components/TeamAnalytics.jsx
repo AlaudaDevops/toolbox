@@ -68,31 +68,66 @@ const initialsOf = (name) =>
 /*  Pillar derivation — same source the roadmap tab uses                 */
 /* -------------------------------------------------------------------- */
 
-// buildComponentToPillar takes the BasicPillar list from /api/basic and
-// returns a Map: lowercased component name → pillar name. Used to
-// classify members by the components they've touched.
-const buildComponentToPillar = (basicPillars) => {
+// buildComponentToPillars takes the configured pillar mapping from
+// /api/contributions/pillars (`pillars: [{name, components: []}, ...]`)
+// and returns a Map: lowercased component name → array of pillar names.
+// One component MAY map to multiple pillars (helm/trivy → CI/CD +
+// Tool Deployment). Falls back to the BasicPillar list from /api/basic
+// when the configured mapping is empty.
+const buildComponentToPillars = (configuredPillars, basicPillars) => {
   const m = new Map();
+  if (configuredPillars && configuredPillars.length) {
+    configuredPillars.forEach((p) => {
+      (p.components || []).forEach((c) => {
+        const key = (c || '').trim().toLowerCase();
+        if (!key) return;
+        const list = m.get(key) || [];
+        if (!list.includes(p.name)) list.push(p.name);
+        m.set(key, list);
+      });
+    });
+    return m;
+  }
   (basicPillars || []).forEach((p) => {
     const comp = (p.component || '').trim().toLowerCase();
-    if (comp) m.set(comp, p.name);
+    if (!comp) return;
+    const list = m.get(comp) || [];
+    if (!list.includes(p.name)) list.push(p.name);
+    m.set(comp, list);
   });
   return m;
 };
 
-// derivePillarForMember picks the pillar with the most component matches
-// from the member's component set. Falls back to the operator-set
-// override (member.pillar_id) when no match, then to ''.
-const derivePillarForMember = (memberComponents, override, compToPillar) => {
-  if (override) return override;
-  if (!memberComponents || memberComponents.length === 0) return '';
+// pillarsForMember returns the SET of pillars a member is associated
+// with, derived from their touched components. A dev who works on
+// CI/CD-tagged AND Tool Deployment-tagged components shows up under
+// both. The operator override (`override`, free-form string from the
+// `pillar_id` PATCH endpoint) is honored only when the components map
+// produced no matches — it lets the operator pin members whose work
+// doesn't surface a clear component yet.
+const pillarsForMember = (memberComponents, override, compToPillars) => {
+  const set = new Set();
+  (memberComponents || []).forEach((c) => {
+    const key = (c || '').trim().toLowerCase();
+    (compToPillars.get(key) || []).forEach((p) => set.add(p));
+  });
+  if (set.size === 0 && override) set.add(override);
+  return [...set];
+};
+
+// dominantPillar picks the single most-frequent pillar match — used
+// only for legacy single-pillar bucketing (the filter pill comparison
+// and color-of-row). The multi-tag display uses pillarsForMember.
+const dominantPillar = (memberComponents, override, compToPillars) => {
+  if (!memberComponents || memberComponents.length === 0) return override || '';
   const tally = new Map();
   memberComponents.forEach((c) => {
     const key = (c || '').trim().toLowerCase();
-    const pillar = compToPillar.get(key);
-    if (pillar) tally.set(pillar, (tally.get(pillar) || 0) + 1);
+    (compToPillars.get(key) || []).forEach((p) => {
+      tally.set(p, (tally.get(p) || 0) + 1);
+    });
   });
-  if (tally.size === 0) return '';
+  if (tally.size === 0) return override || '';
   let best = '', bestN = -1;
   for (const [p, n] of tally) {
     if (n > bestN) { best = p; bestN = n; }
@@ -188,32 +223,31 @@ function Spark({ values, width = 110, height = 28 }) {
 /*  Pillar throughput stack chart                                        */
 /* -------------------------------------------------------------------- */
 
-function PillarStack({ rows, pillarOrder }) {
-  if (!rows || rows.length === 0) {
+function PillarStack({ buckets, pillarOrder, metric = 'prs_merged' }) {
+  // Buckets come from /api/contributions/pillars: one row per (pillar, week)
+  // with prs_merged + jira_done counts already attributed by the backend's
+  // configured team_analytics.pillars map. A PR or issue spanning multiple
+  // pillars contributes once to each.
+  if (!buckets || buckets.length === 0) {
     return <p className="ta-meta">No throughput data in window.</p>;
   }
-  // Aggregate weekly PRs per (week, pillar) — using the derived pillar
-  // on each row, NOT the operator-set members.pillar_id.
   const byWeek = new Map();
   const pillarSet = new Set();
-  rows.forEach((r) => {
-    const pillar = r.derivedPillar || 'Unassigned';
-    pillarSet.add(pillar);
-    (r.week_totals || []).forEach((w) => {
-      if (!w || !w.week_start) return;
-      if (!byWeek.has(w.week_start)) byWeek.set(w.week_start, {});
-      const cell = byWeek.get(w.week_start);
-      cell[pillar] = (cell[pillar] || 0) + (w.prs_merged || 0);
-    });
+  buckets.forEach((b) => {
+    if (!b || !b.week_start) return;
+    pillarSet.add(b.pillar);
+    if (!byWeek.has(b.week_start)) byWeek.set(b.week_start, {});
+    const cell = byWeek.get(b.week_start);
+    cell[b.pillar] = (cell[b.pillar] || 0) + (b[metric] || 0);
   });
   const weekKeys = [...byWeek.keys()].sort();
   if (weekKeys.length === 0) {
     return <p className="ta-meta">No PRs in this window.</p>;
   }
-  // Stable pillar order: roadmap-tab order first, then any extras (e.g.
-  // "Unassigned") alphabetically.
-  const known = pillarOrder.filter((p) => pillarSet.has(p));
-  const extras = [...pillarSet].filter((p) => !pillarOrder.includes(p)).sort();
+  // Stable pillar order: configured order first (any zero-stack pillars
+  // still render so the legend is complete), then extras like "Unassigned".
+  const known = (pillarOrder || []).filter((p) => pillarSet.has(p));
+  const extras = [...pillarSet].filter((p) => !(pillarOrder || []).includes(p)).sort();
   const pillarList = [...known, ...extras];
 
   const stack = weekKeys.map((wk) => {
@@ -415,6 +449,7 @@ export default function TeamAnalytics() {
   const [status, setStatus] = useState(null);
   const [network, setNetwork] = useState(null);
   const [basicPillars, setBasicPillars] = useState([]);
+  const [pillarsResp, setPillarsResp] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -428,12 +463,13 @@ export default function TeamAnalytics() {
     const load = async () => {
       try {
         setLoading(true);
-        const [membersResp, teamResp, statusResp, netResp, basicResp] = await Promise.all([
+        const [membersResp, teamResp, statusResp, netResp, basicResp, pillarsR] = await Promise.all([
           contributionsAPI.listMembers().catch(() => ({ members: [] })),
           contributionsAPI.team().catch(() => ({ members: [] })),
           contributionsAPI.status().catch(() => null),
           contributionsAPI.network().catch(() => null),
           roadmapAPI.getBasicData().catch(() => ({ pillars: [] })),
+          contributionsAPI.pillars().catch(() => null),
         ]);
         if (cancelled) return;
         setMembers(membersResp.members || []);
@@ -441,6 +477,7 @@ export default function TeamAnalytics() {
         setStatus(statusResp);
         setNetwork(netResp);
         setBasicPillars(basicResp?.pillars || []);
+        setPillarsResp(pillarsR);
       } catch (e) {
         if (cancelled) return;
         const err = handleAPIError(e);
@@ -454,17 +491,26 @@ export default function TeamAnalytics() {
     return () => { cancelled = true; };
   }, [reloadTick]);
 
-  // Pillar sort by sequence (matches roadmap tab); stable name list
-  // for the filter pills + chart legend.
+  // Pillar order: prefer the configured team_analytics.pillars order (the
+  // backend's source of truth for attribution). Falls back to the roadmap
+  // tab's BasicPillar sequence ordering when no team_analytics.pillars is
+  // configured.
   const orderedPillarNames = useMemo(() => {
+    const fromConfig = pillarsResp?.order || [];
+    if (fromConfig.length > 0) return fromConfig;
     const sorted = [...(basicPillars || [])].sort((a, b) => {
       if ((a.sequence || 0) !== (b.sequence || 0)) return (a.sequence || 0) - (b.sequence || 0);
       return (a.name || '').localeCompare(b.name || '');
     });
     return sorted.map((p) => p.name).filter(Boolean);
-  }, [basicPillars]);
+  }, [pillarsResp, basicPillars]);
 
-  const compToPillar = useMemo(() => buildComponentToPillar(basicPillars), [basicPillars]);
+  // Component → pillars map. Source of truth: the backend's configured
+  // mapping (team_analytics.pillars), falling back to BasicPillar.
+  const compToPillars = useMemo(
+    () => buildComponentToPillars(pillarsResp?.pillars, basicPillars),
+    [pillarsResp, basicPillars]
+  );
 
   const rows = useMemo(() => {
     const byID = new Map((team || []).map((t) => [t.member_id, t]));
@@ -474,7 +520,8 @@ export default function TeamAnalytics() {
       const week_totals = t.week_totals || [];
       const components = t.components || [];
       const override = pick(m, 'pillar_id', 'PillarID');
-      const derivedPillar = derivePillarForMember(components, override, compToPillar);
+      const pillars = pillarsForMember(components, override, compToPillars);
+      const dom = dominantPillar(components, override, compToPillars);
       return {
         id,
         name: pick(m, 'display_name', 'DisplayName') || id || 'unknown',
@@ -482,8 +529,8 @@ export default function TeamAnalytics() {
         email:  pick(m, 'email', 'Email'),
         jira_account_id: pick(m, 'jira_account_id', 'JiraAccountID'),
         pillarOverride: override,
-        derivedPillar,
-        pillar: derivedPillar || override || '',
+        pillars,
+        pillar: dom,
         active: pick(m, 'active', 'Active') !== false,
         components,
         jira:    t.jira_issues_done || 0,
@@ -497,11 +544,12 @@ export default function TeamAnalytics() {
     (team || []).forEach((t) => {
       if (!members.find((m) => pick(m, 'id', 'ID') === t.member_id)) {
         const components = t.components || [];
-        const derivedPillar = derivePillarForMember(components, '', compToPillar);
+        const pillars = pillarsForMember(components, '', compToPillars);
+        const dom = dominantPillar(components, '', compToPillars);
         merged.push({
           id: t.member_id, name: t.member_id,
           github: '', email: '', jira_account_id: '',
-          pillarOverride: '', derivedPillar, pillar: derivedPillar,
+          pillarOverride: '', pillars, pillar: dom,
           active: true, components,
           jira:    t.jira_issues_done || 0,
           points:  t.jira_points_done || 0,
@@ -513,12 +561,12 @@ export default function TeamAnalytics() {
       }
     });
     return merged;
-  }, [members, team, compToPillar]);
+  }, [members, team, compToPillars]);
 
   const filteredRows = useMemo(() => {
     if (pillarFilter === 'all') return rows;
-    if (pillarFilter === '__unassigned') return rows.filter((r) => !r.pillar);
-    return rows.filter((r) => r.pillar === pillarFilter);
+    if (pillarFilter === '__unassigned') return rows.filter((r) => !r.pillars || r.pillars.length === 0);
+    return rows.filter((r) => (r.pillars || []).includes(pillarFilter));
   }, [rows, pillarFilter]);
 
   const sortedRows = useMemo(() => {
@@ -618,7 +666,6 @@ export default function TeamAnalytics() {
       {!empty && tab === 'team' && (
         <TeamView
           rows={sortedRows}
-          allRows={rows}
           orderedPillarNames={orderedPillarNames}
           pillarFilter={pillarFilter}
           onPillarFilter={setPillarFilter}
@@ -628,6 +675,7 @@ export default function TeamAnalytics() {
           onRowClick={openMember}
           loading={loading}
           network={network}
+          pillarBuckets={pillarsResp?.buckets || []}
         />
       )}
 
@@ -643,7 +691,11 @@ export default function TeamAnalytics() {
       )}
 
       {!empty && tab === 'slice' && (
-        <SliceView rows={rows} orderedPillarNames={orderedPillarNames} />
+        <SliceView
+          rows={rows}
+          orderedPillarNames={orderedPillarNames}
+          pillarBuckets={pillarsResp?.buckets || []}
+        />
       )}
     </div>
   );
@@ -653,7 +705,7 @@ export default function TeamAnalytics() {
 /*  Team Overview tab                                                    */
 /* -------------------------------------------------------------------- */
 
-function TeamView({ rows, allRows, orderedPillarNames, pillarFilter, onPillarFilter, sortKey, sortDir, onSort, onRowClick, loading, network }) {
+function TeamView({ rows, orderedPillarNames, pillarFilter, onPillarFilter, sortKey, sortDir, onSort, onRowClick, loading, network, pillarBuckets }) {
   return (
     <>
       <div className="ta-panel">
@@ -721,7 +773,17 @@ function TeamView({ rows, allRows, orderedPillarNames, pillarFilter, onPillarFil
                       </div>
                     </div>
                   </td>
-                  <td><span className="ta-meta">{m.pillar || '—'}</span></td>
+                  <td>
+                    {m.pillars && m.pillars.length > 0 ? (
+                      <div className="ta-pillar-tags">
+                        {m.pillars.map((p) => (
+                          <span key={p} className="ta-pillar-tag">{p}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="ta-meta">—</span>
+                    )}
+                  </td>
                   <td className="ta-right"><span className="ta-num">{m.jira}</span><DeltaPill d={dJira} /></td>
                   <td className="ta-right"><span className="ta-num">{points}</span></td>
                   <td className="ta-right"><span className="ta-num">{m.prs}</span><DeltaPill d={dPRs} /></td>
@@ -743,7 +805,7 @@ function TeamView({ rows, allRows, orderedPillarNames, pillarFilter, onPillarFil
             <div className="ta-panel__sub">PRs merged · 12-week stack</div>
           </header>
           <div className="ta-chartwrap">
-            <PillarStack rows={allRows} pillarOrder={orderedPillarNames} />
+            <PillarStack buckets={pillarBuckets} pillarOrder={orderedPillarNames} />
           </div>
         </div>
         <div className="ta-panel">
@@ -841,10 +903,13 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
 
   const compMax = Math.max(1, ...components.map((c) => c.issues || 0));
   const sortedRoster = [...allRows].sort((a, b) => a.name.localeCompare(b.name));
-  const pillarLabel = memberRow.pillar || 'unassigned';
-  const pillarSource = memberRow.pillarOverride
+  const pillarsList = (memberRow.pillars && memberRow.pillars.length > 0)
+    ? memberRow.pillars
+    : (memberRow.pillarOverride ? [memberRow.pillarOverride] : []);
+  const pillarLabel = pillarsList.length > 0 ? pillarsList.join(' · ') : 'unassigned';
+  const pillarSource = memberRow.pillarOverride && (!memberRow.pillars || memberRow.pillars.length === 0)
     ? 'override'
-    : memberRow.derivedPillar
+    : pillarsList.length > 0
       ? 'derived from components'
       : 'no match';
 
@@ -1005,16 +1070,19 @@ const SLICE_COL_AXES = [
   { val: 'quarter', label: 'Quarter' },
 ];
 
-function SliceView({ rows, orderedPillarNames }) {
+function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
   const [rowsAxis, setRowsAxis] = useState('pillar');
   const [colsAxis, setColsAxis] = useState('week');
   const [metric,   setMetric]   = useState('prs');
 
+  // The set of weeks: union of (member rows' weeks) + (pillar buckets'
+  // weeks). Lets the matrix render even when one source is empty.
   const allWeeks = useMemo(() => {
-    const set = new Map();
-    rows.forEach((r) => (r.week_totals || []).forEach((w) => set.set(w.week_start, true)));
-    return [...set.keys()].sort();
-  }, [rows]);
+    const set = new Set();
+    rows.forEach((r) => (r.week_totals || []).forEach((w) => set.add(w.week_start)));
+    (pillarBuckets || []).forEach((b) => { if (b?.week_start) set.add(b.week_start); });
+    return [...set].sort();
+  }, [rows, pillarBuckets]);
 
   const seriesByMember = useMemo(() => {
     const out = new Map();
@@ -1024,6 +1092,24 @@ function SliceView({ rows, orderedPillarNames }) {
     });
     return out;
   }, [rows, allWeeks]);
+
+  // seriesByPillar parallels seriesByMember but is built from the
+  // backend's per-pillar attribution (pillarBuckets). Multi-pillar PRs /
+  // issues are already fanned out by the server, so adding cells here
+  // does not need any further fan-out.
+  const seriesByPillar = useMemo(() => {
+    const out = new Map();
+    (pillarBuckets || []).forEach((b) => {
+      if (!b?.pillar || !b.week_start) return;
+      if (!out.has(b.pillar)) out.set(b.pillar, new Map());
+      out.get(b.pillar).set(b.week_start, b);
+    });
+    const aligned = new Map();
+    out.forEach((byWeek, pillar) => {
+      aligned.set(pillar, allWeeks.map((wk) => byWeek.get(wk) || { jira_done: 0, prs_merged: 0 }));
+    });
+    return aligned;
+  }, [pillarBuckets, allWeeks]);
 
   const metricGetter = useCallback((b) => {
     if (metric === 'jira')   return b.jira_done   || 0;
@@ -1035,13 +1121,15 @@ function SliceView({ rows, orderedPillarNames }) {
     if (rowsAxis === 'member') {
       return rows.slice().sort((a, b) => a.name.localeCompare(b.name)).map((r) => r.id);
     }
-    const set = new Set();
-    rows.forEach((r) => set.add(r.pillar || 'Unassigned'));
-    // Stable ordering: roadmap-tab pillar order first, then any extras.
-    const known = orderedPillarNames.filter((p) => set.has(p));
-    const extras = [...set].filter((p) => !orderedPillarNames.includes(p)).sort();
-    return [...known, ...extras];
-  }, [rows, rowsAxis, orderedPillarNames]);
+    // Pillar axis: union of (configured order) + (pillars that actually
+    // have buckets). Empty pillars still render so the operator can see
+    // which mappings contributed nothing.
+    const set = new Set([...seriesByPillar.keys()]);
+    const known = (orderedPillarNames || []).filter((p) => set.has(p) || (orderedPillarNames || []).includes(p));
+    const fromBuckets = [...set].filter((p) => !known.includes(p)).sort();
+    const merged = [...new Set([...known, ...fromBuckets])];
+    return merged.length ? merged : (orderedPillarNames || []);
+  }, [rowsAxis, rows, orderedPillarNames, seriesByPillar]);
 
   const cols = useMemo(() => {
     if (colsAxis === 'week') {
@@ -1059,10 +1147,21 @@ function SliceView({ rows, orderedPillarNames }) {
   }, [allWeeks, colsAxis]);
 
   const matrix = useMemo(() => rowKeys.map((rk) => {
-    const matches = rowsAxis === 'member'
-      ? rows.filter((r) => r.id === rk)
-      : rows.filter((r) => (r.pillar || 'Unassigned') === rk);
     const cells = cols.map((col) => {
+      if (rowsAxis === 'pillar') {
+        const series = seriesByPillar.get(rk) || allWeeks.map(() => ({}));
+        if (colsAxis === 'week') {
+          if (metric === 'points') return 0;
+          const idx = allWeeks.indexOf(col.key);
+          if (idx < 0) return 0;
+          return metricGetter(series[idx] || {});
+        }
+        const [start, end] = col.range;
+        if (metric === 'points') return 0;
+        return series.slice(start, end).reduce((s, b) => s + metricGetter(b), 0);
+      }
+      // Member axis — sum the member's week_totals series.
+      const matches = rows.filter((r) => r.id === rk);
       if (colsAxis === 'week') {
         if (metric === 'points') return 0;
         const idx = allWeeks.indexOf(col.key);
@@ -1085,7 +1184,7 @@ function SliceView({ rows, orderedPillarNames }) {
     const max = Math.max(1, ...cells);
     const total = cells.reduce((a, b) => a + b, 0);
     return { rowKey: rk, cells, max, total };
-  }), [rowKeys, cols, rows, rowsAxis, colsAxis, metric, seriesByMember, allWeeks, metricGetter]);
+  }), [rowKeys, cols, rows, rowsAxis, colsAxis, metric, seriesByMember, seriesByPillar, allWeeks, metricGetter]);
 
   const labelOfRow = (rk) => {
     if (rowsAxis === 'member') {

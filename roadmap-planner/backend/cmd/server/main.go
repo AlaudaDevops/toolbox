@@ -205,9 +205,12 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 		zap.Int("backfill_days", cfg.Storage.BackfillDays))
 
 	service := contributions.NewService(store)
+	pillarMap := contributions.NewPillarMap(cfg.TeamAnalytics)
+	service.SetPillarMap(pillarMap)
 	aggregator := contributions.NewAggregator(store)
 	api.AddContributionsRoutes(router, store, service, aggregator)
-	logger.Info("Contributions API routes added")
+	logger.Info("Contributions API routes added",
+		zap.Int("pillars_configured", len(pillarMap.Order())))
 
 	// Optional Jira sync goroutine.
 	//

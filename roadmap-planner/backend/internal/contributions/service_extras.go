@@ -175,46 +175,123 @@ type PillarBucket struct {
 	JiraDone  int       `json:"jira_done"`
 }
 
-// PillarThroughput returns weekly PR-merged / Jira-done counts per
-// pillar, restricted to members with a non-empty `pillar_id`. Members
-// without a pillar are surfaced under the synthetic "Unassigned" key
-// so the dashboard can hint that pillars need to be set.
+// PillarThroughput returns weekly PR-merged / Jira-done counts per pillar.
+//
+// Attribution is per-PR (via repo→pillars in the configured PillarMap)
+// and per-issue (via Jira components → pillars). A PR or issue that maps
+// to multiple pillars contributes one full unit to each — there is no
+// proportional split. Member-level totals are unaffected; this rollup
+// is independent of `members.pillar_id`.
+//
+// Items that don't match any configured pillar fall under the synthetic
+// "Unassigned" key so the dashboard can prompt the operator to extend
+// the mapping.
 func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuery) ([]PillarBucket, error) {
-	rows, err := s.store.MemberWeekMetrics(ctx, q)
-	if err != nil {
-		return nil, err
+	d, ok := s.store.(interface {
+		Dialect() storage.Dialect
+		DB() *sql.DB
+	})
+	if !ok {
+		return nil, fmt.Errorf("pillars: store does not expose Dialect/DB")
 	}
-	members, err := s.store.ListMembers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	pillarOf := map[string]string{}
-	for _, m := range members {
-		p := m.PillarID
-		if p == "" {
-			p = "Unassigned"
-		}
-		pillarOf[m.ID] = p
-	}
+	dialect := d.Dialect()
+	db := d.DB()
+	pm := s.PillarMap()
+
 	type key struct {
 		Pillar string
 		Week   time.Time
 	}
 	agg := map[key]*PillarBucket{}
-	for _, r := range rows {
-		p := pillarOf[r.MemberID]
-		if p == "" {
-			p = "Unassigned"
-		}
-		k := key{Pillar: p, Week: r.WeekStart}
+	bump := func(pillar string, week time.Time, prs, jira int) {
+		k := key{Pillar: pillar, Week: week}
 		b, ok := agg[k]
 		if !ok {
-			b = &PillarBucket{Pillar: p, WeekStart: r.WeekStart}
+			b = &PillarBucket{Pillar: pillar, WeekStart: week}
 			agg[k] = b
 		}
-		b.PRsMerged += r.PRsMerged
-		b.JiraDone += r.JiraIssuesDone
+		b.PRsMerged += prs
+		b.JiraDone += jira
 	}
+
+	// PRs by repo × week. We pull (repo_id, week, count) and fan out per
+	// repo to the pillars it claims.
+	prSQL := rebindSimple(dialect, fmt.Sprintf(`
+		SELECT pr.repo_id, %s AS week_start, COUNT(*) AS n
+		FROM pull_requests pr
+		WHERE pr.merged_at IS NOT NULL
+		  AND pr.merged_at >= ?
+		  AND pr.merged_at <  ?
+		GROUP BY pr.repo_id, %s`, dialect.WeekStart("pr.merged_at"), dialect.WeekStart("pr.merged_at")))
+	prRows, err := db.QueryContext(ctx, prSQL, q.From, q.To)
+	if err != nil {
+		return nil, fmt.Errorf("pillars: pr aggregate: %w", err)
+	}
+	defer prRows.Close()
+	for prRows.Next() {
+		var repo string
+		var week time.Time
+		var n int
+		if err := prRows.Scan(&repo, &week, &n); err != nil {
+			return nil, err
+		}
+		pillars := pm.PillarsForRepo(repo)
+		if len(pillars) == 0 {
+			bump("Unassigned", week, n, 0)
+			continue
+		}
+		for _, p := range pillars {
+			bump(p, week, n, 0)
+		}
+	}
+	if err := prRows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Jira issues done by week × components. Latest snapshot per issue,
+	// resolved_at in window, then expand the JSON components array and
+	// route to the matching pillars. Issues with no component or no
+	// configured mapping land under "Unassigned".
+	jiraSQL := rebindSimple(dialect, fmt.Sprintf(`
+		SELECT %s AS week_start, components
+		FROM (
+		  SELECT s.resolved_at, s.components, s.issue_key,
+		         ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
+		  FROM issue_snapshots s
+		  JOIN collection_runs r ON s.run_id = r.id
+		  WHERE s.resolved_at IS NOT NULL
+		    AND s.resolved_at >= ?
+		    AND s.resolved_at <  ?
+		) ranked
+		WHERE rn = 1`, dialect.WeekStart("resolved_at")))
+	jRows, err := db.QueryContext(ctx, jiraSQL, q.From, q.To)
+	if err != nil {
+		return nil, fmt.Errorf("pillars: jira aggregate: %w", err)
+	}
+	defer jRows.Close()
+	for jRows.Next() {
+		var week time.Time
+		var rawComponents sql.NullString
+		if err := jRows.Scan(&week, &rawComponents); err != nil {
+			return nil, err
+		}
+		var comps []string
+		if rawComponents.Valid && rawComponents.String != "" && rawComponents.String != "null" {
+			_ = json.Unmarshal([]byte(rawComponents.String), &comps)
+		}
+		pillars := pm.PillarsForComponents(comps)
+		if len(pillars) == 0 {
+			bump("Unassigned", week, 0, 1)
+			continue
+		}
+		for _, p := range pillars {
+			bump(p, week, 0, 1)
+		}
+	}
+	if err := jRows.Err(); err != nil {
+		return nil, err
+	}
+
 	out := make([]PillarBucket, 0, len(agg))
 	for _, b := range agg {
 		out = append(out, *b)

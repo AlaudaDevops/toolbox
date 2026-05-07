@@ -25,14 +25,46 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	Debug   bool    `mapstructure:"debug"`
-	Logger  Logger  `mapstructure:"logger"`
-	Jira    Jira    `mapstructure:"jira"`
-	Server  Server  `mapstructure:"server"`
-	Cache   Cache   `mapstructure:"cache"`
-	Metrics Metrics `mapstructure:"metrics"`
-	Storage Storage `mapstructure:"storage"`
-	GitHub  GitHub  `mapstructure:"github"`
+	Debug         bool          `mapstructure:"debug"`
+	Logger        Logger        `mapstructure:"logger"`
+	Jira          Jira          `mapstructure:"jira"`
+	Server        Server        `mapstructure:"server"`
+	Cache         Cache         `mapstructure:"cache"`
+	Metrics       Metrics       `mapstructure:"metrics"`
+	Storage       Storage       `mapstructure:"storage"`
+	GitHub        GitHub        `mapstructure:"github"`
+	TeamAnalytics TeamAnalytics `mapstructure:"team_analytics"`
+}
+
+// TeamAnalytics holds the pillar attribution map used by /api/contributions/pillars
+// (and the slice explorer's pillar axis).
+//
+// Layout: pillar name → list of repo globs and Jira component names that
+// belong to it. A single repo or component MAY appear under several pillars;
+// each appearance credits the corresponding pillar independently when a PR
+// or issue lands. Member-level totals stay independent of this mapping —
+// pillar attribution is per-PR / per-issue, not per-member.
+//
+// Repo entries support glob (`*`) wildcards. Owner case-insensitive match.
+// Jira component names match exactly (case-insensitive).
+//
+// Example:
+//
+//	team_analytics:
+//	  pillars:
+//	    "CI/CD":
+//	      repos: ["alaudadevops/tektoncd-*", "alaudadevops/helm*"]
+//	      components: ["Tekton"]
+//	    "Tool Deployment":
+//	      repos: ["alaudadevops/harbor*", "alaudadevops/helm*"]
+type TeamAnalytics struct {
+	Pillars map[string]PillarMapping `mapstructure:"pillars"`
+}
+
+// PillarMapping is one bucket inside TeamAnalytics.Pillars.
+type PillarMapping struct {
+	Repos      []string `mapstructure:"repos"`
+	Components []string `mapstructure:"components"`
 }
 
 // Storage configures the durable team-analytics store.

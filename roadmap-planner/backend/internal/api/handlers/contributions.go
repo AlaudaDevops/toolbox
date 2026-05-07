@@ -170,9 +170,13 @@ func (h *ContributionsHandler) NetworkDensity(c *gin.Context) {
 
 // PillarThroughput — GET /api/contributions/pillars?from=&to=
 //
-// Returns weekly PR-merged + Jira-done counts grouped by member.pillar.
-// Members without a pillar are surfaced under the synthetic "Unassigned"
-// label so the dashboard can hint that pillars need to be set.
+// Returns weekly PR-merged + Jira-done counts grouped by pillar. Pillar
+// attribution is per-PR (via repo→pillars) and per-issue (via Jira
+// component → pillars), driven by the team_analytics.pillars config.
+// PRs / issues that don't match any configured pillar fall under the
+// synthetic "Unassigned" key. The `pillars` field in the response gives
+// the configured display order so the frontend can render zero-stack
+// pillars even when they had no activity.
 func (h *ContributionsHandler) PillarThroughput(c *gin.Context) {
 	q, err := h.parseQuery(c)
 	if err != nil {
@@ -185,7 +189,15 @@ func (h *ContributionsHandler) PillarThroughput(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"buckets": rows, "from": q.From, "to": q.To})
+	pm := h.service.PillarMap()
+	c.JSON(http.StatusOK, gin.H{
+		"buckets":    rows,
+		"from":       q.From,
+		"to":         q.To,
+		"pillars":    pm.PublicConfig(),
+		"order":      pm.Order(),
+		"configured": pm.Configured(),
+	})
 }
 
 // UpdateMember — PATCH /api/contributions/members/:id

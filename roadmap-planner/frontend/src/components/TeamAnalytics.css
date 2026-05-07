@@ -191,6 +191,24 @@
   border-color: var(--fg);
 }
 
+.ta-pillar-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 240px;
+}
+.ta-pillar-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fg-subtle);
+  background: var(--bg-sunken);
+  white-space: nowrap;
+}
+
 .ta-seg {
   display: inline-flex;
   border: 1px solid var(--border);
