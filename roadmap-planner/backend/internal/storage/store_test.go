@@ -82,12 +82,12 @@ func TestSQLiteRoundTrip(t *testing.T) {
 		{
 			IssueKey: "DEVOPS-1", IssueType: "Epic", Status: "Done",
 			AssigneeID: "alice", PillarID: "essentials",
-			Components: []string{"argo-cd", "tekton"},
-			Versions:   []string{"argo-cd-2.9.0"},
-			SprintID:   "Sprint 26.05",
+			Components:  []string{"argo-cd", "tekton"},
+			Versions:    []string{"argo-cd-2.9.0"},
+			SprintID:    "Sprint 26.05",
 			StoryPoints: 3,
-			CreatedAt:  now.Add(-72 * time.Hour),
-			ResolvedAt: &resolved,
+			CreatedAt:   now.Add(-72 * time.Hour),
+			ResolvedAt:  &resolved,
 		},
 		{
 			IssueKey: "DEVOPS-2", IssueType: "Bug", Status: "In Progress",
@@ -118,11 +118,11 @@ func TestSQLiteRoundTrip(t *testing.T) {
 			Number: 173, Title: "ci: smoke test", State: "merged",
 			AuthorID: "alice", HeadBranch: "DEVOPS-1-smoke", BaseBranch: "main",
 			Additions: 42, Deletions: 8, ChangedFiles: 3,
-			EpicKey:   "DEVOPS-1",
-			CreatedAt: now.Add(-12 * time.Hour),
+			EpicKey:       "DEVOPS-1",
+			CreatedAt:     now.Add(-12 * time.Hour),
 			FirstReviewAt: &first,
-			MergedAt: &merged,
-			FetchedAt: now,
+			MergedAt:      &merged,
+			FetchedAt:     now,
 		},
 	}
 	if err := store.UpsertPullRequests(ctx, prs); err != nil {

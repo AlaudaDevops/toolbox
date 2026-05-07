@@ -123,13 +123,13 @@ func (h *ContributionsHandler) MemberDetail(c *gin.Context) {
 		}
 	}
 	resp := gin.H{
-		"member_id":                 summary.MemberID,
-		"week_totals":               summary.WeekTotals,
-		"jira_issues_done":          summary.JiraIssuesDone,
-		"jira_points_done":          summary.JiraPointsDone,
-		"prs_merged":                summary.PRsMerged,
-		"prs_reviewed":              summary.PRsReviewed,
-		"review_latency_p50_hours":  summary.ReviewLatencyP50,
+		"member_id":                summary.MemberID,
+		"week_totals":              summary.WeekTotals,
+		"jira_issues_done":         summary.JiraIssuesDone,
+		"jira_points_done":         summary.JiraPointsDone,
+		"prs_merged":               summary.PRsMerged,
+		"prs_reviewed":             summary.PRsReviewed,
+		"review_latency_p50_hours": summary.ReviewLatencyP50,
 	}
 	if info != nil {
 		resp["info"] = info

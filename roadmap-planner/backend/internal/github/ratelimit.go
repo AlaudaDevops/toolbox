@@ -19,9 +19,9 @@ import (
 //
 // GitHub returns three relevant headers on every API response:
 //
-//   X-RateLimit-Remaining   — calls left in the current window.
-//   X-RateLimit-Reset       — Unix epoch seconds when the window resets.
-//   X-RateLimit-Limit       — total budget (we track but don't act on).
+//	X-RateLimit-Remaining   — calls left in the current window.
+//	X-RateLimit-Reset       — Unix epoch seconds when the window resets.
+//	X-RateLimit-Limit       — total budget (we track but don't act on).
 //
 // On 403/429 with a Retry-After header, the *secondary* rate limit is
 // in play and Retry-After is the authoritative wait — handled in

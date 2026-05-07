@@ -27,6 +27,7 @@ export default [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         process: 'readonly',
+        URL: 'readonly',
         URLSearchParams: 'readonly',
         require: 'readonly',
       },

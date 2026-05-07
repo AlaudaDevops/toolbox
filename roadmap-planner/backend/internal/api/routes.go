@@ -140,11 +140,11 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 // access as the rest of the app — we deliberately do not expose member
 // metrics anonymously):
 //
-//   GET   /api/contributions/members         — directory of members
-//   GET   /api/contributions/team            — team-overview rollups
-//   GET   /api/contributions/members/:id     — single member detail
-//   PATCH /api/contributions/members/:id     — update editable identity fields
-//   GET   /api/contributions/status          — last-sync timestamps
+//	GET   /api/contributions/members         — directory of members
+//	GET   /api/contributions/team            — team-overview rollups
+//	GET   /api/contributions/members/:id     — single member detail
+//	PATCH /api/contributions/members/:id     — update editable identity fields
+//	GET   /api/contributions/status          — last-sync timestamps
 func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service, aggregator *contributions.Aggregator) {
 	if store == nil || service == nil {
 		return

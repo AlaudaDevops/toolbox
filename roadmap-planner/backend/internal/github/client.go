@@ -81,18 +81,18 @@ func NewWithTokenSource(baseURL string, ts TokenSource, httpClient *http.Client)
 // Field tags mirror GitHub's JSON; helpers below normalise into our
 // storage shape.
 type PullRequest struct {
-	Number       int       `json:"number"`
-	Title        string    `json:"title"`
-	State        string    `json:"state"` // "open" | "closed"
-	Draft        bool      `json:"draft"`
-	HTMLURL      string    `json:"html_url"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Number       int        `json:"number"`
+	Title        string     `json:"title"`
+	State        string     `json:"state"` // "open" | "closed"
+	Draft        bool       `json:"draft"`
+	HTMLURL      string     `json:"html_url"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 	ClosedAt     *time.Time `json:"closed_at"`
 	MergedAt     *time.Time `json:"merged_at"`
-	Additions    int       `json:"additions"`
-	Deletions    int       `json:"deletions"`
-	ChangedFiles int       `json:"changed_files"`
+	Additions    int        `json:"additions"`
+	Deletions    int        `json:"deletions"`
+	ChangedFiles int        `json:"changed_files"`
 	User         struct {
 		Login string `json:"login"`
 	} `json:"user"`
@@ -189,10 +189,10 @@ func (c *Client) ListReviews(ctx context.Context, owner, repo string, number int
 
 // do is the request engine. It:
 //
-//   1. Sleeps before issuing if the rate-limit budget is near-exhausted.
-//   2. Resolves a token from the configured TokenSource (PAT or App).
-//   3. On 403/429 with a Retry-After hint, sleeps and retries ONCE.
-//      After that, surfaces the error so the caller can decide.
+//  1. Sleeps before issuing if the rate-limit budget is near-exhausted.
+//  2. Resolves a token from the configured TokenSource (PAT or App).
+//  3. On 403/429 with a Retry-After hint, sleeps and retries ONCE.
+//     After that, surfaces the error so the caller can decide.
 //
 // JSON decoding only runs on 2xx with a non-nil out.
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, out interface{}) error {

@@ -38,13 +38,13 @@ func NewService(store storage.Store) *Service {
 
 // MemberSummary is one row of the team-overview dashboard.
 type MemberSummary struct {
-	MemberID         string  `json:"member_id"`
+	MemberID         string   `json:"member_id"`
 	WeekTotals       []Bucket `json:"week_totals"`
-	JiraIssuesDone   int     `json:"jira_issues_done"`
-	JiraPointsDone   float64 `json:"jira_points_done"`
-	PRsMerged        int     `json:"prs_merged"`
-	PRsReviewed      int     `json:"prs_reviewed"`
-	ReviewLatencyP50 float64 `json:"review_latency_p50_hours,omitempty"`
+	JiraIssuesDone   int      `json:"jira_issues_done"`
+	JiraPointsDone   float64  `json:"jira_points_done"`
+	PRsMerged        int      `json:"prs_merged"`
+	PRsReviewed      int      `json:"prs_reviewed"`
+	ReviewLatencyP50 float64  `json:"review_latency_p50_hours,omitempty"`
 }
 
 // Bucket is one weekly aggregation point.

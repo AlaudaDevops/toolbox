@@ -202,7 +202,7 @@ func asFloat(v interface{}) float64 {
 //   - Jira Cloud: list of objects with "id", "name", "state".
 //   - Jira Server / GreenHopper: list of strings like
 //     "com.atlassian.greenhopper.service.sprint.Sprint@hash[
-//      id=123,rapidViewId=…,state=ACTIVE,name=Sprint 26.05,…]".
+//     id=123,rapidViewId=…,state=ACTIVE,name=Sprint 26.05,…]".
 //
 // We don't need to be authoritative — sprint id only fuels the rollup
 // "this sprint" widget; if we cannot parse, we fall back to empty and

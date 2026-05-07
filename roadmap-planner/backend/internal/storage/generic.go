@@ -28,8 +28,8 @@ type genericStore struct {
 	d  Dialect
 }
 
-func (s *genericStore) Close() error    { return s.db.Close() }
-func (s *genericStore) DB() *sql.DB     { return s.db }
+func (s *genericStore) Close() error     { return s.db.Close() }
+func (s *genericStore) DB() *sql.DB      { return s.db }
 func (s *genericStore) Dialect() Dialect { return s.d }
 
 func (s *genericStore) Migrate(ctx context.Context) error {

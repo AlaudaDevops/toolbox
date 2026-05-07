@@ -90,11 +90,11 @@ func NewSyncer(client Searcher, store storage.Store, cfg Config) *Syncer {
 // collection_runs. Returns the *Result so callers can log / surface to
 // the UI.
 type Result struct {
-	Mode         string // "backfill" | "incremental"
-	IssuesSeen   int
+	Mode          string // "backfill" | "incremental"
+	IssuesSeen    int
 	IssuesWritten int
-	MembersSeen  int
-	DurationMs   int64
+	MembersSeen   int
+	DurationMs    int64
 }
 
 func (s *Syncer) Run(ctx context.Context) (*Result, error) {

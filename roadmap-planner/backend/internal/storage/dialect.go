@@ -18,10 +18,10 @@ import (
 // We deliberately keep this small. The schema (DDL) and the queries we
 // hand-write are 95% portable between the two; the gaps are:
 //
-//   1. placeholder syntax — SQLite is `?`, Postgres is `$1, $2, …`.
-//   2. "round timestamp down to its Monday-week-start DATE" — SQLite
-//      uses `DATE(col, 'weekday 1', '-7 days')`, Postgres uses
-//      `date_trunc('week', col)::date`.
+//  1. placeholder syntax — SQLite is `?`, Postgres is `$1, $2, …`.
+//  2. "round timestamp down to its Monday-week-start DATE" — SQLite
+//     uses `DATE(col, 'weekday 1', '-7 days')`, Postgres uses
+//     `date_trunc('week', col)::date`.
 //
 // The remaining differences (JSON column types, foreign-key enforcement,
 // pragmas vs. settings) are absorbed at Open* time, not in queries.
@@ -72,8 +72,8 @@ func rebind(d Dialect, q string) string {
 
 type sqliteDialect struct{}
 
-func (sqliteDialect) Name() string         { return "sqlite" }
-func (sqliteDialect) DriverName() string   { return "sqlite" }
+func (sqliteDialect) Name() string       { return "sqlite" }
+func (sqliteDialect) DriverName() string { return "sqlite" }
 func (sqliteDialect) Placeholder(int) string {
 	return "?"
 }

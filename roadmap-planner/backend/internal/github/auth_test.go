@@ -171,7 +171,7 @@ func TestAppTokenSource_PropagatesErrors(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	src, err := NewAppTokenSource(AppCredentials{
-		AppID:          1, InstallationID: 1, PrivateKeyPEM: pemBytes, BaseURL: srv.URL,
+		AppID: 1, InstallationID: 1, PrivateKeyPEM: pemBytes, BaseURL: srv.URL,
 	})
 	if err != nil {
 		t.Fatalf("new: %v", err)

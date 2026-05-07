@@ -101,7 +101,7 @@ func TestBackfillThenIncremental(t *testing.T) {
 	}
 
 	fake := &fakeSearcher{byPattern: map[string][]jira.SnapshotIssue{
-		`resolved >=`:        resolvedIssues,
+		`resolved >=`:         resolvedIssues,
 		`resolution is EMPTY`: openIssues,
 	}}
 
@@ -186,11 +186,11 @@ func TestMemberIDFromUser(t *testing.T) {
 		in   *models.User
 		want string
 	}{
-		{"nil",     nil, ""},
-		{"email wins",        &models.User{EmailAddress: "Alice.Tan@alauda.io", AccountID: "acct-abc", Name: "atan"}, "alice.tan"},
-		{"account fallback",  &models.User{AccountID: "acct-abc", Name: "atan"}, "acct-acct-abc"},
-		{"name fallback",     &models.User{Name: "Bohan Z"}, "bohan-z"},
-		{"display last",      &models.User{DisplayName: "Carlos Méndez"}, "u-"},
+		{"nil", nil, ""},
+		{"email wins", &models.User{EmailAddress: "Alice.Tan@alauda.io", AccountID: "acct-abc", Name: "atan"}, "alice.tan"},
+		{"account fallback", &models.User{AccountID: "acct-abc", Name: "atan"}, "acct-acct-abc"},
+		{"name fallback", &models.User{Name: "Bohan Z"}, "bohan-z"},
+		{"display last", &models.User{DisplayName: "Carlos Méndez"}, "u-"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
