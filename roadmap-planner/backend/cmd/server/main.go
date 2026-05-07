@@ -355,12 +355,21 @@ func openStore(cfg config.Storage) (storage.Store, error) {
 func parseRepos(specs []string) []ghclient.RepoConfig {
 	out := make([]ghclient.RepoConfig, 0, len(specs))
 	for _, raw := range specs {
-		// "owner/name" or "owner/name:component"
+		// "owner/name", "owner/name:component", or "owner/*" for
+		// wildcard expansion (resolved at Sync time against
+		// /orgs/{owner}/repos). Component labels are not allowed on
+		// wildcard specs — write `OWNER/NAME:component` separately if
+		// you want a per-repo label override.
 		spec, comp, _ := strings.Cut(raw, ":")
 		owner, name, ok := strings.Cut(spec, "/")
 		if !ok || owner == "" || name == "" {
 			logger.Warn("malformed github repo spec, skipping", zap.String("spec", raw))
 			continue
+		}
+		if name == "*" && comp != "" {
+			logger.Warn("github repo wildcard cannot carry a component label, dropping label",
+				zap.String("spec", raw))
+			comp = ""
 		}
 		out = append(out, ghclient.RepoConfig{
 			Owner: owner, Name: name, Component: comp,
