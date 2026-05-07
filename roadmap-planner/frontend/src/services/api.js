@@ -226,6 +226,15 @@ export const contributionsAPI = {
     return response.data;
   },
 
+  // Update editable identity fields on a member. Only `github_login`,
+  // `display_name` and `pillar_id` are accepted today; the backend
+  // triggers an aggregator rebuild after the upsert so PR/review counts
+  // refresh against the new linkage on the next read.
+  updateMember: async (id, payload) => {
+    const response = await api.patch(`/api/contributions/members/${id}`, payload);
+    return response.data;
+  },
+
   // Last-sync timestamps per source (jira / github).
   status: async () => {
     const response = await api.get('/api/contributions/status');

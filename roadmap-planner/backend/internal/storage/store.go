@@ -90,33 +90,43 @@ type IssueSnapshot struct {
 
 // PullRequest is a GitHub PR record. Linked to an Epic via EpicKey when
 // the configured Linker can resolve one (branch regex, PR title, etc.).
+//
+// GitHubAuthorLogin is the raw login string returned by the GitHub API
+// (lower-cased on write). It's stored alongside the resolved AuthorID
+// so the aggregator can re-link history when an operator later fills in
+// `members.github_login` via PATCH — see migrations/0002.
 type PullRequest struct {
-	ID            string // "org/name#number"
-	RepoID        string
-	Number        int
-	Title         string
-	State         string // "open" | "merged" | "closed"
-	AuthorID      string // FK to members.id, empty if no match
-	HeadBranch    string
-	BaseBranch    string
-	Additions     int
-	Deletions     int
-	ChangedFiles  int
-	EpicKey       string
-	CreatedAt     time.Time
-	FirstReviewAt *time.Time
-	MergedAt      *time.Time
-	ClosedAt      *time.Time
-	FetchedAt     time.Time
+	ID                string // "org/name#number"
+	RepoID            string
+	Number            int
+	Title             string
+	State             string // "open" | "merged" | "closed"
+	AuthorID          string // FK to members.id, empty if no match
+	GitHubAuthorLogin string // raw `pr.user.login`, lower-cased
+	HeadBranch        string
+	BaseBranch        string
+	Additions         int
+	Deletions         int
+	ChangedFiles      int
+	EpicKey           string
+	CreatedAt         time.Time
+	FirstReviewAt     *time.Time
+	MergedAt          *time.Time
+	ClosedAt          *time.Time
+	FetchedAt         time.Time
 }
 
 // PRReview is one review event on a PR.
+//
+// GitHubReviewerLogin mirrors PullRequest.GitHubAuthorLogin: the raw
+// login enables retroactive re-linking after a github_login edit.
 type PRReview struct {
-	ID          string
-	PRID        string
-	ReviewerID  string
-	State       string // approved | changes_requested | commented
-	SubmittedAt time.Time
+	ID                  string
+	PRID                string
+	ReviewerID          string
+	GitHubReviewerLogin string // raw `review.user.login`, lower-cased
+	State               string // approved | changes_requested | commented
+	SubmittedAt         time.Time
 }
 
 // Member is the join entity across Jira and GitHub.

@@ -122,14 +122,15 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 	defer tx.Rollback()
 	q := rebind(s.d, `
 		INSERT INTO pull_requests (
-			id, repo_id, number, title, state, author_id,
+			id, repo_id, number, title, state, author_id, github_author_login,
 			head_branch, base_branch, additions, deletions, changed_files,
 			epic_key, created_at, first_review_at, merged_at, closed_at, fetched_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			title = excluded.title,
 			state = excluded.state,
 			author_id = excluded.author_id,
+			github_author_login = excluded.github_author_login,
 			additions = excluded.additions,
 			deletions = excluded.deletions,
 			changed_files = excluded.changed_files,
@@ -145,7 +146,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 	defer stmt.Close()
 	for _, p := range prs {
 		_, err := stmt.ExecContext(ctx,
-			p.ID, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID),
+			p.ID, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID), nullable(p.GitHubAuthorLogin),
 			nullable(p.HeadBranch), nullable(p.BaseBranch), p.Additions, p.Deletions, p.ChangedFiles,
 			nullable(p.EpicKey), p.CreatedAt, p.FirstReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
 		)
@@ -166,9 +167,11 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 	}
 	defer tx.Rollback()
 	q := rebind(s.d, `
-		INSERT INTO pr_reviews (id, pr_id, reviewer_id, state, submitted_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO pr_reviews (id, pr_id, reviewer_id, github_reviewer_login, state, submitted_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
+			reviewer_id = excluded.reviewer_id,
+			github_reviewer_login = excluded.github_reviewer_login,
 			state = excluded.state,
 			submitted_at = excluded.submitted_at`)
 	stmt, err := tx.PrepareContext(ctx, q)
@@ -177,7 +180,8 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 	}
 	defer stmt.Close()
 	for _, r := range reviews {
-		_, err := stmt.ExecContext(ctx, r.ID, r.PRID, nullable(r.ReviewerID), r.State, r.SubmittedAt)
+		_, err := stmt.ExecContext(ctx, r.ID, r.PRID, nullable(r.ReviewerID),
+			nullable(r.GitHubReviewerLogin), r.State, r.SubmittedAt)
 		if err != nil {
 			return fmt.Errorf("upsert review %s: %w", r.ID, err)
 		}

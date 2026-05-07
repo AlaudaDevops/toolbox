@@ -140,6 +140,7 @@ func (c *Client) toSnapshotIssue(issue *jira.Issue, opts SnapshotSearchOpts) Sna
 			Name:         issue.Fields.Assignee.Name,
 			DisplayName:  issue.Fields.Assignee.DisplayName,
 			EmailAddress: issue.Fields.Assignee.EmailAddress,
+			Active:       issue.Fields.Assignee.Active,
 		}
 	}
 	si.CreatedAt = time.Time(issue.Fields.Created)

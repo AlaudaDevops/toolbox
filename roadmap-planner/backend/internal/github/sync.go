@@ -166,29 +166,31 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			} else if pr.State == "closed" {
 				state = "closed"
 			}
-			authorID := byLogin[strings.ToLower(pr.User.Login)]
+			authorLogin := strings.ToLower(pr.User.Login)
+			authorID := byLogin[authorLogin]
 			epicKey := ""
 			if s.linker != nil {
 				epicKey = s.linker.Link(pr)
 			}
 			full := repo.FullName()
 			rec := storage.PullRequest{
-				ID:           fmt.Sprintf("%s#%d", full, pr.Number),
-				RepoID:       full,
-				Number:       pr.Number,
-				Title:        pr.Title,
-				State:        state,
-				AuthorID:     authorID,
-				HeadBranch:   pr.Head.Ref,
-				BaseBranch:   pr.Base.Ref,
-				Additions:    pr.Additions,
-				Deletions:    pr.Deletions,
-				ChangedFiles: pr.ChangedFiles,
-				EpicKey:      epicKey,
-				CreatedAt:    pr.CreatedAt,
-				MergedAt:     pr.MergedAt,
-				ClosedAt:     pr.ClosedAt,
-				FetchedAt:    runStart,
+				ID:                fmt.Sprintf("%s#%d", full, pr.Number),
+				RepoID:            full,
+				Number:            pr.Number,
+				Title:             pr.Title,
+				State:             state,
+				AuthorID:          authorID,
+				GitHubAuthorLogin: authorLogin,
+				HeadBranch:        pr.Head.Ref,
+				BaseBranch:        pr.Base.Ref,
+				Additions:         pr.Additions,
+				Deletions:         pr.Deletions,
+				ChangedFiles:      pr.ChangedFiles,
+				EpicKey:           epicKey,
+				CreatedAt:         pr.CreatedAt,
+				MergedAt:          pr.MergedAt,
+				ClosedAt:          pr.ClosedAt,
+				FetchedAt:         runStart,
 			}
 
 			// Reviews — skip the API call for:
@@ -213,12 +215,14 @@ func (s *Syncer) Sync(ctx context.Context) error {
 					var first *time.Time
 					for _, rev := range reviews {
 						st := strings.ToLower(rev.State)
+						reviewerLogin := strings.ToLower(rev.User.Login)
 						reviewBatch = append(reviewBatch, storage.PRReview{
-							ID:          fmt.Sprintf("%s#%d/r%d", full, pr.Number, rev.ID),
-							PRID:        rec.ID,
-							ReviewerID:  byLogin[strings.ToLower(rev.User.Login)],
-							State:       st,
-							SubmittedAt: rev.SubmittedAt,
+							ID:                  fmt.Sprintf("%s#%d/r%d", full, pr.Number, rev.ID),
+							PRID:                rec.ID,
+							ReviewerID:          byLogin[reviewerLogin],
+							GitHubReviewerLogin: reviewerLogin,
+							State:               st,
+							SubmittedAt:         rev.SubmittedAt,
 						})
 						if first == nil || rev.SubmittedAt.Before(*first) {
 							first = &rev.SubmittedAt

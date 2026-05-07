@@ -140,15 +140,16 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 // access as the rest of the app — we deliberately do not expose member
 // metrics anonymously):
 //
-//   GET /api/contributions/members            — directory of members
-//   GET /api/contributions/team               — team-overview rollups
-//   GET /api/contributions/members/:id        — single member detail
-//   GET /api/contributions/status             — last-sync timestamps
-func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service) {
+//   GET   /api/contributions/members         — directory of members
+//   GET   /api/contributions/team            — team-overview rollups
+//   GET   /api/contributions/members/:id     — single member detail
+//   PATCH /api/contributions/members/:id     — update editable identity fields
+//   GET   /api/contributions/status          — last-sync timestamps
+func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service, aggregator *contributions.Aggregator) {
 	if store == nil || service == nil {
 		return
 	}
-	h := handlers.NewContributionsHandler(store, service)
+	h := handlers.NewContributionsHandler(store, service, aggregator)
 	api := router.Group("/api")
 	g := api.Group("/contributions")
 	g.Use(middleware.AuthMiddleware())
@@ -156,6 +157,7 @@ func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *co
 		g.GET("/members", h.ListMembers)
 		g.GET("/team", h.TeamOverview)
 		g.GET("/members/:id", h.MemberDetail)
+		g.PATCH("/members/:id", h.UpdateMember)
 		g.GET("/status", h.CollectorStatus)
 	}
 }

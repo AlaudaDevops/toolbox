@@ -250,7 +250,11 @@ func (s *Syncer) writeBatch(ctx context.Context, runID string, issues []jira.Sna
 			DisplayName:   coalesce(it.Assignee.DisplayName, it.Assignee.Name, mid),
 			Email:         strings.ToLower(it.Assignee.EmailAddress),
 			JiraAccountID: it.Assignee.AccountID,
-			Active:        true,
+			// Trust the latest Jira state for the user: deactivated users
+			// should drop out of the team list automatically. UpsertMember
+			// always overwrites on conflict so a user that flips active
+			// will reflect on the next sync cycle.
+			Active: it.Assignee.Active,
 		}); err != nil {
 			s.logger.Warn("upsert member failed", zap.String("id", mid), zap.Error(err))
 		}

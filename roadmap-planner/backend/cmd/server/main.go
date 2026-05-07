@@ -206,7 +206,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 
 	service := contributions.NewService(store)
 	aggregator := contributions.NewAggregator(store)
-	api.AddContributionsRoutes(router, store, service)
+	api.AddContributionsRoutes(router, store, service, aggregator)
 	logger.Info("Contributions API routes added")
 
 	// Optional Jira sync goroutine.
