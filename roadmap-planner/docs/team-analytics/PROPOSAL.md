@@ -482,6 +482,65 @@ runs against a docker-compose pg are documented in `DEVELOPMENT.md`.
 
 ---
 
+## 6.7 GitHub auth & rate-limit safety
+
+The GitHub client supports two auth modes — operators pick one in
+config; the rest of the code is identical:
+
+| Mode | When to use | Rate-limit budget |
+|---|---|---|
+| **PAT** (`github.token` or `GITHUB_TOKEN`) | Local dev, one-off scripts, testing | 5,000 req/h, shared with whatever else that user runs |
+| **GitHub App** (`github.app.{app_id,installation_id,private_key_*}`) | Production, multi-repo ingestion | 5,000–15,000 req/h, scales with installation size, **does not share with PATs** |
+
+The App path mints a 1-hour installation token via JWT exchange,
+caches it, and refreshes lazily 5 minutes before expiry. PKCS#1 and
+PKCS#8 PEMs are both accepted (so `openssl pkcs8` conversion is not
+required).
+
+### Rate-limit handling (always on)
+
+The client tracks GitHub's rate-limit state across requests and acts
+on two signals:
+
+1. **Pre-flight throttle.** If the most recent response left
+   `X-RateLimit-Remaining < 50`, the next request blocks until
+   `X-RateLimit-Reset + 1s` (capped at 10 min). Polite — we never
+   march into a 403.
+2. **Reactive backoff.** On 403/429, we honor `Retry-After` if
+   present, otherwise fall back to `X-RateLimit-Reset`. One automatic
+   retry; after that the error surfaces.
+
+Plus one budget-saving optimisation in the Syncer: PRs **closed
+without merge more than 7 days ago** skip the per-PR reviews call
+entirely. They almost never accrue new reviews and dominate the call
+count on noisy repos.
+
+### Backfill cost — corrected math
+
+For a 180-day window, with the 7-day-closed skip applied:
+
+| Repos | Active PRs (6mo) | API calls | PAT (5k/h) | App (≥10k/h) |
+|---|---|---|---|---|
+| 1 | 300 | ~315 | 4 min | 2 min |
+| 5 | 1,500 | ~1,500 | 18 min | 9 min |
+| 20 | 6,000 | ~5,000 (skip kicks in) | ~1h | ~30 min |
+
+Once backfill clears, incremental syncs only re-fetch PRs with
+`updated >= last_sync` — typically dozens per cycle, well below any
+limit.
+
+### Tests
+
+- `auth_test.go` — round-trips an App-installation-token mint via
+  `httptest`, validates the JWT signature/issuer at the fake server,
+  and confirms the cache (no second mint) + refresh (mint after
+  forced expiry) behaviour. Both PKCS#1 and PKCS#8 keys parse.
+- `ratelimit_test.go` — 429-then-200 retry path, pre-flight wait when
+  `Remaining < threshold`, and the `maxBackoff` clamp on a
+  pathological `Retry-After: 99999`.
+
+---
+
 ## 7. UI / UX direction
 
 Companion file: `prototype.html` is a working static mock — open it in a

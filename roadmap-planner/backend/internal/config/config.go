@@ -56,19 +56,47 @@ type Storage struct {
 //
 // Repos are listed as "owner/name" strings; "owner/name:component" syntax
 // also works to attach a component label to every PR fetched from that
-// repo. The token resolves from env (GITHUB_TOKEN) or Token here.
+// repo.
+//
+// Two auth modes (mutually exclusive — App wins when both are set):
+//
+//   - PAT path:  set Token, or the GITHUB_TOKEN env var.
+//   - App path:  set App.{AppID, InstallationID, PrivateKey*}.
+//
+// App auth is recommended for production: per-installation rate-limit
+// pool that scales with repo count, no human-account dependency, and a
+// proper audit trail in the org log.
 //
 // BackfillDays overrides Storage.BackfillDays for the GitHub side
 // specifically. Useful when GitHub history is shorter than Jira history
 // (e.g., the repo was migrated recently).
 type GitHub struct {
-	Enabled      bool     `mapstructure:"enabled"`
-	BaseURL      string   `mapstructure:"base_url"` // empty -> api.github.com
-	Token        string   `mapstructure:"token"`
-	SyncInterval string   `mapstructure:"sync_interval"` // duration, e.g. "30m"
-	Repos        []string `mapstructure:"repos"`
-	ProjectKey   string   `mapstructure:"project_key"`   // for the default Linker (defaults to Jira.Project)
-	BackfillDays int      `mapstructure:"backfill_days"` // first-run window override; 0 = inherit Storage.BackfillDays
+	Enabled      bool      `mapstructure:"enabled"`
+	BaseURL      string    `mapstructure:"base_url"` // empty -> api.github.com
+	Token        string    `mapstructure:"token"`
+	App          GitHubApp `mapstructure:"app"`
+	SyncInterval string    `mapstructure:"sync_interval"` // duration, e.g. "30m"
+	Repos        []string  `mapstructure:"repos"`
+	ProjectKey   string    `mapstructure:"project_key"`   // for the default Linker (defaults to Jira.Project)
+	BackfillDays int       `mapstructure:"backfill_days"` // first-run window override; 0 = inherit Storage.BackfillDays
+}
+
+// GitHubApp configures the App-installation auth path.
+//
+// PrivateKeyPEM holds the raw PEM (multiline). PrivateKeyPath points to
+// a file on disk; mount the App's downloaded .pem from a Kubernetes
+// Secret as a file and set this. PrivateKeyPEM wins if both are set.
+type GitHubApp struct {
+	AppID          int64  `mapstructure:"app_id"`
+	InstallationID int64  `mapstructure:"installation_id"`
+	PrivateKeyPath string `mapstructure:"private_key_path"`
+	PrivateKeyPEM  string `mapstructure:"private_key_pem"`
+}
+
+// Configured reports whether enough App fields are set to mint a token.
+func (g GitHubApp) Configured() bool {
+	return g.AppID > 0 && g.InstallationID > 0 &&
+		(g.PrivateKeyPath != "" || g.PrivateKeyPEM != "")
 }
 
 // Logger represents logger configuration settings
@@ -278,6 +306,9 @@ func Load() (*Config, error) {
 	viper.SetDefault("github.sync_interval", "30m")
 	viper.SetDefault("github.repos", []string{})
 	viper.SetDefault("github.backfill_days", 0) // inherit storage.backfill_days
+	viper.SetDefault("github.app.app_id", 0)
+	viper.SetDefault("github.app.installation_id", 0)
+	viper.SetDefault("github.app.private_key_path", "")
 
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -308,6 +339,10 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("github.base_url", "GITHUB_BASE_URL")
 	_ = viper.BindEnv("github.sync_interval", "GITHUB_SYNC_INTERVAL")
 	_ = viper.BindEnv("github.backfill_days", "GITHUB_BACKFILL_DAYS")
+	_ = viper.BindEnv("github.app.app_id", "GITHUB_APP_ID")
+	_ = viper.BindEnv("github.app.installation_id", "GITHUB_APP_INSTALLATION_ID")
+	_ = viper.BindEnv("github.app.private_key_path", "GITHUB_APP_PRIVATE_KEY_PATH")
+	_ = viper.BindEnv("github.app.private_key_pem", "GITHUB_APP_PRIVATE_KEY_PEM")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

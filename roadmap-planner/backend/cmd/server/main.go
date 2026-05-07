@@ -247,28 +247,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 
 	// Optional GitHub sync goroutine.
 	if cfg.GitHub.Enabled {
-		repos := parseRepos(cfg.GitHub.Repos)
-		if len(repos) == 0 {
-			logger.Warn("github.enabled but github.repos is empty; skipping sync")
-		} else {
-			projectKey := cfg.GitHub.ProjectKey
-			if projectKey == "" {
-				projectKey = cfg.Jira.Project
-			}
-			client := ghclient.New(cfg.GitHub.BaseURL, cfg.GitHub.Token, nil)
-			backfill := cfg.GitHub.BackfillDays
-			if backfill <= 0 {
-				backfill = cfg.Storage.BackfillDays
-			}
-			syncer := ghclient.NewSyncer(client, store, repos, ghclient.DefaultLinker(projectKey), backfill)
-
-			interval, err := time.ParseDuration(cfg.GitHub.SyncInterval)
-			if err != nil {
-				interval = 30 * time.Minute
-			}
-			go runGitHubSync(ctx, syncer, aggregator, interval)
-			logger.Info("GitHub sync started", zap.Duration("interval", interval), zap.Int("repos", len(repos)))
-		}
+		startGitHubSync(ctx, cfg, store, aggregator)
 	}
 
 	go func() {
@@ -276,6 +255,76 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 		_ = store.Close()
 	}()
 	return nil
+}
+
+// startGitHubSync wires up the GitHub side: client (PAT or App auth),
+// Syncer, and the goroutine that drives it on the configured interval.
+//
+// All failures are non-fatal — if GitHub auth or repo parsing breaks,
+// we log and continue without a GitHub syncer rather than refusing to
+// start the whole server. The roadmap UI keeps working.
+func startGitHubSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator) {
+	repos := parseRepos(cfg.GitHub.Repos)
+	if len(repos) == 0 {
+		logger.Warn("github.enabled but github.repos is empty; skipping sync")
+		return
+	}
+	projectKey := cfg.GitHub.ProjectKey
+	if projectKey == "" {
+		projectKey = cfg.Jira.Project
+	}
+	client, authMode, err := buildGitHubClient(&cfg.GitHub)
+	if err != nil {
+		logger.Error("github client init failed", zap.Error(err))
+		return
+	}
+	logger.Info("GitHub auth ready", zap.String("mode", authMode))
+
+	backfill := cfg.GitHub.BackfillDays
+	if backfill <= 0 {
+		backfill = cfg.Storage.BackfillDays
+	}
+	syncer := ghclient.NewSyncer(client, store, repos, ghclient.DefaultLinker(projectKey), backfill)
+
+	interval, err := time.ParseDuration(cfg.GitHub.SyncInterval)
+	if err != nil {
+		interval = 30 * time.Minute
+	}
+	go runGitHubSync(ctx, syncer, aggregator, interval)
+	logger.Info("GitHub sync started",
+		zap.Duration("interval", interval),
+		zap.Int("repos", len(repos)),
+		zap.Int("backfill_days", backfill))
+}
+
+// buildGitHubClient picks the auth path. App config wins when present
+// (production deployments should run with an App; Token is for local
+// dev / one-off scripts).
+//
+// Returns (client, modeLabel, error) so the caller can log which path
+// is in effect.
+func buildGitHubClient(cfg *config.GitHub) (*ghclient.Client, string, error) {
+	if cfg.App.Configured() {
+		ts, err := ghclient.NewAppTokenSource(ghclient.AppCredentials{
+			AppID:          cfg.App.AppID,
+			InstallationID: cfg.App.InstallationID,
+			PrivateKeyPath: cfg.App.PrivateKeyPath,
+			PrivateKeyPEM:  []byte(cfg.App.PrivateKeyPEM),
+			BaseURL:        cfg.BaseURL,
+		})
+		if err != nil {
+			return nil, "", fmt.Errorf("github app: %w", err)
+		}
+		return ghclient.NewWithTokenSource(cfg.BaseURL, ts, nil), "app", nil
+	}
+	if cfg.Token == "" {
+		// Allow unauthenticated for public-only smoke tests, but warn:
+		// every real install should be authenticated to lift the
+		// 60-req/h ceiling.
+		logger.Warn("github auth: no token and no app configured — running unauthenticated (60 req/h cap)")
+		return ghclient.New(cfg.BaseURL, "", nil), "unauthenticated", nil
+	}
+	return ghclient.New(cfg.BaseURL, cfg.Token, nil), "pat", nil
 }
 
 // openStore selects the right storage backend based on cfg.Type. We

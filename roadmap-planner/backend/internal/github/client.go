@@ -31,27 +31,49 @@ import (
 )
 
 // Client is a tiny GitHub REST client.
+//
+// Auth is pluggable via TokenSource — a static PAT or a refreshing
+// GitHub-App installation token both fit. Rate-limit handling is
+// always-on:
+//
+//   - Pre-flight: if the previous response left us below MinRemaining,
+//     we sleep until the reset window (capped at maxBackoff).
+//   - On 403/429: we honor Retry-After (or X-RateLimit-Reset) and retry
+//     once. After that we surface the error to the caller.
 type Client struct {
-	baseURL string
-	token   string
-	http    *http.Client
+	baseURL     string
+	tokenSource TokenSource
+	http        *http.Client
+	rl          *rateLimit
 }
 
-// New builds a client. baseURL defaults to api.github.com; pass
-// https://github.example.com/api/v3 for GHES. token is a PAT or
-// fine-grained token; required for private repos and to lift the rate
-// limit to 5,000 req/hour.
+// New builds a client with a static PAT (or empty for unauthenticated
+// access — only useful against public read-only routes). For GitHub
+// App auth, use NewWithTokenSource.
+//
+// baseURL defaults to api.github.com; pass
+// https://github.example.com/api/v3 for GHES.
 func New(baseURL, token string, httpClient *http.Client) *Client {
+	return NewWithTokenSource(baseURL, StaticTokenSource{Value: token}, httpClient)
+}
+
+// NewWithTokenSource builds a client backed by an arbitrary TokenSource
+// — typically a *AppTokenSource minted via NewAppTokenSource.
+func NewWithTokenSource(baseURL string, ts TokenSource, httpClient *http.Client) *Client {
 	if baseURL == "" {
 		baseURL = "https://api.github.com"
 	}
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
+	if ts == nil {
+		ts = StaticTokenSource{}
+	}
 	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		token:   token,
-		http:    httpClient,
+		baseURL:     strings.TrimRight(baseURL, "/"),
+		tokenSource: ts,
+		http:        httpClient,
+		rl:          newRateLimit(),
 	}
 }
 
@@ -165,29 +187,70 @@ func (c *Client) ListReviews(ctx context.Context, owner, repo string, number int
 	return out, nil
 }
 
-// do is the request engine. Adds auth + Accept headers, decodes JSON,
-// and wraps non-2xx as an error with body for diagnostics.
+// do is the request engine. It:
+//
+//   1. Sleeps before issuing if the rate-limit budget is near-exhausted.
+//   2. Resolves a token from the configured TokenSource (PAT or App).
+//   3. On 403/429 with a Retry-After hint, sleeps and retries ONCE.
+//      After that, surfaces the error so the caller can decide.
+//
+// JSON decoding only runs on 2xx with a non-nil out.
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, out interface{}) error {
-	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
-	if err != nil {
+	const maxAttempts = 2
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if err := c.rl.waitIfNeeded(ctx); err != nil {
+			return err
+		}
+		req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+		token, err := c.tokenSource.Token(ctx)
+		if err != nil {
+			return fmt.Errorf("github auth: %w", err)
+		}
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return err
+		}
+		c.rl.observe(resp)
+
+		// Rate-limited? Decide whether we'll retry.
+		if wait, ok := c.rl.retryAfter(resp); ok && attempt < maxAttempts-1 {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+			t := time.NewTimer(wait)
+			select {
+			case <-ctx.Done():
+				t.Stop()
+				return ctx.Err()
+			case <-t.C:
+			}
+			continue
+		}
+
+		// Non-rate-limit error.
+		if resp.StatusCode >= 300 {
+			raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+			resp.Body.Close()
+			return fmt.Errorf("github %s %s: %s — %s", method, path, resp.Status, strings.TrimSpace(string(raw)))
+		}
+
+		// Success.
+		if out == nil {
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+			return nil
+		}
+		err = json.NewDecoder(resp.Body).Decode(out)
+		resp.Body.Close()
 		return err
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("github %s %s: %s — %s", method, path, resp.Status, strings.TrimSpace(string(raw)))
-	}
-	if out == nil {
-		return nil
-	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	return fmt.Errorf("github %s %s: rate-limited beyond retry budget", method, path)
 }

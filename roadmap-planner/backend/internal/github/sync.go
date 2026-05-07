@@ -191,8 +191,20 @@ func (s *Syncer) Sync(ctx context.Context) error {
 				FetchedAt:    runStart,
 			}
 
-			// Reviews — only for non-draft, non-trivially-old PRs.
-			if !pr.Draft {
+			// Reviews — skip the API call for:
+			//   - drafts (no useful review data)
+			//   - PRs closed without merge >7d ago (rarely accrue new
+			//     reviews, and they dominate the call budget on noisy
+			//     repos during backfill)
+			//
+			// We always fetch reviews for merged PRs in window — those
+			// drive the review-latency rollup.
+			skipReviews := pr.Draft
+			if !skipReviews && pr.MergedAt == nil && pr.ClosedAt != nil &&
+				time.Since(*pr.ClosedAt) > 7*24*time.Hour {
+				skipReviews = true
+			}
+			if !skipReviews {
 				reviews, err := s.client.ListReviews(ctx, repo.Owner, repo.Name, pr.Number)
 				if err != nil {
 					s.logger.Warn("ListReviews failed",
