@@ -109,7 +109,7 @@ func applyMigration(ctx context.Context, db *sql.DB, d Dialect, m migration) err
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	for _, stmt := range splitStatements(m.sql) {
 		if strings.TrimSpace(stmt) == "" {
