@@ -82,11 +82,16 @@ type Issue struct {
 }
 
 // User represents a Jira user
+//
+// Active mirrors Jira's `active` field on the user object. Default true
+// when missing from the JSON: many Jira REST responses omit the field
+// for the authenticated user's own row.
 type User struct {
 	AccountID    string `json:"account_id"`
 	Name         string `json:"name"`
 	DisplayName  string `json:"display_name"`
 	EmailAddress string `json:"email_address"`
+	Active       bool   `json:"active"`
 }
 
 // StatusChange represents a status transition from Jira changelog
@@ -613,5 +618,6 @@ func convertJiraUserToUser(jiraUser *jira.User) *User {
 		Name:         jiraUser.Name,
 		DisplayName:  jiraUser.DisplayName,
 		EmailAddress: jiraUser.EmailAddress,
+		Active:       jiraUser.Active,
 	}
 }

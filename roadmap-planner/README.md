@@ -10,6 +10,10 @@ A web-based Kanban application for managing product roadmaps using direct Jira i
 - **Epic Management**: Create epics and link them to milestones
 - **Drag & Drop**: Move epics between milestones easily
 - **Component Versioning**: Filter and manage component versions
+- **Team Analytics** *(opt-in, see [docs/team-analytics/PROPOSAL.md](docs/team-analytics/PROPOSAL.md))*:
+  durable history of Jira issues + GitHub PRs and reviews, sliced by member,
+  pillar and component. Disabled by default; enable via `storage.enabled` and
+  optionally `github.enabled` in `config.yaml`.
 
 ## Architecture
 

@@ -31,6 +31,72 @@ type Config struct {
 	Server  Server  `mapstructure:"server"`
 	Cache   Cache   `mapstructure:"cache"`
 	Metrics Metrics `mapstructure:"metrics"`
+	Storage Storage `mapstructure:"storage"`
+	GitHub  GitHub  `mapstructure:"github"`
+}
+
+// Storage configures the durable team-analytics store.
+//
+// Type supports "sqlite" (default, file-based, single-binary) or
+// "postgres" (DSN in DSN, recommended for shared deployments). Path is
+// only consulted for sqlite; DSN is only consulted for postgres.
+//
+// BackfillDays controls how far back the *first* collection cycle
+// reaches. After the first run we resume incrementally from the
+// previous run's timestamp. Default 180.
+type Storage struct {
+	Enabled      bool   `mapstructure:"enabled"`
+	Type         string `mapstructure:"type"`          // "sqlite" | "postgres"
+	Path         string `mapstructure:"path"`          // e.g. "./data/roadmap.db" (sqlite)
+	DSN          string `mapstructure:"dsn"`           // e.g. "postgres://…" (postgres)
+	BackfillDays int    `mapstructure:"backfill_days"` // first-run window, default 180
+}
+
+// GitHub configures the team-analytics GitHub ingestion.
+//
+// Repos are listed as "owner/name" strings; "owner/name:component" syntax
+// also works to attach a component label to every PR fetched from that
+// repo.
+//
+// Two auth modes (mutually exclusive — App wins when both are set):
+//
+//   - PAT path:  set Token, or the GITHUB_TOKEN env var.
+//   - App path:  set App.{AppID, InstallationID, PrivateKey*}.
+//
+// App auth is recommended for production: per-installation rate-limit
+// pool that scales with repo count, no human-account dependency, and a
+// proper audit trail in the org log.
+//
+// BackfillDays overrides Storage.BackfillDays for the GitHub side
+// specifically. Useful when GitHub history is shorter than Jira history
+// (e.g., the repo was migrated recently).
+type GitHub struct {
+	Enabled      bool      `mapstructure:"enabled"`
+	BaseURL      string    `mapstructure:"base_url"` // empty -> api.github.com
+	Token        string    `mapstructure:"token"`
+	App          GitHubApp `mapstructure:"app"`
+	SyncInterval string    `mapstructure:"sync_interval"` // duration, e.g. "30m"
+	Repos        []string  `mapstructure:"repos"`
+	ProjectKey   string    `mapstructure:"project_key"`   // for the default Linker (defaults to Jira.Project)
+	BackfillDays int       `mapstructure:"backfill_days"` // first-run window override; 0 = inherit Storage.BackfillDays
+}
+
+// GitHubApp configures the App-installation auth path.
+//
+// PrivateKeyPEM holds the raw PEM (multiline). PrivateKeyPath points to
+// a file on disk; mount the App's downloaded .pem from a Kubernetes
+// Secret as a file and set this. PrivateKeyPEM wins if both are set.
+type GitHubApp struct {
+	AppID          int64  `mapstructure:"app_id"`
+	InstallationID int64  `mapstructure:"installation_id"`
+	PrivateKeyPath string `mapstructure:"private_key_path"`
+	PrivateKeyPEM  string `mapstructure:"private_key_pem"`
+}
+
+// Configured reports whether enough App fields are set to mint a token.
+func (g GitHubApp) Configured() bool {
+	return g.AppID > 0 && g.InstallationID > 0 &&
+		(g.PrivateKeyPath != "" || g.PrivateKeyPEM != "")
 }
 
 // Logger represents logger configuration settings
@@ -41,12 +107,20 @@ type Logger struct {
 }
 
 // Jira represents Jira configuration settings
+//
+// Sync* fields are consumed by the team-analytics jirasync package; they
+// are ignored when storage.enabled is false.
 type Jira struct {
-	BaseURL  string   `mapstructure:"base_url"`
-	Username string   `mapstructure:"username"`
-	Password string   `mapstructure:"password"`
-	Project  string   `mapstructure:"project"`
-	Quarters []string `mapstructure:"quarters"`
+	BaseURL          string   `mapstructure:"base_url"`
+	Username         string   `mapstructure:"username"`
+	Password         string   `mapstructure:"password"`
+	Project          string   `mapstructure:"project"`
+	Quarters         []string `mapstructure:"quarters"`
+	SyncEnabled      bool     `mapstructure:"sync_enabled"`
+	SyncInterval     string   `mapstructure:"sync_interval"`      // e.g. "30m"
+	BackfillDays     int      `mapstructure:"backfill_days"`      // first-run window; 0 = inherit storage.backfill_days
+	StoryPointsField string   `mapstructure:"story_points_field"` // optional Jira customfield id
+	SprintField      string   `mapstructure:"sprint_field"`       // optional Jira customfield id
 }
 
 // Server represents server configuration settings
@@ -202,6 +276,11 @@ func Load() (*Config, error) {
 	viper.SetDefault("server.cors.allowed_origins", []string{"http://localhost:3000"})
 	viper.SetDefault("jira.project", "DEVOPS")
 	viper.SetDefault("jira.quarters", []string{"2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q4"})
+	viper.SetDefault("jira.sync_enabled", false)
+	viper.SetDefault("jira.sync_interval", "30m")
+	viper.SetDefault("jira.backfill_days", 0)
+	viper.SetDefault("jira.story_points_field", "")
+	viper.SetDefault("jira.sprint_field", "")
 	viper.SetDefault("cache.ttl", "5m")
 	viper.SetDefault("cache.refresh_interval", "1m")
 
@@ -214,6 +293,23 @@ func Load() (*Config, error) {
 	viper.SetDefault("metrics.prometheus.namespace", "roadmap")
 	viper.SetDefault("metrics.filters", []OptionsConfig{})
 
+	// Storage defaults
+	viper.SetDefault("storage.enabled", false)
+	viper.SetDefault("storage.type", "sqlite")
+	viper.SetDefault("storage.path", "./data/roadmap.db")
+	viper.SetDefault("storage.dsn", "")
+	viper.SetDefault("storage.backfill_days", 180)
+
+	// GitHub defaults
+	viper.SetDefault("github.enabled", false)
+	viper.SetDefault("github.base_url", "")
+	viper.SetDefault("github.sync_interval", "30m")
+	viper.SetDefault("github.repos", []string{})
+	viper.SetDefault("github.backfill_days", 0) // inherit storage.backfill_days
+	viper.SetDefault("github.app.app_id", 0)
+	viper.SetDefault("github.app.installation_id", 0)
+	viper.SetDefault("github.app.private_key_path", "")
+
 	// Environment variable mapping
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
@@ -222,12 +318,31 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("jira.base_url", "JIRA_BASE_URL")
 	_ = viper.BindEnv("jira.username", "JIRA_USERNAME")
 	_ = viper.BindEnv("jira.password", "JIRA_PASSWORD")
+	_ = viper.BindEnv("jira.sync_enabled", "JIRA_SYNC_ENABLED")
+	_ = viper.BindEnv("jira.sync_interval", "JIRA_SYNC_INTERVAL")
+	_ = viper.BindEnv("jira.backfill_days", "JIRA_BACKFILL_DAYS")
+	_ = viper.BindEnv("jira.story_points_field", "JIRA_STORY_POINTS_FIELD")
+	_ = viper.BindEnv("jira.sprint_field", "JIRA_SPRINT_FIELD")
 	_ = viper.BindEnv("server.static_files_path", "STATIC_FILES_PATH")
 	_ = viper.BindEnv("server.port", "SERVER_PORT")
 	_ = viper.BindEnv("debug", "DEBUG")
 	_ = viper.BindEnv("metrics.enabled", "METRICS_ENABLED")
 	_ = viper.BindEnv("metrics.collection_interval", "METRICS_COLLECTION_INTERVAL")
 	_ = viper.BindEnv("metrics.historical_days", "METRICS_HISTORICAL_DAYS")
+	_ = viper.BindEnv("storage.enabled", "STORAGE_ENABLED")
+	_ = viper.BindEnv("storage.type", "STORAGE_TYPE")
+	_ = viper.BindEnv("storage.path", "STORAGE_PATH")
+	_ = viper.BindEnv("storage.dsn", "STORAGE_DSN")
+	_ = viper.BindEnv("storage.backfill_days", "STORAGE_BACKFILL_DAYS")
+	_ = viper.BindEnv("github.enabled", "GITHUB_ENABLED")
+	_ = viper.BindEnv("github.token", "GITHUB_TOKEN")
+	_ = viper.BindEnv("github.base_url", "GITHUB_BASE_URL")
+	_ = viper.BindEnv("github.sync_interval", "GITHUB_SYNC_INTERVAL")
+	_ = viper.BindEnv("github.backfill_days", "GITHUB_BACKFILL_DAYS")
+	_ = viper.BindEnv("github.app.app_id", "GITHUB_APP_ID")
+	_ = viper.BindEnv("github.app.installation_id", "GITHUB_APP_INSTALLATION_ID")
+	_ = viper.BindEnv("github.app.private_key_path", "GITHUB_APP_PRIVATE_KEY_PATH")
+	_ = viper.BindEnv("github.app.private_key_pem", "GITHUB_APP_PRIVATE_KEY_PEM")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

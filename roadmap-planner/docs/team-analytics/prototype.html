@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roadmap Planner — Team Analytics (Prototype)</title>
+<style>
+  /* ---------------------------------------------------------------------
+     Visual language: matches roadmap-planner Atlas edition — editorial
+     serif display, IBM-Plex-Mono captions, restrained palette.
+     This file is intentionally dependency-free so it opens in any browser.
+     --------------------------------------------------------------------- */
+  :root {
+    --bg:        #f8f6f1;
+    --bg-elev:   #ffffff;
+    --bg-soft:   #f0ede5;
+    --fg:        #1a1a1a;
+    --fg-soft:   #4a4a4a;
+    --fg-muted:  #888280;
+    --border:    #d8d2c4;
+    --border-soft: #e6e2d6;
+    --accent:    #b8443c;            /* atlas red */
+    --accent-soft: #efd9d4;
+    --good:      #2f6b3a;
+    --warn:      #b87a1a;
+    --bad:       #b8443c;
+    --serif: "Iowan Old Style", "Cambria", Georgia, "Times New Roman", serif;
+    --mono:  "IBM Plex Mono", "JetBrains Mono", ui-monospace, "Menlo", monospace;
+    --ui:    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--ui);
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 28px 36px 80px;
+  }
+
+  /* ---------- masthead ---------- */
+  .mast {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 18px;
+  }
+  .mast__title { font-family: var(--serif); font-size: 32px; line-height: 1.1; letter-spacing: -0.01em; }
+  .mast__title em { font-style: italic; color: var(--accent); }
+  .mast__sub  { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-muted); margin-top: 6px; }
+  .mast__bracket { display: inline-block; padding: 3px 8px 4px; border: 1px solid var(--border); border-radius: 2px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em; color: var(--fg-soft); }
+
+  /* ---------- tabs ---------- */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 22px; }
+  .tab {
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    padding: 10px 18px 12px;
+    font-family: var(--ui);
+    font-size: 13px;
+    color: var(--fg-muted);
+    cursor: pointer;
+    letter-spacing: 0.02em;
+  }
+  .tab:hover { color: var(--fg-soft); }
+  .tab.is-active { color: var(--fg); border-bottom-color: var(--accent); font-weight: 500; }
+  .tab__num { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; color: var(--fg-muted); margin-right: 8px; }
+  .tab.is-active .tab__num { color: var(--accent); }
+
+  /* ---------- shared layout ---------- */
+  .panel {
+    background: var(--bg-elev);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 0;
+    overflow: hidden;
+  }
+  .panel__head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    background: var(--bg-soft);
+  }
+  .panel__title { font-family: var(--serif); font-size: 18px; }
+  .panel__sub   { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-muted); }
+
+  /* ---------- filters ---------- */
+  .filters { display: flex; gap: 10px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border-soft); background: #fbf9f4; flex-wrap: wrap; }
+  .filters__lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-muted); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 3px; overflow: hidden; }
+  .seg button { background: transparent; border: 0; border-right: 1px solid var(--border); padding: 5px 10px; font-family: var(--mono); font-size: 11px; cursor: pointer; color: var(--fg-soft); }
+  .seg button:last-child { border-right: 0; }
+  .seg button.is-active { background: var(--fg); color: var(--bg-elev); }
+  .pill { display: inline-block; padding: 2px 9px; border: 1px solid var(--border); border-radius: 999px; font-family: var(--mono); font-size: 10.5px; color: var(--fg-soft); cursor: pointer; user-select: none; }
+  .pill.is-active { background: var(--fg); color: var(--bg-elev); border-color: var(--fg); }
+
+  /* ---------- team table ---------- */
+  table.tbl { width: 100%; border-collapse: collapse; }
+  table.tbl th {
+    text-align: left;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--fg-muted);
+    background: #fbf9f4;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  table.tbl th:hover { color: var(--fg-soft); }
+  table.tbl th.is-sorted { color: var(--accent); }
+  table.tbl td {
+    padding: 14px;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: middle;
+  }
+  table.tbl tr:last-child td { border-bottom: 0; }
+  table.tbl tr.row-link:hover { background: var(--bg-soft); cursor: pointer; }
+
+  .member-cell { display: flex; align-items: center; gap: 12px; }
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 10.5px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .member-name { font-weight: 500; font-size: 13.5px; }
+  .member-meta { font-family: var(--mono); font-size: 10.5px; color: var(--fg-muted); letter-spacing: 0.04em; }
+
+  .num { font-family: var(--mono); font-size: 14px; font-variant-numeric: tabular-nums; }
+  .num--lg { font-size: 22px; font-family: var(--serif); }
+  .delta { display: inline-block; margin-left: 6px; font-family: var(--mono); font-size: 11px; }
+  .delta.up { color: var(--good); }
+  .delta.down { color: var(--bad); }
+  .delta.flat { color: var(--fg-muted); }
+
+  .spark { display: block; }
+
+  /* ---------- member profile ---------- */
+  .profile-grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+  .profile-card { padding: 22px; border: 1px solid var(--border-soft); border-radius: 4px; background: var(--bg-elev); }
+  .profile-avatar {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 18px; font-weight: 600;
+    border: 1px solid var(--border);
+  }
+  .profile-name { font-family: var(--serif); font-size: 24px; margin-top: 14px; }
+  .profile-pillar { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--fg-muted); margin-top: 4px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--border-soft); margin: 18px -22px -22px; border-top: 1px solid var(--border-soft); }
+  .kpi { background: var(--bg-elev); padding: 14px 18px; }
+  .kpi__lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-muted); }
+  .kpi__val { font-family: var(--serif); font-size: 26px; margin-top: 4px; }
+
+  .chart-card { background: var(--bg-elev); border: 1px solid var(--border-soft); border-radius: 4px; padding: 18px 22px; }
+  .chart-card + .chart-card { margin-top: 14px; }
+  .chart-title { font-family: var(--serif); font-size: 16px; margin: 0 0 4px; display: flex; justify-content: space-between; align-items: baseline; }
+  .chart-title .pill { font-family: var(--mono); }
+  .chart-sub   { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 12px; }
+
+  /* ---------- slice explorer ---------- */
+  .pivot { width: 100%; border-collapse: collapse; }
+  .pivot th, .pivot td { padding: 8px 10px; font-family: var(--mono); font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--border-soft); }
+  .pivot th { background: #fbf9f4; color: var(--fg-muted); letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+  .pivot td:first-child, .pivot th:first-child { text-align: left; font-family: var(--serif); font-size: 13.5px; text-transform: none; letter-spacing: 0; color: var(--fg); }
+  .pivot td.heat {
+    position: relative;
+    color: var(--fg);
+  }
+  .pivot td.heat::before {
+    content: ""; position: absolute; inset: 2px 1px;
+    background: var(--accent);
+    opacity: var(--h, 0);
+    border-radius: 2px;
+    z-index: 0;
+  }
+  .pivot td.heat span { position: relative; z-index: 1; }
+
+  /* ---------- back link ---------- */
+  .backlink { background: transparent; border: 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--fg-muted); cursor: pointer; padding: 0 0 14px; }
+  .backlink:hover { color: var(--accent); }
+
+  .row { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
+  @media (max-width: 1100px) { .row { grid-template-columns: 1fr; } .profile-grid { grid-template-columns: 1fr; } }
+
+  .legend { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.08em; color: var(--fg-muted); display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .rule {
+    height: 1px; background: var(--border-soft); margin: 22px 0; border: 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================== -->
+<!--                          MASTHEAD                              -->
+<!-- ============================================================== -->
+<header class="mast">
+  <div>
+    <span class="mast__bracket">N° 03 · TEAM ANALYTICS</span>
+    <h1 class="mast__title" style="margin: 8px 0 0;">Velocity, <em>contributions</em>, evolution.</h1>
+    <p class="mast__sub">Roadmap Planner · Prototype · v0 · See PROPOSAL.md for context</p>
+  </div>
+  <div class="mast__sub">
+    Source <span style="color: var(--fg-soft)">Jira + GitHub</span> ·
+    Window <span style="color: var(--fg-soft)">12 weeks</span> ·
+    Snapshot <span style="color: var(--fg-soft)" id="now"></span>
+  </div>
+</header>
+
+<!-- ============================================================== -->
+<!--                            TABS                                -->
+<!-- ============================================================== -->
+<nav class="tabs" role="tablist">
+  <button class="tab is-active" data-view="team"   ><span class="tab__num">01</span>Team overview</button>
+  <button class="tab"           data-view="member" ><span class="tab__num">02</span>Member profile</button>
+  <button class="tab"           data-view="slice"  ><span class="tab__num">03</span>Slice explorer</button>
+</nav>
+
+<!-- ============================================================== -->
+<!--                       VIEW · TEAM TABLE                        -->
+<!-- ============================================================== -->
+<section class="view view--team">
+  <div class="panel">
+    <header class="panel__head">
+      <div>
+        <div class="panel__title">All members · last 12 weeks</div>
+        <div class="panel__sub">Sortable. Click a row for the member profile.</div>
+      </div>
+      <div class="filters" style="border: 0; padding: 0; background: transparent;">
+        <span class="filters__lbl">Pillar</span>
+        <span class="pill is-active" data-filter="all">All</span>
+        <span class="pill" data-filter="ci-cd">CI/CD</span>
+        <span class="pill" data-filter="essentials">Essentials</span>
+        <span class="pill" data-filter="observability">Observability</span>
+      </div>
+    </header>
+    <table class="tbl" id="team-table">
+      <thead>
+        <tr>
+          <th data-sort="name"      class="is-sorted">Member</th>
+          <th data-sort="pillar">Pillar</th>
+          <th data-sort="jira" style="text-align:right">Jira done</th>
+          <th data-sort="points" style="text-align:right">Story pts</th>
+          <th data-sort="prs" style="text-align:right">PRs merged</th>
+          <th data-sort="reviews" style="text-align:right">Reviews</th>
+          <th data-sort="latency" style="text-align:right">Review&nbsp;p50</th>
+          <th>Trend (PRs/wk)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="row">
+    <div class="panel">
+      <header class="panel__head"><div class="panel__title">Throughput, by pillar</div><div class="panel__sub">PRs merged · 12-week stack</div></header>
+      <div style="padding: 22px;"><svg id="pillar-stack" width="100%" height="240" viewBox="0 0 600 240" preserveAspectRatio="none"></svg></div>
+    </div>
+    <div class="panel">
+      <header class="panel__head"><div class="panel__title">Review network density</div><div class="panel__sub">Who reviews whom</div></header>
+      <div style="padding: 18px 22px;">
+        <p style="margin: 0; color: var(--fg-soft); font-family: var(--serif); font-size: 14px;">
+          In the last 12 weeks, <strong>67%</strong> of PRs received their first review within
+          24 hours. Cross-pillar review participation is healthy
+          (<strong>34%</strong> of reviews crossed pillar boundaries) — that's a leading
+          indicator of knowledge sharing, and we plot it on the Slice tab.
+        </p>
+        <div style="margin-top: 16px; display: flex; flex-direction: column; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--fg-soft);">
+          <div>→ p50 first-review latency · <span style="color: var(--fg)">8.3h</span></div>
+          <div>→ p90 first-review latency · <span style="color: var(--fg)">42h</span></div>
+          <div>→ orphan PRs (no review)   · <span style="color: var(--warn)">11%</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== -->
+<!--                       VIEW · MEMBER PROFILE                    -->
+<!-- ============================================================== -->
+<section class="view view--member" hidden>
+  <button class="backlink">← Back to team overview</button>
+
+  <div class="profile-grid">
+    <aside class="profile-card">
+      <div class="profile-avatar" id="m-avatar">AL</div>
+      <div class="profile-name"   id="m-name">Member name</div>
+      <div class="profile-pillar" id="m-pillar">PILLAR</div>
+      <div style="margin-top: 12px; font-family: var(--mono); font-size: 11px; color: var(--fg-soft);">
+        <div id="m-github">github · @</div>
+        <div id="m-jira">jira · </div>
+      </div>
+      <div class="kpi-grid">
+        <div class="kpi"><div class="kpi__lbl">Jira done</div><div class="kpi__val" id="kpi-jira">—</div></div>
+        <div class="kpi"><div class="kpi__lbl">Story pts</div><div class="kpi__val" id="kpi-pts">—</div></div>
+        <div class="kpi"><div class="kpi__lbl">PRs merged</div><div class="kpi__val" id="kpi-prs">—</div></div>
+        <div class="kpi"><div class="kpi__lbl">Reviews</div><div class="kpi__val" id="kpi-rev">—</div></div>
+      </div>
+    </aside>
+
+    <div>
+      <div class="chart-card">
+        <h3 class="chart-title">Weekly contribution
+          <span class="legend"><span class="swatch" style="background: var(--accent)"></span>PRs merged
+            &nbsp;<span class="swatch" style="background: #2c5d75"></span>Jira done
+            &nbsp;<span class="swatch" style="background: #b87a1a"></span>Reviews
+          </span>
+        </h3>
+        <div class="chart-sub">Last 12 weeks · counts per ISO week</div>
+        <svg id="m-chart" width="100%" height="220" viewBox="0 0 720 220" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div class="chart-card">
+        <h3 class="chart-title">Components touched
+          <span class="legend"><span style="font-family: var(--mono);">Each row = one component · width = PRs merged</span></span>
+        </h3>
+        <div class="chart-sub">Where this member spent their commits</div>
+        <div id="m-bars"></div>
+      </div>
+
+      <div class="chart-card">
+        <h3 class="chart-title">This sprint <span class="pill" id="m-sprint-name" style="background: var(--bg-soft);">—</span></h3>
+        <div class="chart-sub">Live · refreshes with the next collection cycle</div>
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 6px;">
+          <div><div class="kpi__lbl">In progress</div><div class="num num--lg" id="sp-wip">—</div></div>
+          <div><div class="kpi__lbl">Done</div><div class="num num--lg" id="sp-done">—</div></div>
+          <div><div class="kpi__lbl">PRs open</div><div class="num num--lg" id="sp-open">—</div></div>
+          <div><div class="kpi__lbl">PRs merged</div><div class="num num--lg" id="sp-merged">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== -->
+<!--                       VIEW · SLICE EXPLORER                    -->
+<!-- ============================================================== -->
+<section class="view view--slice" hidden>
+  <div class="panel">
+    <header class="panel__head">
+      <div><div class="panel__title">Slice explorer</div><div class="panel__sub">2 axes + 1 metric. Always.</div></div>
+    </header>
+    <div class="filters">
+      <span class="filters__lbl">Rows</span>
+      <div class="seg" data-axis="rows">
+        <button class="is-active" data-val="pillar">Pillar</button>
+        <button data-val="component">Component</button>
+        <button data-val="member">Member</button>
+      </div>
+      <span class="filters__lbl" style="margin-left: 12px;">Cols</span>
+      <div class="seg" data-axis="cols">
+        <button class="is-active" data-val="week">Week</button>
+        <button data-val="quarter">Quarter</button>
+      </div>
+      <span class="filters__lbl" style="margin-left: 12px;">Metric</span>
+      <div class="seg" data-axis="metric">
+        <button class="is-active" data-val="prs">PRs merged</button>
+        <button data-val="jira">Jira done</button>
+        <button data-val="points">Story pts</button>
+      </div>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="pivot" id="pivot"><thead></thead><tbody></tbody></table>
+    </div>
+    <div style="padding: 14px 18px; font-family: var(--mono); font-size: 10.5px; color: var(--fg-muted); border-top: 1px solid var(--border-soft);">
+      Heat is per-row max. Cells are absolute counts. Hover for tooltip (real impl).
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== -->
+<!--                              JS                                -->
+<!-- ============================================================== -->
+<script>
+/* ----------------------------------------------------------------------
+   MOCK DATA
+   In the real impl this comes from /api/contributions/* — same shape.
+   Generated deterministically so the prototype always renders the same.
+   ---------------------------------------------------------------------- */
+const PILLARS = ["CI/CD", "Essentials", "Observability"];
+const COMPONENTS = ["argo-cd", "tekton", "harbor", "prometheus", "kube-ovn", "alertmanager"];
+
+const MEMBERS = [
+  { id: "alice",   name: "Alice Tan",       pillar: "CI/CD",          github: "alicetan",   jira: "alice@alauda.io"  },
+  { id: "bo",      name: "Bo Han Zhang",    pillar: "CI/CD",          github: "bohan-z",    jira: "bohan@alauda.io"  },
+  { id: "carlos",  name: "Carlos Méndez",   pillar: "Essentials",     github: "cmendez",    jira: "carlos@alauda.io" },
+  { id: "dani",    name: "Daniel Moriñigo", pillar: "Essentials",     github: "dmorinigo",  jira: "daniel@alauda.io" },
+  { id: "ester",   name: "Ester Wang",      pillar: "Observability", github: "esterw",     jira: "ester@alauda.io"  },
+  { id: "fiona",   name: "Fiona Chen",      pillar: "CI/CD",          github: "fchen",      jira: "fiona@alauda.io"  },
+  { id: "gianni",  name: "Gianni Rossi",    pillar: "Observability", github: "gianni-r",   jira: "gianni@alauda.io" },
+  { id: "hua",     name: "Hua Li",          pillar: "Essentials",     github: "hua-li",     jira: "hua@alauda.io"    },
+  { id: "ibra",    name: "Ibrahim Yousef",  pillar: "CI/CD",          github: "iyousef",    jira: "ibra@alauda.io"   },
+  { id: "jia",     name: "Jia Zhao",        pillar: "Observability", github: "jiaz",       jira: "jia@alauda.io"    },
+];
+
+// deterministic pseudo-random
+function prng(seed) { let s = seed; return () => (s = (s * 9301 + 49297) % 233280) / 233280; }
+
+const WEEKS = 12;
+const data = MEMBERS.map((m, i) => {
+  const rnd = prng(7919 + i * 31);
+  const base = 2 + Math.floor(rnd() * 4);
+  const trend = (rnd() - 0.5) * 0.3;
+  const series = Array.from({ length: WEEKS }, (_, w) => {
+    const x = base + w * trend + (rnd() - 0.5) * 2.4;
+    return {
+      week: w,
+      prs:     Math.max(0, Math.round(x)),
+      jira:    Math.max(0, Math.round(x * 1.5 + (rnd() - 0.5) * 3)),
+      points:  Math.max(0, Math.round((x * 1.5 + (rnd() - 0.5) * 3) * 1.6)),
+      reviews: Math.max(0, Math.round(x * 1.8 + (rnd() - 0.5) * 4)),
+    };
+  });
+  const sum = (k) => series.reduce((a, s) => a + s[k], 0);
+  return {
+    ...m,
+    series,
+    totals: { prs: sum("prs"), jira: sum("jira"), points: sum("points"), reviews: sum("reviews") },
+    reviewLatencyP50: +(4 + rnd() * 18).toFixed(1),
+    components: COMPONENTS
+      .map((c) => ({ component: c, prs: Math.round(rnd() * sum("prs") / 2) }))
+      .filter((c) => c.prs > 0)
+      .sort((a, b) => b.prs - a.prs)
+      .slice(0, 4),
+    sprint: {
+      name: "Sprint 26.05",
+      wip:    1 + Math.floor(rnd() * 4),
+      done:   2 + Math.floor(rnd() * 5),
+      open:   Math.floor(rnd() * 3),
+      merged: 2 + Math.floor(rnd() * 4),
+    },
+  };
+});
+
+/* ---------------- masthead clock ---------------- */
+document.getElementById("now").textContent = new Date().toISOString().slice(0, 16) + "Z";
+
+/* ---------------- tabs ---------------- */
+const views = { team: ".view--team", member: ".view--member", slice: ".view--slice" };
+function showView(name) {
+  Object.entries(views).forEach(([k, sel]) => document.querySelector(sel).hidden = (k !== name));
+  document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("is-active", t.dataset.view === name));
+}
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showView(t.dataset.view)));
+
+/* ---------------- team table ---------------- */
+const tbody = document.querySelector("#team-table tbody");
+let sortKey = "name", sortAsc = true, pillarFilter = "all";
+
+function sparkline(series, key, color) {
+  const w = 110, h = 28, pad = 2;
+  const vals = series.map((s) => s[key]);
+  const max = Math.max(1, ...vals);
+  const step = (w - 2 * pad) / (vals.length - 1);
+  const pts = vals.map((v, i) => `${pad + i * step},${h - pad - (v / max) * (h - 2 * pad)}`).join(" ");
+  const last = pts.split(" ").pop().split(",");
+  return `<svg class="spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <polyline fill="none" stroke="${color}" stroke-width="1.4" points="${pts}" />
+    <circle cx="${last[0]}" cy="${last[1]}" r="2.2" fill="${color}" />
+  </svg>`;
+}
+
+function delta(series, key) {
+  const recent = series.slice(-4).reduce((a, s) => a + s[key], 0);
+  const prior  = series.slice(-8, -4).reduce((a, s) => a + s[key], 0);
+  if (prior === 0) return `<span class="delta flat">·</span>`;
+  const pct = Math.round(((recent - prior) / prior) * 100);
+  if (Math.abs(pct) < 5) return `<span class="delta flat">±${Math.abs(pct)}%</span>`;
+  return `<span class="delta ${pct > 0 ? "up" : "down"}">${pct > 0 ? "▲" : "▼"} ${Math.abs(pct)}%</span>`;
+}
+
+function renderTeam() {
+  const filtered = data.filter((m) =>
+    pillarFilter === "all" ||
+    m.pillar.toLowerCase().replace(/[^a-z]/g, "-").includes(pillarFilter.replace(/[^a-z]/g, "-"))
+  );
+  const sorted = [...filtered].sort((a, b) => {
+    const av = sortKey === "name" ? a.name :
+               sortKey === "pillar" ? a.pillar :
+               sortKey === "latency" ? a.reviewLatencyP50 :
+               a.totals[sortKey];
+    const bv = sortKey === "name" ? b.name :
+               sortKey === "pillar" ? b.pillar :
+               sortKey === "latency" ? b.reviewLatencyP50 :
+               b.totals[sortKey];
+    if (av < bv) return sortAsc ? -1 : 1;
+    if (av > bv) return sortAsc ?  1 : -1;
+    return 0;
+  });
+  tbody.innerHTML = sorted.map((m) => `
+    <tr class="row-link" data-id="${m.id}">
+      <td>
+        <div class="member-cell">
+          <span class="avatar">${m.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}</span>
+          <div>
+            <div class="member-name">${m.name}</div>
+            <div class="member-meta">@${m.github}</div>
+          </div>
+        </div>
+      </td>
+      <td><span class="member-meta">${m.pillar}</span></td>
+      <td style="text-align:right"><span class="num">${m.totals.jira}</span>${delta(m.series, "jira")}</td>
+      <td style="text-align:right"><span class="num">${m.totals.points}</span></td>
+      <td style="text-align:right"><span class="num">${m.totals.prs}</span>${delta(m.series, "prs")}</td>
+      <td style="text-align:right"><span class="num">${m.totals.reviews}</span>${delta(m.series, "reviews")}</td>
+      <td style="text-align:right"><span class="num">${m.reviewLatencyP50}h</span></td>
+      <td>${sparkline(m.series, "prs", "var(--accent)")}</td>
+    </tr>
+  `).join("");
+  document.querySelectorAll("#team-table th").forEach((th) =>
+    th.classList.toggle("is-sorted", th.dataset.sort === sortKey));
+  document.querySelectorAll(".row-link").forEach((tr) =>
+    tr.addEventListener("click", () => openMember(tr.dataset.id)));
+}
+
+document.querySelectorAll("#team-table th").forEach((th) => {
+  th.addEventListener("click", () => {
+    if (sortKey === th.dataset.sort) sortAsc = !sortAsc;
+    else { sortKey = th.dataset.sort; sortAsc = (sortKey === "name" || sortKey === "pillar"); }
+    renderTeam();
+  });
+});
+
+document.querySelectorAll(".pill[data-filter]").forEach((p) => {
+  p.addEventListener("click", () => {
+    document.querySelectorAll(".pill[data-filter]").forEach((q) => q.classList.remove("is-active"));
+    p.classList.add("is-active");
+    pillarFilter = p.dataset.filter;
+    renderTeam();
+  });
+});
+
+/* ---------------- pillar stack chart ---------------- */
+function renderPillarStack() {
+  const svg = document.getElementById("pillar-stack");
+  const W = 600, H = 240, pad = { l: 36, r: 12, t: 14, b: 28 };
+  const colors = { "CI/CD": "var(--accent)", "Essentials": "#2c5d75", "Observability": "#b87a1a" };
+  const stack = Array.from({ length: WEEKS }, (_, w) => {
+    const o = { week: w };
+    PILLARS.forEach((p) => o[p] = data.filter((m) => m.pillar === p).reduce((a, m) => a + m.series[w].prs, 0));
+    return o;
+  });
+  const max = Math.max(...stack.map((s) => PILLARS.reduce((a, p) => a + s[p], 0)));
+  const xStep = (W - pad.l - pad.r) / WEEKS;
+  let html = "";
+  stack.forEach((s, i) => {
+    let yCursor = H - pad.b;
+    PILLARS.forEach((p) => {
+      const h = (s[p] / max) * (H - pad.t - pad.b);
+      yCursor -= h;
+      html += `<rect x="${pad.l + i * xStep + 2}" y="${yCursor}" width="${xStep - 4}" height="${h}" fill="${colors[p]}" opacity="0.85" />`;
+    });
+  });
+  // y axis
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + (H - pad.t - pad.b) * (g / 4);
+    const v = Math.round(max * (1 - g / 4));
+    html += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y}" y2="${y}" stroke="var(--border-soft)" stroke-width="1" />`;
+    html += `<text x="${pad.l - 6}" y="${y + 3}" text-anchor="end" font-family="var(--mono)" font-size="9.5" fill="var(--fg-muted)">${v}</text>`;
+  }
+  // legend
+  html += `<g font-family="var(--mono)" font-size="10" fill="var(--fg-muted)">`;
+  PILLARS.forEach((p, i) => {
+    html += `<rect x="${pad.l + i * 110}" y="${H - 14}" width="9" height="9" fill="${colors[p]}" />
+             <text x="${pad.l + i * 110 + 14}" y="${H - 6}">${p}</text>`;
+  });
+  html += `</g>`;
+  svg.innerHTML = html;
+}
+
+/* ---------------- member profile ---------------- */
+function openMember(id) {
+  const m = data.find((x) => x.id === id);
+  if (!m) return;
+  document.getElementById("m-avatar").textContent = m.name.split(" ").map((s) => s[0]).slice(0, 2).join("");
+  document.getElementById("m-name").textContent   = m.name;
+  document.getElementById("m-pillar").textContent = m.pillar.toUpperCase();
+  document.getElementById("m-github").textContent = `github · @${m.github}`;
+  document.getElementById("m-jira").textContent   = `jira · ${m.jira}`;
+  document.getElementById("kpi-jira").textContent = m.totals.jira;
+  document.getElementById("kpi-pts").textContent  = m.totals.points;
+  document.getElementById("kpi-prs").textContent  = m.totals.prs;
+  document.getElementById("kpi-rev").textContent  = m.totals.reviews;
+  document.getElementById("m-sprint-name").textContent = m.sprint.name;
+  document.getElementById("sp-wip").textContent    = m.sprint.wip;
+  document.getElementById("sp-done").textContent   = m.sprint.done;
+  document.getElementById("sp-open").textContent   = m.sprint.open;
+  document.getElementById("sp-merged").textContent = m.sprint.merged;
+
+  // weekly chart
+  const svg = document.getElementById("m-chart");
+  const W = 720, H = 220, pad = { l: 40, r: 12, t: 14, b: 30 };
+  const series = m.series;
+  const allMax = Math.max(1, ...series.flatMap((s) => [s.prs, s.jira, s.reviews]));
+  const xStep = (W - pad.l - pad.r) / (WEEKS - 1);
+  const path = (key, color) => {
+    const pts = series.map((s, i) => `${pad.l + i * xStep},${H - pad.b - (s[key] / allMax) * (H - pad.t - pad.b)}`);
+    return `<polyline fill="none" stroke="${color}" stroke-width="1.7" points="${pts.join(" ")}" />` +
+      pts.map((p) => `<circle cx="${p.split(",")[0]}" cy="${p.split(",")[1]}" r="2.5" fill="${color}" />`).join("");
+  };
+  let html = "";
+  for (let g = 0; g <= 4; g++) {
+    const y = pad.t + (H - pad.t - pad.b) * (g / 4);
+    const v = Math.round(allMax * (1 - g / 4));
+    html += `<line x1="${pad.l}" x2="${W - pad.r}" y1="${y}" y2="${y}" stroke="var(--border-soft)" stroke-width="1" />`;
+    html += `<text x="${pad.l - 6}" y="${y + 3}" text-anchor="end" font-family="var(--mono)" font-size="10" fill="var(--fg-muted)">${v}</text>`;
+  }
+  for (let i = 0; i < WEEKS; i++) {
+    html += `<text x="${pad.l + i * xStep}" y="${H - 10}" text-anchor="middle" font-family="var(--mono)" font-size="9.5" fill="var(--fg-muted)">w${i + 1}</text>`;
+  }
+  html += path("jira", "#2c5d75");
+  html += path("reviews", "#b87a1a");
+  html += path("prs", "var(--accent)");
+  svg.innerHTML = html;
+
+  // components
+  const bars = document.getElementById("m-bars");
+  const max = Math.max(1, ...m.components.map((c) => c.prs));
+  bars.innerHTML = m.components.map((c) => `
+    <div style="display: grid; grid-template-columns: 110px 1fr 40px; align-items: center; gap: 10px; padding: 4px 0;">
+      <div style="font-family: var(--mono); font-size: 11.5px; color: var(--fg-soft);">${c.component}</div>
+      <div style="height: 12px; background: var(--bg-soft); border-radius: 2px; overflow: hidden;">
+        <div style="width: ${(c.prs / max) * 100}%; height: 100%; background: var(--accent);"></div>
+      </div>
+      <div style="text-align: right; font-family: var(--mono); font-size: 11.5px;">${c.prs}</div>
+    </div>
+  `).join("");
+
+  showView("member");
+}
+document.querySelector(".backlink").addEventListener("click", () => showView("team"));
+
+/* ---------------- slice explorer ---------------- */
+const sliceState = { rows: "pillar", cols: "week", metric: "prs" };
+document.querySelectorAll(".seg button").forEach((b) => {
+  b.addEventListener("click", () => {
+    const axis = b.parentElement.dataset.axis;
+    b.parentElement.querySelectorAll("button").forEach((q) => q.classList.remove("is-active"));
+    b.classList.add("is-active");
+    sliceState[axis] = b.dataset.val;
+    renderSlice();
+  });
+});
+
+function renderSlice() {
+  const head = document.querySelector("#pivot thead");
+  const body = document.querySelector("#pivot tbody");
+  // resolve rows
+  let rowKeys, rowOf;
+  if (sliceState.rows === "pillar") { rowKeys = PILLARS; rowOf = (m) => m.pillar; }
+  else if (sliceState.rows === "component") { rowKeys = COMPONENTS; rowOf = null; }
+  else { rowKeys = MEMBERS.map((m) => m.id); rowOf = (m) => m.id; }
+  // resolve cols
+  let cols;
+  if (sliceState.cols === "week") cols = Array.from({ length: WEEKS }, (_, i) => `w${i + 1}`);
+  else cols = ["Q1", "Q2", "Q3", "Q4"];
+  // build rows
+  const rows = rowKeys.map((rk) => {
+    const cells = cols.map((c, i) => {
+      let v = 0;
+      if (sliceState.rows === "component") {
+        // approximate: distribute member PRs over components proportionally
+        v = data.reduce((a, m) => {
+          const cmp = m.components.find((x) => x.component === rk);
+          if (!cmp) return a;
+          const wkSum = m.series.reduce((s, w) => s + w[sliceState.metric], 0);
+          const wk = m.series[i % WEEKS][sliceState.metric];
+          return a + Math.round((cmp.prs / Math.max(1, m.totals.prs)) * (sliceState.cols === "week" ? wk : wkSum / 4));
+        }, 0);
+      } else if (sliceState.cols === "week") {
+        v = data
+          .filter((m) => rowOf(m) === rk || (sliceState.rows === "member" && m.id === rk))
+          .reduce((a, m) => a + m.series[i][sliceState.metric], 0);
+      } else {
+        const start = i * 3, end = start + 3;
+        v = data
+          .filter((m) => rowOf(m) === rk || (sliceState.rows === "member" && m.id === rk))
+          .reduce((a, m) => a + m.series.slice(start, end).reduce((s, w) => s + w[sliceState.metric], 0), 0);
+      }
+      return v;
+    });
+    return { label: rk, cells, max: Math.max(1, ...cells), total: cells.reduce((a, b) => a + b, 0) };
+  });
+  // render
+  head.innerHTML = `<tr><th>${sliceState.rows.toUpperCase()}</th>${cols.map((c) => `<th>${c}</th>`).join("")}<th>Σ</th></tr>`;
+  body.innerHTML = rows.map((r) => `
+    <tr>
+      <td>${sliceState.rows === "member" ? (MEMBERS.find((m) => m.id === r.label) || {}).name || r.label : r.label}</td>
+      ${r.cells.map((v) => `<td class="heat" style="--h: ${(v / r.max).toFixed(2)}"><span>${v}</span></td>`).join("")}
+      <td style="font-weight: 600;">${r.total}</td>
+    </tr>
+  `).join("");
+}
+
+/* ---------------- init ---------------- */
+renderTeam();
+renderPillarStack();
+renderSlice();
+</script>
+
+</body>
+</html>

@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
 import KanbanBoard from './components/KanbanBoard';
 import MetricsDashboard from './components/MetricsDashboard';
+import TeamAnalytics from './components/TeamAnalytics';
 import LoginModal from './components/modals/LoginModal';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { RoadmapProvider } from './hooks/useRoadmap';
-import { LogOut, LayoutGrid, Activity, Sun, Moon, BookOpen, Layers } from 'lucide-react';
+import { LogOut, LayoutGrid, Activity, Users, Sun, Moon, BookOpen, Layers } from 'lucide-react';
 import './App.css';
 
 const THEME_KEY = 'roadmap-planner-theme';   // 'platform' | 'atlas'
@@ -158,6 +159,14 @@ function AppContent() {
               <Activity size={14} strokeWidth={1.75} />
               <span>Metrics</span>
             </button>
+            <button
+              type="button"
+              className={`app-nav__item ${currentView === 'team' ? 'is-active' : ''}`}
+              onClick={() => setCurrentView('team')}
+            >
+              <Users size={14} strokeWidth={1.75} />
+              <span>Team</span>
+            </button>
           </nav>
 
           <div className="app-header__right">
@@ -194,7 +203,9 @@ function AppContent() {
         </header>
 
         <main className="app-main">
-          {currentView === 'roadmap' ? <KanbanBoard /> : <MetricsDashboard />}
+          {currentView === 'roadmap' && <KanbanBoard />}
+          {currentView === 'metrics' && <MetricsDashboard />}
+          {currentView === 'team'    && <TeamAnalytics />}
         </main>
 
         <footer className="app-footer" data-editorial>
