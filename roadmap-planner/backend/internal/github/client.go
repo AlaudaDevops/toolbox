@@ -223,7 +223,7 @@ func (c *Client) do(ctx context.Context, method, path string, body io.Reader, ou
 
 		// Rate-limited? Decide whether we'll retry.
 		if wait, ok := c.rl.retryAfter(resp); ok && attempt < maxAttempts-1 {
-			io.Copy(io.Discard, resp.Body)
+			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 			t := time.NewTimer(wait)
 			select {
@@ -244,7 +244,7 @@ func (c *Client) do(ctx context.Context, method, path string, body io.Reader, ou
 
 		// Success.
 		if out == nil {
-			io.Copy(io.Discard, resp.Body)
+			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 			return nil
 		}

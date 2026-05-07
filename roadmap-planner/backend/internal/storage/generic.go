@@ -79,7 +79,7 @@ func (s *genericStore) WriteIssueSnapshots(ctx context.Context, runID string, is
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := rebind(s.d, `
 		INSERT INTO issue_snapshots (
 			run_id, issue_key, issue_type, status, assignee_id, pillar_id,
@@ -119,7 +119,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := rebind(s.d, `
 		INSERT INTO pull_requests (
 			id, repo_id, number, title, state, author_id, github_author_login,
@@ -165,7 +165,7 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	q := rebind(s.d, `
 		INSERT INTO pr_reviews (id, pr_id, reviewer_id, github_reviewer_login, state, submitted_at)
 		VALUES (?, ?, ?, ?, ?, ?)
