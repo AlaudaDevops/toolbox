@@ -10,22 +10,34 @@
  *   3. Slice explorer  — pivot of (member|pillar) × (week|quarter)
  *                        on (PRs merged|Jira done|Story pts) with heat tint.
  *
- * Tab + selected member are reflected into ?tab=…&member=… so the view
- * is deep-linkable and the browser's back button works as expected.
+ * Pillar provenance: the same Jira "Pillar" issue type the roadmap tab
+ * uses, fetched via /api/basic. Each member's pillar is derived from
+ * their components_touched set by majority match against
+ * BasicPillar.component. The legacy free-form members.pillar_id is kept
+ * as an explicit override on the profile form.
+ *
+ * Theming: every visual var comes from styles/theme.css semantic tokens
+ * (--bg, --fg, --border, --accent, --ocean, --amber, --forest, …) so
+ * light / dark / Atlas modes flip automatically.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import { contributionsAPI, handleAPIError } from '../services/api';
+import { contributionsAPI, handleAPIError, roadmapAPI } from '../services/api';
 import './TeamAnalytics.css';
 
 /* -------------------------------------------------------------------- */
 /*  Generic helpers                                                      */
 /* -------------------------------------------------------------------- */
 
-const PILLAR_COLORS = {
-  Unassigned: '#a39a8a',
+// Theme-token series colors. CSS custom properties resolve at paint-time
+// against the active [data-theme]/[data-mode], so dark mode + Atlas
+// theme just work without per-mode branching here.
+const SERIES_COLOR = {
+  prs:     'var(--accent)',
+  jira:    'var(--ocean)',
+  reviews: 'var(--amber)',
 };
-const SERIES_PALETTE = ['#b8443c', '#2c5d75', '#b87a1a', '#3a6d4b', '#7a4f9c', '#9c4f4f', '#4f7f9c'];
+const PILLAR_PALETTE = ['var(--accent)', 'var(--ocean)', 'var(--amber)', 'var(--forest)', 'var(--crimson)'];
 
 const formatHours = (h) => (h == null ? '—' : `${(+h).toFixed(1)}h`);
 const formatPct = (p) => (p == null || isNaN(p) ? '—' : `${Math.round(p)}%`);
@@ -52,12 +64,52 @@ const initialsOf = (name) =>
     .join('')
     .toUpperCase() || '?';
 
-const colorForPillar = (p, fallbackIdx = 0) => {
-  if (!p) return PILLAR_COLORS.Unassigned;
-  if (PILLAR_COLORS[p]) return PILLAR_COLORS[p];
+/* -------------------------------------------------------------------- */
+/*  Pillar derivation — same source the roadmap tab uses                 */
+/* -------------------------------------------------------------------- */
+
+// buildComponentToPillar takes the BasicPillar list from /api/basic and
+// returns a Map: lowercased component name → pillar name. Used to
+// classify members by the components they've touched.
+const buildComponentToPillar = (basicPillars) => {
+  const m = new Map();
+  (basicPillars || []).forEach((p) => {
+    const comp = (p.component || '').trim().toLowerCase();
+    if (comp) m.set(comp, p.name);
+  });
+  return m;
+};
+
+// derivePillarForMember picks the pillar with the most component matches
+// from the member's component set. Falls back to the operator-set
+// override (member.pillar_id) when no match, then to ''.
+const derivePillarForMember = (memberComponents, override, compToPillar) => {
+  if (override) return override;
+  if (!memberComponents || memberComponents.length === 0) return '';
+  const tally = new Map();
+  memberComponents.forEach((c) => {
+    const key = (c || '').trim().toLowerCase();
+    const pillar = compToPillar.get(key);
+    if (pillar) tally.set(pillar, (tally.get(pillar) || 0) + 1);
+  });
+  if (tally.size === 0) return '';
+  let best = '', bestN = -1;
+  for (const [p, n] of tally) {
+    if (n > bestN) { best = p; bestN = n; }
+  }
+  return best;
+};
+
+const colorForPillar = (pillarName, allPillars) => {
+  if (!pillarName) return 'var(--fg-faint)';
+  // Stable index from the ordered pillar list (preserves the order the
+  // roadmap tab shows). Falls back to a hash-derived index when the
+  // pillar isn't in the basic data.
+  const idx = (allPillars || []).indexOf(pillarName);
+  if (idx >= 0) return PILLAR_PALETTE[idx % PILLAR_PALETTE.length];
   let h = 0;
-  for (let i = 0; i < p.length; i++) h = (h * 31 + p.charCodeAt(i)) >>> 0;
-  return SERIES_PALETTE[(h + fallbackIdx) % SERIES_PALETTE.length];
+  for (let i = 0; i < pillarName.length; i++) h = (h * 31 + pillarName.charCodeAt(i)) >>> 0;
+  return PILLAR_PALETTE[h % PILLAR_PALETTE.length];
 };
 
 /* -------------------------------------------------------------------- */
@@ -92,7 +144,7 @@ const writeURLState = ({ tab, id }) => {
 };
 
 /* -------------------------------------------------------------------- */
-/*  Delta indicator (last-4 vs prior-4 weeks)                            */
+/*  Delta indicator                                                      */
 /* -------------------------------------------------------------------- */
 
 const computeDelta = (series, key) => {
@@ -115,43 +167,55 @@ function DeltaPill({ d }) {
 }
 
 /* -------------------------------------------------------------------- */
-/*  Sparkline (table cell)                                               */
+/*  Sparkline                                                            */
 /* -------------------------------------------------------------------- */
 
-function Spark({ values, color = 'currentColor', width = 110, height = 28 }) {
-  if (!values || values.length === 0) {
-    return <span className="ta-meta">—</span>;
-  }
+function Spark({ values, width = 110, height = 28 }) {
+  if (!values || values.length === 0) return <span className="ta-meta">—</span>;
   const max = Math.max(1, ...values);
   const step = (width - 4) / Math.max(1, values.length - 1);
   const pts = values.map((v, i) => `${2 + i * step},${height - 2 - (v / max) * (height - 4)}`);
   const last = pts[pts.length - 1].split(',');
   return (
     <svg className="ta-spark" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      <polyline fill="none" stroke={color} strokeWidth="1.4" points={pts.join(' ')} />
-      <circle cx={last[0]} cy={last[1]} r="2.2" fill={color} />
+      <polyline fill="none" stroke="currentColor" strokeWidth="1.4" points={pts.join(' ')} />
+      <circle cx={last[0]} cy={last[1]} r="2.2" fill="currentColor" />
     </svg>
   );
 }
 
 /* -------------------------------------------------------------------- */
-/*  Pillar throughput stack chart (Team tab)                             */
+/*  Pillar throughput stack chart                                        */
 /* -------------------------------------------------------------------- */
 
-function PillarStack({ buckets }) {
-  if (!buckets || buckets.length === 0) {
+function PillarStack({ rows, pillarOrder }) {
+  if (!rows || rows.length === 0) {
     return <p className="ta-meta">No throughput data in window.</p>;
   }
+  // Aggregate weekly PRs per (week, pillar) — using the derived pillar
+  // on each row, NOT the operator-set members.pillar_id.
   const byWeek = new Map();
-  const pillars = new Set();
-  buckets.forEach((b) => {
-    pillars.add(b.pillar);
-    const k = b.week_start;
-    if (!byWeek.has(k)) byWeek.set(k, {});
-    byWeek.get(k)[b.pillar] = b.prs_merged || 0;
+  const pillarSet = new Set();
+  rows.forEach((r) => {
+    const pillar = r.derivedPillar || 'Unassigned';
+    pillarSet.add(pillar);
+    (r.week_totals || []).forEach((w) => {
+      if (!w || !w.week_start) return;
+      if (!byWeek.has(w.week_start)) byWeek.set(w.week_start, {});
+      const cell = byWeek.get(w.week_start);
+      cell[pillar] = (cell[pillar] || 0) + (w.prs_merged || 0);
+    });
   });
   const weekKeys = [...byWeek.keys()].sort();
-  const pillarList = [...pillars].sort();
+  if (weekKeys.length === 0) {
+    return <p className="ta-meta">No PRs in this window.</p>;
+  }
+  // Stable pillar order: roadmap-tab order first, then any extras (e.g.
+  // "Unassigned") alphabetically.
+  const known = pillarOrder.filter((p) => pillarSet.has(p));
+  const extras = [...pillarSet].filter((p) => !pillarOrder.includes(p)).sort();
+  const pillarList = [...known, ...extras];
+
   const stack = weekKeys.map((wk) => {
     const cell = byWeek.get(wk);
     return { week: wk, ...Object.fromEntries(pillarList.map((p) => [p, cell[p] || 0])) };
@@ -160,8 +224,7 @@ function PillarStack({ buckets }) {
 
   const W = 600, H = 240, pad = { l: 36, r: 12, t: 14, b: 36 };
   const xStep = (W - pad.l - pad.r) / Math.max(1, stack.length);
-
-  const colors = Object.fromEntries(pillarList.map((p, i) => [p, colorForPillar(p, i)]));
+  const colors = Object.fromEntries(pillarList.map((p) => [p, colorForPillar(p, pillarOrder)]));
 
   return (
     <>
@@ -216,7 +279,7 @@ function PillarStack({ buckets }) {
 }
 
 /* -------------------------------------------------------------------- */
-/*  Network density panel (Team tab)                                     */
+/*  Network density panel                                                */
 /* -------------------------------------------------------------------- */
 
 function NetworkPanel({ network }) {
@@ -225,21 +288,20 @@ function NetworkPanel({ network }) {
       <div className="ta-chartwrap--small">
         <p className="ta-fact">
           Review-network metrics need at least one PR + review in the window.
-          Once GitHub sync has populated history (and members have <code>github_login</code>
+          Once GitHub sync has populated history (and members have <code>github_login</code>{' '}
           set on their profile), this panel surfaces orphan rate, first-review p50/p90,
           and cross-pillar review percentage.
         </p>
       </div>
     );
   }
-  const under24 = formatPct(network.first_review_under_24h_pct);
-  const cross   = formatPct(network.cross_pillar_review_pct);
   return (
     <div className="ta-chartwrap--small">
       <p className="ta-fact">
-        Last 12 weeks: <strong>{under24}</strong> of PRs received their first review within 24 hours.
-        Cross-pillar review participation is <strong>{cross}</strong> — that's a
-        leading indicator of knowledge sharing, and you can slice it on the Slice tab.
+        Last 12 weeks: <strong>{formatPct(network.first_review_under_24h_pct)}</strong> of PRs
+        received their first review within 24 hours. Cross-pillar review participation is{' '}
+        <strong>{formatPct(network.cross_pillar_review_pct)}</strong> — a leading indicator of
+        knowledge sharing, sliceable on the Slice tab.
       </p>
       <div className="ta-bullets">
         <div>→ p50 first-review latency · <b>{formatHours(network.first_review_p50_hours)}</b></div>
@@ -251,7 +313,7 @@ function NetworkPanel({ network }) {
 }
 
 /* -------------------------------------------------------------------- */
-/*  Multi-line weekly trend (Member profile)                             */
+/*  Multi-line trend chart                                               */
 /* -------------------------------------------------------------------- */
 
 function TrendChart({ weeks }) {
@@ -265,9 +327,9 @@ function TrendChart({ weeks }) {
   const xOf = (i) => pad.l + i * xStep;
 
   const lines = [
-    { key: 'jira_done', color: '#2c5d75' },
-    { key: 'reviews',   color: '#b87a1a' },
-    { key: 'prs_merged',color: 'var(--ta-accent, #b8443c)' },
+    { key: 'jira_done',  color: SERIES_COLOR.jira    },
+    { key: 'reviews',    color: SERIES_COLOR.reviews },
+    { key: 'prs_merged', color: SERIES_COLOR.prs     },
   ];
 
   return (
@@ -301,16 +363,16 @@ function TrendChart({ weeks }) {
         })}
       </svg>
       <div className="ta-legend" style={{ marginTop: 6 }}>
-        <span><i style={{ background: 'var(--ta-accent, #b8443c)' }} />PRs merged</span>
-        <span><i style={{ background: '#2c5d75' }} />Jira done</span>
-        <span><i style={{ background: '#b87a1a' }} />Reviews</span>
+        <span><i style={{ background: SERIES_COLOR.prs }} />PRs merged</span>
+        <span><i style={{ background: SERIES_COLOR.jira }} />Jira done</span>
+        <span><i style={{ background: SERIES_COLOR.reviews }} />Reviews</span>
       </div>
     </>
   );
 }
 
 /* -------------------------------------------------------------------- */
-/*  Status badge (last-sync indicator)                                   */
+/*  Status badge                                                         */
 /* -------------------------------------------------------------------- */
 
 function StatusBadge({ source, info }) {
@@ -335,10 +397,10 @@ function StatusBadge({ source, info }) {
 const TABLE_COLS = [
   { key: 'name',    label: 'Member',     align: 'left',  sortable: true },
   { key: 'pillar',  label: 'Pillar',     align: 'left',  sortable: true },
-  { key: 'jira',    label: 'Jira done',  align: 'right', sortable: true, withDelta: 'jira_done' },
+  { key: 'jira',    label: 'Jira done',  align: 'right', sortable: true },
   { key: 'points',  label: 'Story pts',  align: 'right', sortable: true },
-  { key: 'prs',     label: 'PRs merged', align: 'right', sortable: true, withDelta: 'prs_merged' },
-  { key: 'reviews', label: 'Reviews',    align: 'right', sortable: true, withDelta: 'reviews' },
+  { key: 'prs',     label: 'PRs merged', align: 'right', sortable: true },
+  { key: 'reviews', label: 'Reviews',    align: 'right', sortable: true },
   { key: 'latency', label: 'Review p50', align: 'right', sortable: true },
   { key: 'spark',   label: 'PRs / wk',   align: 'left',  sortable: false },
 ];
@@ -352,7 +414,7 @@ export default function TeamAnalytics() {
   const [team, setTeam] = useState([]);
   const [status, setStatus] = useState(null);
   const [network, setNetwork] = useState(null);
-  const [pillars, setPillars] = useState([]);
+  const [basicPillars, setBasicPillars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -366,19 +428,19 @@ export default function TeamAnalytics() {
     const load = async () => {
       try {
         setLoading(true);
-        const [membersResp, teamResp, statusResp, netResp, pillResp] = await Promise.all([
+        const [membersResp, teamResp, statusResp, netResp, basicResp] = await Promise.all([
           contributionsAPI.listMembers().catch(() => ({ members: [] })),
           contributionsAPI.team().catch(() => ({ members: [] })),
           contributionsAPI.status().catch(() => null),
           contributionsAPI.network().catch(() => null),
-          contributionsAPI.pillars().catch(() => ({ buckets: [] })),
+          roadmapAPI.getBasicData().catch(() => ({ pillars: [] })),
         ]);
         if (cancelled) return;
         setMembers(membersResp.members || []);
         setTeam(teamResp.members || []);
         setStatus(statusResp);
         setNetwork(netResp);
-        setPillars(pillResp.buckets || []);
+        setBasicPillars(basicResp?.pillars || []);
       } catch (e) {
         if (cancelled) return;
         const err = handleAPIError(e);
@@ -392,20 +454,38 @@ export default function TeamAnalytics() {
     return () => { cancelled = true; };
   }, [reloadTick]);
 
+  // Pillar sort by sequence (matches roadmap tab); stable name list
+  // for the filter pills + chart legend.
+  const orderedPillarNames = useMemo(() => {
+    const sorted = [...(basicPillars || [])].sort((a, b) => {
+      if ((a.sequence || 0) !== (b.sequence || 0)) return (a.sequence || 0) - (b.sequence || 0);
+      return (a.name || '').localeCompare(b.name || '');
+    });
+    return sorted.map((p) => p.name).filter(Boolean);
+  }, [basicPillars]);
+
+  const compToPillar = useMemo(() => buildComponentToPillar(basicPillars), [basicPillars]);
+
   const rows = useMemo(() => {
     const byID = new Map((team || []).map((t) => [t.member_id, t]));
     const merged = (members || []).map((m) => {
       const id = pick(m, 'id', 'ID');
       const t = byID.get(id) || {};
       const week_totals = t.week_totals || [];
+      const components = t.components || [];
+      const override = pick(m, 'pillar_id', 'PillarID');
+      const derivedPillar = derivePillarForMember(components, override, compToPillar);
       return {
         id,
         name: pick(m, 'display_name', 'DisplayName') || id || 'unknown',
         github: pick(m, 'github_login', 'GitHubLogin'),
         email:  pick(m, 'email', 'Email'),
         jira_account_id: pick(m, 'jira_account_id', 'JiraAccountID'),
-        pillar: pick(m, 'pillar_id', 'PillarID'),
+        pillarOverride: override,
+        derivedPillar,
+        pillar: derivedPillar || override || '',
         active: pick(m, 'active', 'Active') !== false,
+        components,
         jira:    t.jira_issues_done || 0,
         points:  t.jira_points_done || 0,
         prs:     t.prs_merged || 0,
@@ -416,10 +496,13 @@ export default function TeamAnalytics() {
     });
     (team || []).forEach((t) => {
       if (!members.find((m) => pick(m, 'id', 'ID') === t.member_id)) {
+        const components = t.components || [];
+        const derivedPillar = derivePillarForMember(components, '', compToPillar);
         merged.push({
           id: t.member_id, name: t.member_id,
           github: '', email: '', jira_account_id: '',
-          pillar: '', active: true,
+          pillarOverride: '', derivedPillar, pillar: derivedPillar,
+          active: true, components,
           jira:    t.jira_issues_done || 0,
           points:  t.jira_points_done || 0,
           prs:     t.prs_merged || 0,
@@ -430,13 +513,7 @@ export default function TeamAnalytics() {
       }
     });
     return merged;
-  }, [members, team]);
-
-  const pillarNames = useMemo(() => {
-    const set = new Set();
-    rows.forEach((r) => { if (r.pillar) set.add(r.pillar); });
-    return [...set].sort();
-  }, [rows]);
+  }, [members, team, compToPillar]);
 
   const filteredRows = useMemo(() => {
     if (pillarFilter === 'all') return rows;
@@ -534,17 +611,15 @@ export default function TeamAnalytics() {
       {empty && (
         <div className="ta-empty">
           <h3>No analytics data yet</h3>
-          <p>
-            This view shows once <code>storage.enabled</code> is on and the collector has
-            captured at least one cycle.
-          </p>
+          <p>This view shows once <code>storage.enabled</code> is on and the collector has captured at least one cycle.</p>
         </div>
       )}
 
       {!empty && tab === 'team' && (
         <TeamView
           rows={sortedRows}
-          pillarNames={pillarNames}
+          allRows={rows}
+          orderedPillarNames={orderedPillarNames}
           pillarFilter={pillarFilter}
           onPillarFilter={setPillarFilter}
           sortKey={sortKey}
@@ -552,7 +627,6 @@ export default function TeamAnalytics() {
           onSort={handleSort}
           onRowClick={openMember}
           loading={loading}
-          pillars={pillars}
           network={network}
         />
       )}
@@ -563,12 +637,13 @@ export default function TeamAnalytics() {
           onBack={() => goToTab('team')}
           onSaved={onSavedMember}
           allRows={rows}
+          orderedPillarNames={orderedPillarNames}
           onSwitchMember={openMember}
         />
       )}
 
       {!empty && tab === 'slice' && (
-        <SliceView rows={rows} />
+        <SliceView rows={rows} orderedPillarNames={orderedPillarNames} />
       )}
     </div>
   );
@@ -578,7 +653,7 @@ export default function TeamAnalytics() {
 /*  Team Overview tab                                                    */
 /* -------------------------------------------------------------------- */
 
-function TeamView({ rows, pillarNames, pillarFilter, onPillarFilter, sortKey, sortDir, onSort, onRowClick, loading, pillars, network }) {
+function TeamView({ rows, allRows, orderedPillarNames, pillarFilter, onPillarFilter, sortKey, sortDir, onSort, onRowClick, loading, network }) {
   return (
     <>
       <div className="ta-panel">
@@ -594,7 +669,7 @@ function TeamView({ rows, pillarNames, pillarFilter, onPillarFilter, sortKey, so
               className={`ta-pill${pillarFilter === 'all' ? ' is-active' : ''}`}
               onClick={() => onPillarFilter('all')}
             >All</button>
-            {pillarNames.map((p) => (
+            {orderedPillarNames.map((p) => (
               <button key={p} type="button"
                 className={`ta-pill${pillarFilter === p ? ' is-active' : ''}`}
                 onClick={() => onPillarFilter(p)}
@@ -652,7 +727,7 @@ function TeamView({ rows, pillarNames, pillarFilter, onPillarFilter, sortKey, so
                   <td className="ta-right"><span className="ta-num">{m.prs}</span><DeltaPill d={dPRs} /></td>
                   <td className="ta-right"><span className="ta-num">{m.reviews}</span><DeltaPill d={dReviews} /></td>
                   <td className="ta-right"><span className="ta-num">{formatHours(m.latency)}</span></td>
-                  <td><Spark values={sparkValues} color="var(--ta-accent, #b8443c)" /></td>
+                  <td><Spark values={sparkValues} /></td>
                 </tr>
               );
             })}
@@ -668,7 +743,7 @@ function TeamView({ rows, pillarNames, pillarFilter, onPillarFilter, sortKey, so
             <div className="ta-panel__sub">PRs merged · 12-week stack</div>
           </header>
           <div className="ta-chartwrap">
-            <PillarStack buckets={pillars} />
+            <PillarStack rows={allRows} pillarOrder={orderedPillarNames} />
           </div>
         </div>
         <div className="ta-panel">
@@ -687,7 +762,7 @@ function TeamView({ rows, pillarNames, pillarFilter, onPillarFilter, sortKey, so
 /*  Member Profile tab                                                   */
 /* -------------------------------------------------------------------- */
 
-function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
+function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, onSwitchMember }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editGh, setEditGh] = useState('');
@@ -706,7 +781,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
         if (cancelled) return;
         setDetail(d);
         setEditGh(pick(d.info, 'github_login', 'GitHubLogin') || memberRow.github || '');
-        setEditPillar(pick(d.info, 'pillar_id', 'PillarID') || memberRow.pillar || '');
+        setEditPillar(pick(d.info, 'pillar_id', 'PillarID') || memberRow.pillarOverride || '');
       } catch (e) {
         if (cancelled) return;
         toast.error(`Profile load: ${handleAPIError(e).message}`);
@@ -716,7 +791,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
     };
     load();
     return () => { cancelled = true; };
-  }, [id, memberRow?.github, memberRow?.pillar]);
+  }, [id, memberRow?.github, memberRow?.pillarOverride]);
 
   if (!memberRow) {
     return (
@@ -766,6 +841,12 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
 
   const compMax = Math.max(1, ...components.map((c) => c.issues || 0));
   const sortedRoster = [...allRows].sort((a, b) => a.name.localeCompare(b.name));
+  const pillarLabel = memberRow.pillar || 'unassigned';
+  const pillarSource = memberRow.pillarOverride
+    ? 'override'
+    : memberRow.derivedPillar
+      ? 'derived from components'
+      : 'no match';
 
   return (
     <>
@@ -777,9 +858,11 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
         <aside className="ta-profile-card">
           <div className="ta-profile-avatar">{initialsOf(memberRow.name)}</div>
           <div className="ta-profile-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</div>
-          <div className="ta-profile-pillar">{(memberRow.pillar || 'unassigned').toUpperCase()}</div>
+          <div className="ta-profile-pillar">{pillarLabel.toUpperCase()}{' '}<span style={{ color: 'var(--fg-faint)' }}>· {pillarSource}</span></div>
           <div className="ta-profile-handles">
-            <div>github · {memberRow.github ? `@${memberRow.github}` : <em style={{ color: 'var(--ta-fg-muted)' }}>not linked</em>}</div>
+            <div>github · {memberRow.github
+              ? <span className="gh">@{memberRow.github}</span>
+              : <em>not linked</em>}</div>
             <div>jira · {memberRow.email || pick(info, 'email', 'Email') || '—'}</div>
           </div>
           <div className="ta-kpi-grid">
@@ -794,9 +877,9 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
           <div className="ta-card">
             <h3 className="ta-card__title">Weekly contribution
               <span className="ta-legend">
-                <span><i style={{ background: 'var(--ta-accent, #b8443c)' }} />PRs merged</span>
-                <span><i style={{ background: '#2c5d75' }} />Jira done</span>
-                <span><i style={{ background: '#b87a1a' }} />Reviews</span>
+                <span><i style={{ background: SERIES_COLOR.prs }} />PRs merged</span>
+                <span><i style={{ background: SERIES_COLOR.jira }} />Jira done</span>
+                <span><i style={{ background: SERIES_COLOR.reviews }} />Reviews</span>
               </span>
             </h3>
             <div className="ta-card__sub">Last {weeks.length || 12} weeks · counts per ISO week</div>
@@ -805,7 +888,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
 
           <div className="ta-card">
             <h3 className="ta-card__title">Components touched
-              <span className="ta-legend"><span style={{ fontFamily: 'var(--ta-mono)' }}>Each row = one component · width = issues</span></span>
+              <span className="ta-meta">Each row = one component · width = issues</span>
             </h3>
             <div className="ta-card__sub">Where this member spent their work in the window</div>
             {components.length === 0 ? (
@@ -825,7 +908,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
 
           <div className="ta-card">
             <h3 className="ta-card__title">This sprint
-              <span className="ta-pill" style={{ background: 'var(--ta-bg-soft)' }}>
+              <span className="ta-pill" style={{ background: 'var(--bg-sunken)' }}>
                 {sprint?.name || '—'}
               </span>
             </h3>
@@ -842,7 +925,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
             <h3 className="ta-card__title">Identity
               <span className="ta-meta">edit · save triggers an aggregator rebuild</span>
             </h3>
-            <div className="ta-card__sub">Map this member to a GitHub login + pillar so PRs and review counts show up</div>
+            <div className="ta-card__sub">Map this member to a GitHub login + (optional) pillar override</div>
             <div className="ta-edit-grid">
               <label className="ta-field">
                 <span className="ta-field-label">Member ID</span>
@@ -868,12 +951,16 @@ function MemberView({ memberRow, onBack, onSaved, allRows, onSwitchMember }) {
                 <span className="ta-field-help">Empty = no GitHub link.</span>
               </label>
               <label className="ta-field">
-                <span className="ta-field-label">Pillar</span>
-                <input className="ta-input"
-                       value={editPillar}
-                       onChange={(e) => setEditPillar(e.target.value)}
-                       placeholder="essentials" />
-                <span className="ta-field-help">Free-form. Drives the Team filter pills + pillar stack chart.</span>
+                <span className="ta-field-label">Pillar override</span>
+                <select className="ta-input"
+                        value={editPillar}
+                        onChange={(e) => setEditPillar(e.target.value)}>
+                  <option value="">— derive from Jira components —</option>
+                  {orderedPillarNames.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+                <span className="ta-field-help">Empty falls back to component-derived pillar.</span>
               </label>
             </div>
             <div className="ta-form-actions">
@@ -918,7 +1005,7 @@ const SLICE_COL_AXES = [
   { val: 'quarter', label: 'Quarter' },
 ];
 
-function SliceView({ rows }) {
+function SliceView({ rows, orderedPillarNames }) {
   const [rowsAxis, setRowsAxis] = useState('pillar');
   const [colsAxis, setColsAxis] = useState('week');
   const [metric,   setMetric]   = useState('prs');
@@ -950,8 +1037,11 @@ function SliceView({ rows }) {
     }
     const set = new Set();
     rows.forEach((r) => set.add(r.pillar || 'Unassigned'));
-    return [...set].sort();
-  }, [rows, rowsAxis]);
+    // Stable ordering: roadmap-tab pillar order first, then any extras.
+    const known = orderedPillarNames.filter((p) => set.has(p));
+    const extras = [...set].filter((p) => !orderedPillarNames.includes(p)).sort();
+    return [...known, ...extras];
+  }, [rows, rowsAxis, orderedPillarNames]);
 
   const cols = useMemo(() => {
     if (colsAxis === 'week') {
