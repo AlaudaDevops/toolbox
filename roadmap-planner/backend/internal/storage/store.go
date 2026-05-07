@@ -52,6 +52,12 @@ type Store interface {
 
 	// Members.
 	UpsertMember(ctx context.Context, m Member) error
+	// SetMemberIdentity writes the operator-editable identity fields
+	// (display_name, github_login, pillar_id) literally — empty values
+	// clear the field. Use for the PATCH /api/contributions/members/:id
+	// path, where UpsertMember's COALESCE-preserve semantics would
+	// silently drop an explicit clear.
+	SetMemberIdentity(ctx context.Context, id, displayName, githubLogin, pillarID string) error
 	ListMembers(ctx context.Context) ([]Member, error)
 
 	// Read paths used by the contributions service.

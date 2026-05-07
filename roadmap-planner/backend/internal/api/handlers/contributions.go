@@ -243,7 +243,12 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 		existing.PillarID = strings.TrimSpace(*req.PillarID)
 	}
 
-	if err := h.store.UpsertMember(c.Request.Context(), *existing); err != nil {
+	// Literal-overwrite on these three fields — UpsertMember's COALESCE
+	// semantics (which protect operator edits from being clobbered by
+	// the Jira sync) would otherwise turn an explicit clear ("github_login": "")
+	// into a no-op. SetMemberIdentity bypasses that and writes verbatim.
+	if err := h.store.SetMemberIdentity(c.Request.Context(), id,
+		existing.DisplayName, existing.GitHubLogin, existing.PillarID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
