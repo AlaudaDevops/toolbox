@@ -229,11 +229,14 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 	}
 	defer prRows.Close()
 	for prRows.Next() {
-		var repo string
-		var week time.Time
+		var repo, weekRaw string
 		var n int
-		if err := prRows.Scan(&repo, &week, &n); err != nil {
+		if err := prRows.Scan(&repo, &weekRaw, &n); err != nil {
 			return nil, err
+		}
+		week, perr := parseWeek(weekRaw)
+		if perr != nil {
+			return nil, fmt.Errorf("pillars: parse pr week %q: %w", weekRaw, perr)
 		}
 		pillars := pm.PillarsForRepo(repo)
 		if len(pillars) == 0 {
@@ -270,10 +273,14 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 	}
 	defer jRows.Close()
 	for jRows.Next() {
-		var week time.Time
+		var weekRaw string
 		var rawComponents sql.NullString
-		if err := jRows.Scan(&week, &rawComponents); err != nil {
+		if err := jRows.Scan(&weekRaw, &rawComponents); err != nil {
 			return nil, err
+		}
+		week, perr := parseWeek(weekRaw)
+		if perr != nil {
+			return nil, fmt.Errorf("pillars: parse jira week %q: %w", weekRaw, perr)
 		}
 		var comps []string
 		if rawComponents.Valid && rawComponents.String != "" && rawComponents.String != "null" {
@@ -561,3 +568,22 @@ func percentile(sorted []float64, p float64) float64 {
 }
 
 func round1(v float64) float64 { return float64(int(v*10+0.5)) / 10 }
+
+// parseWeek converts a `dialect.WeekStart(...)`-derived string (SQLite
+// returns `YYYY-MM-DD`; Postgres' `date_trunc('week', ...)` returns a
+// timestamp) back to time.Time. The driver doesn't infer a column type
+// for a synthesised SELECT expression, so we get strings, not times.
+func parseWeek(s string) (time.Time, error) {
+	for _, layout := range []string{
+		"2006-01-02",
+		"2006-01-02 15:04:05",
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05Z",
+	} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unrecognised week format")
+}
