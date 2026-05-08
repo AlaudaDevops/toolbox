@@ -173,6 +173,7 @@ type PillarBucket struct {
 	WeekStart time.Time `json:"week_start"`
 	PRsMerged int       `json:"prs_merged"`
 	JiraDone  int       `json:"jira_done"`
+	Points    float64   `json:"points"`
 }
 
 // PillarThroughput returns weekly PR-merged / Jira-done counts per pillar.
@@ -203,7 +204,7 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 		Week   time.Time
 	}
 	agg := map[key]*PillarBucket{}
-	bump := func(pillar string, week time.Time, prs, jira int) {
+	bump := func(pillar string, week time.Time, prs, jira int, pts float64) {
 		k := key{Pillar: pillar, Week: week}
 		b, ok := agg[k]
 		if !ok {
@@ -212,6 +213,7 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 		}
 		b.PRsMerged += prs
 		b.JiraDone += jira
+		b.Points += pts
 	}
 
 	// PRs by repo × week. We pull (repo_id, week, count) and fan out per
@@ -240,11 +242,11 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 		}
 		pillars := pm.PillarsForRepo(repo)
 		if len(pillars) == 0 {
-			bump("Unassigned", week, n, 0)
+			bump("Unassigned", week, n, 0, 0)
 			continue
 		}
 		for _, p := range pillars {
-			bump(p, week, n, 0)
+			bump(p, week, n, 0, 0)
 		}
 	}
 	if err := prRows.Err(); err != nil {
@@ -256,9 +258,9 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 	// route to the matching pillars. Issues with no component or no
 	// configured mapping land under "Unassigned".
 	jiraSQL := rebindSimple(dialect, fmt.Sprintf(`
-		SELECT %s AS week_start, components
+		SELECT %s AS week_start, components, story_points
 		FROM (
-		  SELECT s.resolved_at, s.components, s.issue_key,
+		  SELECT s.resolved_at, s.components, s.story_points, s.issue_key,
 		         ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
 		  FROM issue_snapshots s
 		  JOIN collection_runs r ON s.run_id = r.id
@@ -275,7 +277,8 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 	for jRows.Next() {
 		var weekRaw string
 		var rawComponents sql.NullString
-		if err := jRows.Scan(&weekRaw, &rawComponents); err != nil {
+		var pts sql.NullFloat64
+		if err := jRows.Scan(&weekRaw, &rawComponents, &pts); err != nil {
 			return nil, err
 		}
 		week, perr := parseWeek(weekRaw)
@@ -286,13 +289,17 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 		if rawComponents.Valid && rawComponents.String != "" && rawComponents.String != "null" {
 			_ = json.Unmarshal([]byte(rawComponents.String), &comps)
 		}
+		var points float64
+		if pts.Valid {
+			points = pts.Float64
+		}
 		pillars := pm.PillarsForComponents(comps)
 		if len(pillars) == 0 {
-			bump("Unassigned", week, 0, 1)
+			bump("Unassigned", week, 0, 1, points)
 			continue
 		}
 		for _, p := range pillars {
-			bump(p, week, 0, 1)
+			bump(p, week, 0, 1, points)
 		}
 	}
 	if err := jRows.Err(); err != nil {

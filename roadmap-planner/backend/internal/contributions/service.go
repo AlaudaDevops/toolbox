@@ -80,6 +80,7 @@ type MemberSummary struct {
 type Bucket struct {
 	WeekStart time.Time `json:"week_start"`
 	JiraDone  int       `json:"jira_done"`
+	Points    float64   `json:"points"`
 	PRsMerged int       `json:"prs_merged"`
 	Reviews   int       `json:"reviews"`
 }
@@ -119,6 +120,7 @@ func (s *Service) TeamOverview(ctx context.Context, q storage.MemberWeekQuery) (
 			buckets[r.WeekStart] = bk
 		}
 		bk.JiraDone += r.JiraIssuesDone
+		bk.Points += r.JiraPointsDone
 		bk.PRsMerged += r.PRsMerged
 		bk.Reviews += r.PRsReviewed
 	}

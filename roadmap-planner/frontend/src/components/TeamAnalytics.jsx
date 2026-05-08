@@ -1070,6 +1070,15 @@ const SLICE_COL_AXES = [
   { val: 'quarter', label: 'Quarter' },
 ];
 
+// formatCell renders a slice cell. Story points can be fractional (Jira lets
+// estimators set 0.5, 1.5, …) so we keep one decimal when it would matter
+// and trim it otherwise. PR/Jira counts are always integers.
+function formatCell(v, metric) {
+  if (metric !== 'points') return v;
+  const n = Number(v) || 0;
+  return Number.isInteger(n) ? n : n.toFixed(1);
+}
+
 function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
   const [rowsAxis, setRowsAxis] = useState('pillar');
   const [colsAxis, setColsAxis] = useState('week');
@@ -1088,7 +1097,7 @@ function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
     const out = new Map();
     rows.forEach((r) => {
       const byWeek = new Map((r.week_totals || []).map((w) => [w.week_start, w]));
-      out.set(r.id, allWeeks.map((wk) => byWeek.get(wk) || { jira_done: 0, prs_merged: 0, reviews: 0 }));
+      out.set(r.id, allWeeks.map((wk) => byWeek.get(wk) || { jira_done: 0, points: 0, prs_merged: 0, reviews: 0 }));
     });
     return out;
   }, [rows, allWeeks]);
@@ -1106,14 +1115,14 @@ function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
     });
     const aligned = new Map();
     out.forEach((byWeek, pillar) => {
-      aligned.set(pillar, allWeeks.map((wk) => byWeek.get(wk) || { jira_done: 0, prs_merged: 0 }));
+      aligned.set(pillar, allWeeks.map((wk) => byWeek.get(wk) || { jira_done: 0, points: 0, prs_merged: 0 }));
     });
     return aligned;
   }, [pillarBuckets, allWeeks]);
 
   const metricGetter = useCallback((b) => {
     if (metric === 'jira')   return b.jira_done   || 0;
-    if (metric === 'points') return 0;
+    if (metric === 'points') return b.points      || 0;
     return b.prs_merged || 0;
   }, [metric]);
 
@@ -1151,19 +1160,16 @@ function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
       if (rowsAxis === 'pillar') {
         const series = seriesByPillar.get(rk) || allWeeks.map(() => ({}));
         if (colsAxis === 'week') {
-          if (metric === 'points') return 0;
           const idx = allWeeks.indexOf(col.key);
           if (idx < 0) return 0;
           return metricGetter(series[idx] || {});
         }
         const [start, end] = col.range;
-        if (metric === 'points') return 0;
         return series.slice(start, end).reduce((s, b) => s + metricGetter(b), 0);
       }
       // Member axis — sum the member's week_totals series.
       const matches = rows.filter((r) => r.id === rk);
       if (colsAxis === 'week') {
-        if (metric === 'points') return 0;
         const idx = allWeeks.indexOf(col.key);
         if (idx < 0) return 0;
         return matches.reduce((acc, r) => {
@@ -1172,10 +1178,6 @@ function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
         }, 0);
       }
       const [start, end] = col.range;
-      if (metric === 'points') {
-        const perQuarter = matches.reduce((acc, r) => acc + (r.points || 0), 0) / Math.max(1, cols.length);
-        return Math.round(perQuarter);
-      }
       return matches.reduce((acc, r) => {
         const series = seriesByMember.get(r.id) || [];
         return acc + series.slice(start, end).reduce((s, b) => s + metricGetter(b), 0);
@@ -1247,19 +1249,19 @@ function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
                   <td key={i}
                       className={`heat${v === 0 ? ' heat-zero' : ''}`}
                       style={{ '--h': (v / row.max).toFixed(2) }}>
-                    <span>{v}</span>
+                    <span>{formatCell(v, metric)}</span>
                   </td>
                 ))}
-                <td style={{ fontWeight: 600 }}>{row.total}</td>
+                <td style={{ fontWeight: 600 }}>{formatCell(row.total, metric)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <div className="ta-pivot-foot">
-        Heat is per-row max. Cells are absolute counts. Story-points by week is left
-        empty because the rollup keeps total points only — switch to "Quarter" for
-        an even split, or use the Team Overview column.
+        Heat is per-row max. Cells are absolute counts. Story points are summed by
+        each item's resolved-week and fanned out across pillars when an issue or PR
+        attributes to more than one.
       </div>
     </div>
   );
