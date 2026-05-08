@@ -193,6 +193,16 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 // members
 // ----------------------------------------------------------------------
 
+// UpsertMember writes one member row. On conflict (existing id), Jira-
+// derived fields (display_name / email / jira_account_id / active) are
+// always overwritten with the latest value, while *operator-set* fields
+// (github_login, pillar_id) are preserved when the incoming row has them
+// empty. Without this guard, the Jira sync goroutine — which never reads
+// github_login or pillar_id — would clobber them every 30 minutes,
+// silently undoing any PATCH on /api/contributions/members/:id. The PATCH
+// endpoint always passes those fields explicitly, so its writes still
+// land (including intentional clears, which a future iteration would
+// signal differently — today an empty string from PATCH is "no change").
 func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 	now := time.Now().UTC()
 	if m.CreatedAt.IsZero() {
@@ -210,8 +220,8 @@ func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 			display_name = excluded.display_name,
 			email = excluded.email,
 			jira_account_id = excluded.jira_account_id,
-			github_login = excluded.github_login,
-			pillar_id = excluded.pillar_id,
+			github_login = COALESCE(NULLIF(excluded.github_login, ''), members.github_login),
+			pillar_id = COALESCE(NULLIF(excluded.pillar_id, ''), members.pillar_id),
 			active = excluded.active,
 			updated_at = excluded.updated_at`)
 	_, err := s.db.ExecContext(ctx, q,
@@ -219,6 +229,27 @@ func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 		nullable(m.JiraAccountID), nullable(m.GitHubLogin),
 		nullable(m.PillarID), active, m.CreatedAt, m.UpdatedAt)
 	return err
+}
+
+// SetMemberIdentity is the literal-overwrite counterpart to UpsertMember.
+// Used by the PATCH endpoint, where explicit clears are meaningful.
+// All three fields land verbatim (empty string → NULL on the column);
+// updated_at is bumped.
+func (s *genericStore) SetMemberIdentity(ctx context.Context, id, displayName, githubLogin, pillarID string) error {
+	q := rebind(s.d, `
+		UPDATE members
+		   SET display_name = ?, github_login = ?, pillar_id = ?, updated_at = ?
+		 WHERE id = ?`)
+	res, err := s.db.ExecContext(ctx, q,
+		displayName, nullable(githubLogin), nullable(pillarID), time.Now().UTC(), id)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (s *genericStore) ListMembers(ctx context.Context) ([]Member, error) {

@@ -529,6 +529,20 @@ Once backfill clears, incremental syncs only re-fetch PRs with
 `updated >= last_sync` — typically dozens per cycle, well below any
 limit.
 
+### Wildcard repo lists
+
+`github.repos` accepts an `OWNER/*` entry alongside (or instead of) a
+hand-curated list. At Sync time the Syncer walks
+`GET /orgs/{owner}/repos?per_page=100&type=all`, pages through, and
+treats every returned repo as if it had been listed individually. By
+default archived repos and forks are filtered out — both flags are
+togglable on the Syncer struct (`IncludeArchived`, `IncludeForks`).
+The resolved list is cached for `WildcardTTL` (24 h by default), so
+subsequent sync cycles inside that window skip the org-repos call
+entirely. Explicit `OWNER/NAME:component` entries still take effect
+when listed alongside `OWNER/*` — the explicit row keeps its component
+label, and the wildcard expansion is not deduplicated against it.
+
 ### Tests
 
 - `auth_test.go` — round-trips an App-installation-token mint via

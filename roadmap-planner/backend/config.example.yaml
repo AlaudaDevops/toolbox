@@ -108,6 +108,12 @@ github:
   repos:
     - "AlaudaDevops/toolbox"
     # - "owner/name:component"  # optional component label per repo
+    # - "AlaudaDevops/*"        # wildcard: expand to every active,
+    #                           # non-fork repo in the org. Resolved
+    #                           # at sync time, cached 24h. Works
+    #                           # alongside explicit entries — an
+    #                           # explicit OWNER/NAME:component still
+    #                           # keeps its component label.
 
   # Auth — App is recommended for production. Token is fine for local
   # dev or one-off scripts. App wins when both are set.

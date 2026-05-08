@@ -18,21 +18,55 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 // Config represents the application configuration
 type Config struct {
-	Debug   bool    `mapstructure:"debug"`
-	Logger  Logger  `mapstructure:"logger"`
-	Jira    Jira    `mapstructure:"jira"`
-	Server  Server  `mapstructure:"server"`
-	Cache   Cache   `mapstructure:"cache"`
-	Metrics Metrics `mapstructure:"metrics"`
-	Storage Storage `mapstructure:"storage"`
-	GitHub  GitHub  `mapstructure:"github"`
+	Debug         bool          `mapstructure:"debug"`
+	Logger        Logger        `mapstructure:"logger"`
+	Jira          Jira          `mapstructure:"jira"`
+	Server        Server        `mapstructure:"server"`
+	Cache         Cache         `mapstructure:"cache"`
+	Metrics       Metrics       `mapstructure:"metrics"`
+	Storage       Storage       `mapstructure:"storage"`
+	GitHub        GitHub        `mapstructure:"github"`
+	TeamAnalytics TeamAnalytics `mapstructure:"team_analytics"`
+}
+
+// TeamAnalytics holds the pillar attribution map used by /api/contributions/pillars
+// (and the slice explorer's pillar axis).
+//
+// Layout: pillar name → list of repo globs and Jira component names that
+// belong to it. A single repo or component MAY appear under several pillars;
+// each appearance credits the corresponding pillar independently when a PR
+// or issue lands. Member-level totals stay independent of this mapping —
+// pillar attribution is per-PR / per-issue, not per-member.
+//
+// Repo entries support glob (`*`) wildcards. Owner case-insensitive match.
+// Jira component names match exactly (case-insensitive).
+//
+// Example:
+//
+//	team_analytics:
+//	  pillars:
+//	    "CI/CD":
+//	      repos: ["alaudadevops/tektoncd-*", "alaudadevops/helm*"]
+//	      components: ["Tekton"]
+//	    "Tool Deployment":
+//	      repos: ["alaudadevops/harbor*", "alaudadevops/helm*"]
+type TeamAnalytics struct {
+	Pillars map[string]PillarMapping `mapstructure:"pillars" yaml:"pillars"`
+}
+
+// PillarMapping is one bucket inside TeamAnalytics.Pillars.
+type PillarMapping struct {
+	Repos      []string `mapstructure:"repos" yaml:"repos"`
+	Components []string `mapstructure:"components" yaml:"components"`
 }
 
 // Storage configures the durable team-analytics store.
@@ -354,6 +388,21 @@ func Load() (*Config, error) {
 	var config Config
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	// Viper lowercases map keys on unmarshal — that destroys pillar
+	// names like "CI/CD" or "DevOps - RFEs & NFR". Re-parse the
+	// team_analytics block straight from the config file so the
+	// configured names round-trip exactly.
+	if path := viper.ConfigFileUsed(); path != "" {
+		if raw, err := os.ReadFile(path); err == nil {
+			var preserve struct {
+				TeamAnalytics TeamAnalytics `yaml:"team_analytics"`
+			}
+			if uerr := yaml.Unmarshal(raw, &preserve); uerr == nil && len(preserve.TeamAnalytics.Pillars) > 0 {
+				config.TeamAnalytics = preserve.TeamAnalytics
+			}
+		}
 	}
 
 	return &config, nil

@@ -64,6 +64,12 @@ func (d *defaultLinker) Link(pr PullRequest) string {
 // in the last BackfillDays days. Subsequent runs resume from one hour
 // before the previous run's CapturedAt (the overlap absorbs any clock
 // skew or PRs that mutated state without bumping `updated_at`).
+//
+// Wildcard expansion: a RepoConfig with Name == "*" (e.g. "AlaudaDevops/*")
+// is resolved at Sync time against /orgs/{owner}/repos. By default
+// archived repos and forks are filtered out and the resolved list is
+// cached for WildcardTTL (24 h by default). Toggle the filters and TTL
+// on this struct after construction if needed.
 type Syncer struct {
 	client       *Client
 	store        storage.Store
@@ -71,6 +77,15 @@ type Syncer struct {
 	linker       Linker
 	logger       *zap.Logger
 	backfillDays int
+
+	// Wildcard expansion knobs. All have sensible defaults; flip them
+	// from the caller (e.g. cmd/server) before Sync is invoked.
+	WildcardTTL     time.Duration // 0 -> DefaultWildcardTTL (24 h)
+	IncludeArchived bool          // default false (archived repos skipped)
+	IncludeForks    bool          // default false (forks skipped)
+
+	wildcardCache *wildcardCache
+	nowFn         func() time.Time // injectable for cache-TTL tests
 }
 
 // RepoConfig describes one repo to track. Pillar/Component are optional
@@ -93,12 +108,15 @@ func NewSyncer(client *Client, store storage.Store, repos []RepoConfig, linker L
 		backfillDays = 180
 	}
 	return &Syncer{
-		client:       client,
-		store:        store,
-		repos:        repos,
-		linker:       linker,
-		logger:       logger.WithComponent("github-syncer"),
-		backfillDays: backfillDays,
+		client:        client,
+		store:         store,
+		repos:         repos,
+		linker:        linker,
+		logger:        logger.WithComponent("github-syncer"),
+		backfillDays:  backfillDays,
+		WildcardTTL:   DefaultWildcardTTL,
+		wildcardCache: newWildcardCache(),
+		nowFn:         time.Now,
 	}
 }
 
@@ -113,6 +131,21 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		return nil
 	}
 
+	// Resolve OWNER/* specs against the org-repos endpoint before we
+	// start the per-repo loop. A wildcard-expansion failure is recorded
+	// but does not abort the cycle: any explicit + already-resolved
+	// repos are still synced.
+	resolved, resolveErr := s.resolveRepos(ctx)
+	if resolveErr != nil {
+		s.logger.Warn("wildcard repo resolution failed (partial)", zap.Error(resolveErr))
+	}
+	if len(resolved) == 0 {
+		if resolveErr != nil {
+			return resolveErr
+		}
+		return nil
+	}
+
 	// First run: reach back BackfillDays. Subsequent runs: resume from
 	// one hour before the previous CapturedAt to absorb clock skew.
 	since := time.Now().AddDate(0, 0, -s.backfillDays)
@@ -124,14 +157,15 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	s.logger.Info("github sync starting",
 		zap.String("mode", mode),
 		zap.Time("since", since),
-		zap.Int("repos", len(s.repos)))
+		zap.Int("specs", len(s.repos)),
+		zap.Int("repos", len(resolved)))
 
 	runStart := time.Now()
 	runID := fmt.Sprintf("gh-%d", runStart.UnixNano())
 	totalPRs, totalReviews := 0, 0
-	var firstErr error
+	firstErr := resolveErr
 
-	for _, repo := range s.repos {
+	for _, repo := range resolved {
 		prs, err := s.client.ListPullRequests(ctx, repo.Owner, repo.Name, ListPullRequestsOptions{
 			State: "all", Sort: "updated", Direction: "desc",
 			Since: since, MaxPages: 10,

@@ -134,7 +134,70 @@ func (h *ContributionsHandler) MemberDetail(c *gin.Context) {
 	if info != nil {
 		resp["info"] = info
 	}
+	// Best-effort: components-touched + current sprint. We surface the
+	// error in logs but do not fail the whole response — the profile
+	// page is useful even without these extras.
+	if extras, xErr := h.service.MemberExtras(c.Request.Context(), id, q); xErr == nil {
+		resp["components_touched"] = extras.ComponentsTouched
+		if extras.Sprint != nil {
+			resp["sprint"] = extras.Sprint
+		}
+	} else {
+		logger.Warn("member extras failed", zap.String("member_id", id), zap.Error(xErr))
+	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// NetworkDensity — GET /api/contributions/network?from=&to=
+//
+// Aggregate review-health stats for the Team Overview "Review network
+// density" panel: orphan rate, first-review p50/p90, cross-pillar
+// review percentage.
+func (h *ContributionsHandler) NetworkDensity(c *gin.Context) {
+	q, err := h.parseQuery(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	out, err := h.service.NetworkDensity(c.Request.Context(), q)
+	if err != nil {
+		logger.Error("network density failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+// PillarThroughput — GET /api/contributions/pillars?from=&to=
+//
+// Returns weekly PR-merged + Jira-done counts grouped by pillar. Pillar
+// attribution is per-PR (via repo→pillars) and per-issue (via Jira
+// component → pillars), driven by the team_analytics.pillars config.
+// PRs / issues that don't match any configured pillar fall under the
+// synthetic "Unassigned" key. The `pillars` field in the response gives
+// the configured display order so the frontend can render zero-stack
+// pillars even when they had no activity.
+func (h *ContributionsHandler) PillarThroughput(c *gin.Context) {
+	q, err := h.parseQuery(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	rows, err := h.service.PillarThroughput(c.Request.Context(), q)
+	if err != nil {
+		logger.Error("pillar throughput failed", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	pm := h.service.PillarMap()
+	c.JSON(http.StatusOK, gin.H{
+		"buckets":    rows,
+		"from":       q.From,
+		"to":         q.To,
+		"pillars":    pm.PublicConfig(),
+		"order":      pm.Order(),
+		"configured": pm.Configured(),
+	})
 }
 
 // UpdateMember — PATCH /api/contributions/members/:id
@@ -192,7 +255,12 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 		existing.PillarID = strings.TrimSpace(*req.PillarID)
 	}
 
-	if err := h.store.UpsertMember(c.Request.Context(), *existing); err != nil {
+	// Literal-overwrite on these three fields — UpsertMember's COALESCE
+	// semantics (which protect operator edits from being clobbered by
+	// the Jira sync) would otherwise turn an explicit clear ("github_login": "")
+	// into a no-op. SetMemberIdentity bypasses that and writes verbatim.
+	if err := h.store.SetMemberIdentity(c.Request.Context(), id,
+		existing.DisplayName, existing.GitHubLogin, existing.PillarID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
