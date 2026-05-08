@@ -573,6 +573,9 @@ func round1(v float64) float64 { return float64(int(v*10+0.5)) / 10 }
 // returns `YYYY-MM-DD`; Postgres' `date_trunc('week', ...)` returns a
 // timestamp) back to time.Time. The driver doesn't infer a column type
 // for a synthesised SELECT expression, so we get strings, not times.
+// Layout-fallback list covers both SQLite (date-only) and Postgres
+// (timestamp / RFC3339) outputs without requiring dialect-specific
+// branching at the call site.
 func parseWeek(s string) (time.Time, error) {
 	for _, layout := range []string{
 		"2006-01-02",
