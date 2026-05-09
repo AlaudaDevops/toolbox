@@ -35,6 +35,7 @@ type Config struct {
 	Metrics       Metrics       `mapstructure:"metrics"`
 	Storage       Storage       `mapstructure:"storage"`
 	GitHub        GitHub        `mapstructure:"github"`
+	GitLab        GitLab        `mapstructure:"gitlab"`
 	TeamAnalytics TeamAnalytics `mapstructure:"team_analytics"`
 }
 
@@ -75,6 +76,18 @@ type TeamAnalytics struct {
 	//	    daniel: danielfbm
 	//	    jtcheng: chengjingtao
 	GitHubLoginPrefills map[string]string `mapstructure:"github_login_prefills" yaml:"github_login_prefills"`
+	// GitLabUsernamePrefills mirrors GitHubLoginPrefills for the GitLab
+	// side. Same one-shot-on-empty semantics — manual UI edits always
+	// win. Use when the optional email-based auto-prefill (gitlab.users
+	// search) doesn't catch a teammate.
+	//
+	// Example:
+	//
+	//	team_analytics:
+	//	  gitlab_username_prefills:
+	//	    daniel: daniel
+	//	    jtcheng: chengjingtao
+	GitLabUsernamePrefills map[string]string `mapstructure:"gitlab_username_prefills" yaml:"gitlab_username_prefills"`
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
@@ -152,6 +165,32 @@ type GitHubApp struct {
 func (g GitHubApp) Configured() bool {
 	return g.AppID > 0 && g.InstallationID > 0 &&
 		(g.PrivateKeyPath != "" || g.PrivateKeyPEM != "")
+}
+
+// GitLab configures the team-analytics GitLab ingestion.
+//
+// Auth is a personal access token with read_api scope over the projects
+// to track. Bind GITLAB_TOKEN if the deployment doesn't want the secret
+// in the ConfigMap. BaseURL defaults to gitlab.com — set it to the
+// internal instance (https://gitlab-ce.alauda.cn) for the alauda fleet.
+//
+// Groups are listed as glob specs (see internal/gitlab.ParseGroupSpec):
+//   - "group/sub/proj" — exact project lookup
+//   - "group/*"        — direct children of `group`
+//   - "group/**"       — entire subtree, recursively
+//
+// HydrateDiff turns on per-merged-MR additions/deletions/changes_count
+// fetches. Off by default because the data isn't surfaced on the
+// dashboard yet and it ~doubles the API call budget per cycle.
+type GitLab struct {
+	Enabled      bool     `mapstructure:"enabled"`
+	BaseURL      string   `mapstructure:"base_url"`
+	Token        string   `mapstructure:"token"`
+	SyncInterval string   `mapstructure:"sync_interval"`
+	Groups       []string `mapstructure:"groups"`
+	ProjectKey   string   `mapstructure:"project_key"`
+	BackfillDays int      `mapstructure:"backfill_days"`
+	HydrateDiff  bool     `mapstructure:"hydrate_diff"`
 }
 
 // Logger represents logger configuration settings
@@ -355,6 +394,14 @@ func Load() (*Config, error) {
 	viper.SetDefault("storage.dsn", "")
 	viper.SetDefault("storage.backfill_days", 180)
 
+	// GitLab defaults
+	viper.SetDefault("gitlab.enabled", false)
+	viper.SetDefault("gitlab.base_url", "")
+	viper.SetDefault("gitlab.sync_interval", "30m")
+	viper.SetDefault("gitlab.groups", []string{})
+	viper.SetDefault("gitlab.backfill_days", 0)
+	viper.SetDefault("gitlab.hydrate_diff", false)
+
 	// GitHub defaults
 	viper.SetDefault("github.enabled", false)
 	viper.SetDefault("github.base_url", "")
@@ -398,6 +445,11 @@ func Load() (*Config, error) {
 	_ = viper.BindEnv("github.app.installation_id", "GITHUB_APP_INSTALLATION_ID")
 	_ = viper.BindEnv("github.app.private_key_path", "GITHUB_APP_PRIVATE_KEY_PATH")
 	_ = viper.BindEnv("github.app.private_key_pem", "GITHUB_APP_PRIVATE_KEY_PEM")
+	_ = viper.BindEnv("gitlab.enabled", "GITLAB_ENABLED")
+	_ = viper.BindEnv("gitlab.token", "GITLAB_TOKEN")
+	_ = viper.BindEnv("gitlab.base_url", "GITLAB_BASE_URL")
+	_ = viper.BindEnv("gitlab.sync_interval", "GITLAB_SYNC_INTERVAL")
+	_ = viper.BindEnv("gitlab.backfill_days", "GITLAB_BACKFILL_DAYS")
 
 	// Read config file if it exists
 	if err := viper.ReadInConfig(); err != nil {

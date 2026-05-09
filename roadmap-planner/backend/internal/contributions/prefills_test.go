@@ -48,7 +48,9 @@ func TestApplyGitHubLoginPrefills(t *testing.T) {
 		t.Fatalf("bob: %v", err)
 	}
 	// Lay down bob's existing link via the literal-overwrite path.
-	if err := store.SetMemberIdentity(ctx, "bob", "Bob Lee", "bob-on-github", ""); err != nil {
+	if err := store.SetMemberIdentity(ctx, "bob", storage.MemberIdentity{
+		DisplayName: "Bob Lee", GitHubLogin: "bob-on-github",
+	}); err != nil {
 		t.Fatalf("bob set: %v", err)
 	}
 

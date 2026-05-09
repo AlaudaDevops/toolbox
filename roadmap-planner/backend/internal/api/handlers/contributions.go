@@ -219,9 +219,10 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 		return
 	}
 	var req struct {
-		DisplayName *string `json:"display_name"`
-		GitHubLogin *string `json:"github_login"`
-		PillarID    *string `json:"pillar_id"`
+		DisplayName    *string `json:"display_name"`
+		GitHubLogin    *string `json:"github_login"`
+		GitLabUsername *string `json:"gitlab_username"`
+		PillarID       *string `json:"pillar_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -251,16 +252,23 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 	if req.GitHubLogin != nil {
 		existing.GitHubLogin = strings.ToLower(strings.TrimSpace(*req.GitHubLogin))
 	}
+	if req.GitLabUsername != nil {
+		existing.GitLabUsername = strings.ToLower(strings.TrimSpace(*req.GitLabUsername))
+	}
 	if req.PillarID != nil {
 		existing.PillarID = strings.TrimSpace(*req.PillarID)
 	}
 
-	// Literal-overwrite on these three fields — UpsertMember's COALESCE
-	// semantics (which protect operator edits from being clobbered by
-	// the Jira sync) would otherwise turn an explicit clear ("github_login": "")
-	// into a no-op. SetMemberIdentity bypasses that and writes verbatim.
-	if err := h.store.SetMemberIdentity(c.Request.Context(), id,
-		existing.DisplayName, existing.GitHubLogin, existing.PillarID); err != nil {
+	// Literal-overwrite — UpsertMember's COALESCE semantics (which
+	// protect operator edits from being clobbered by the Jira sync)
+	// would otherwise turn an explicit clear ("github_login": "") into
+	// a no-op. SetMemberIdentity bypasses that and writes verbatim.
+	if err := h.store.SetMemberIdentity(c.Request.Context(), id, storage.MemberIdentity{
+		DisplayName:    existing.DisplayName,
+		GitHubLogin:    existing.GitHubLogin,
+		GitLabUsername: existing.GitLabUsername,
+		PillarID:       existing.PillarID,
+	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -287,7 +295,7 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 // data is stale.
 func (h *ContributionsHandler) CollectorStatus(c *gin.Context) {
 	out := gin.H{}
-	for _, src := range []string{"jira", "github"} {
+	for _, src := range []string{"jira", "github", "gitlab"} {
 		run, err := h.store.LatestCollectionRun(c.Request.Context(), src)
 		if err != nil {
 			out[src] = gin.H{"error": err.Error()}

@@ -53,11 +53,10 @@ type Store interface {
 	// Members.
 	UpsertMember(ctx context.Context, m Member) error
 	// SetMemberIdentity writes the operator-editable identity fields
-	// (display_name, github_login, pillar_id) literally — empty values
-	// clear the field. Use for the PATCH /api/contributions/members/:id
-	// path, where UpsertMember's COALESCE-preserve semantics would
-	// silently drop an explicit clear.
-	SetMemberIdentity(ctx context.Context, id, displayName, githubLogin, pillarID string) error
+	// literally — empty values clear the field. Use for the PATCH
+	// /api/contributions/members/:id path, where UpsertMember's
+	// COALESCE-preserve semantics would silently drop an explicit clear.
+	SetMemberIdentity(ctx context.Context, id string, ident MemberIdentity) error
 	ListMembers(ctx context.Context) ([]Member, error)
 
 	// Read paths used by the contributions service.
@@ -94,63 +93,87 @@ type IssueSnapshot struct {
 	ResolvedAt  *time.Time
 }
 
-// PullRequest is a GitHub PR record. Linked to an Epic via EpicKey when
-// the configured Linker can resolve one (branch regex, PR title, etc.).
+// PullRequest is a GitHub PR or GitLab MR record. Linked to an Epic via
+// EpicKey when the configured Linker can resolve one (branch regex,
+// title, etc.).
 //
-// GitHubAuthorLogin is the raw login string returned by the GitHub API
-// (lower-cased on write). It's stored alongside the resolved AuthorID
-// so the aggregator can re-link history when an operator later fills in
-// `members.github_login` via PATCH — see migrations/0002.
+// AuthorLogin is the raw login string returned by the source API (lower-
+// cased on write). It's stored alongside the resolved AuthorID so the
+// aggregator can re-link history when an operator later fills in
+// `members.github_login` (or `members.gitlab_username`) via PATCH — see
+// migrations/0002 and 0003.
+//
+// Source distinguishes "github" from "gitlab" so the two providers can
+// share the same table without losing provenance. Defaults to "github"
+// for rows ingested before the 0003 migration.
 type PullRequest struct {
-	ID                string // "org/name#number"
-	RepoID            string
-	Number            int
-	Title             string
-	State             string // "open" | "merged" | "closed"
-	AuthorID          string // FK to members.id, empty if no match
-	GitHubAuthorLogin string // raw `pr.user.login`, lower-cased
-	HeadBranch        string
-	BaseBranch        string
-	Additions         int
-	Deletions         int
-	ChangedFiles      int
-	EpicKey           string
-	CreatedAt         time.Time
-	FirstReviewAt     *time.Time
-	MergedAt          *time.Time
-	ClosedAt          *time.Time
-	FetchedAt         time.Time
+	ID            string // "owner/name#number" (github) or "group/sub/proj!iid" (gitlab)
+	Source        string // "github" | "gitlab"
+	RepoID        string
+	Number        int
+	Title         string
+	State         string // "open" | "merged" | "closed"
+	AuthorID      string // FK to members.id, empty if no match
+	AuthorLogin   string // raw login from the source API, lower-cased
+	HeadBranch    string
+	BaseBranch    string
+	Additions     int
+	Deletions     int
+	ChangedFiles  int
+	EpicKey       string
+	CreatedAt     time.Time
+	FirstReviewAt *time.Time
+	MergedAt      *time.Time
+	ClosedAt      *time.Time
+	FetchedAt     time.Time
 }
 
-// PRReview is one review event on a PR.
+// PRReview is one review event on a PR or MR.
 //
-// GitHubReviewerLogin mirrors PullRequest.GitHubAuthorLogin: the raw
-// login enables retroactive re-linking after a github_login edit.
+// ReviewerLogin mirrors PullRequest.AuthorLogin: the raw login enables
+// retroactive re-linking after an identity edit.
+//
+// On GitLab the surrogate for "review" is a non-system, non-author MR
+// note: a `/lgtm` body lands as state="approved", any other substantive
+// note as state="commented". Procedural prow commands (/retest, /hold,
+// /cherry-pick, ...) are filtered out at sync time.
 type PRReview struct {
-	ID                  string
-	PRID                string
-	ReviewerID          string
-	GitHubReviewerLogin string // raw `review.user.login`, lower-cased
-	State               string // approved | changes_requested | commented
-	SubmittedAt         time.Time
+	ID            string
+	PRID          string
+	Source        string // "github" | "gitlab"
+	ReviewerID    string
+	ReviewerLogin string // raw login from the source API, lower-cased
+	State         string // approved | changes_requested | commented
+	SubmittedAt   time.Time
 }
 
-// Member is the join entity across Jira and GitHub.
+// MemberIdentity is the operator-editable identity payload for the PATCH
+// endpoint and config-driven prefills. All fields are writes-take-precedence
+// — empty strings clear the corresponding column.
+type MemberIdentity struct {
+	DisplayName    string
+	GitHubLogin    string
+	GitLabUsername string
+	PillarID       string
+}
+
+// Member is the join entity across Jira, GitHub, and GitLab.
 //
 // JSON tags use snake_case to match what the frontend (and any future
 // API consumer) expects; without them the default marshaller emits
 // PascalCase field names and the Team dashboard breaks because
 // `m.display_name` is undefined.
 type Member struct {
-	ID            string    `json:"id"`
-	DisplayName   string    `json:"display_name"`
-	Email         string    `json:"email,omitempty"`
-	JiraAccountID string    `json:"jira_account_id,omitempty"`
-	GitHubLogin   string    `json:"github_login,omitempty"`
-	PillarID      string    `json:"pillar_id,omitempty"`
-	Active        bool      `json:"active"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	DisplayName    string    `json:"display_name"`
+	Email          string    `json:"email,omitempty"`
+	JiraAccountID  string    `json:"jira_account_id,omitempty"`
+	GitHubLogin    string    `json:"github_login,omitempty"`
+	GitLabUsername string    `json:"gitlab_username,omitempty"`
+	PillarID       string    `json:"pillar_id,omitempty"`
+	Active         bool      `json:"active"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // ----------------------------------------------------------------------

@@ -208,23 +208,24 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			}
 			full := repo.FullName()
 			rec := storage.PullRequest{
-				ID:                fmt.Sprintf("%s#%d", full, pr.Number),
-				RepoID:            full,
-				Number:            pr.Number,
-				Title:             pr.Title,
-				State:             state,
-				AuthorID:          authorID,
-				GitHubAuthorLogin: authorLogin,
-				HeadBranch:        pr.Head.Ref,
-				BaseBranch:        pr.Base.Ref,
-				Additions:         pr.Additions,
-				Deletions:         pr.Deletions,
-				ChangedFiles:      pr.ChangedFiles,
-				EpicKey:           epicKey,
-				CreatedAt:         pr.CreatedAt,
-				MergedAt:          pr.MergedAt,
-				ClosedAt:          pr.ClosedAt,
-				FetchedAt:         runStart,
+				ID:            fmt.Sprintf("%s#%d", full, pr.Number),
+				Source:        "github",
+				RepoID:        full,
+				Number:        pr.Number,
+				Title:         pr.Title,
+				State:         state,
+				AuthorID:      authorID,
+				AuthorLogin:   authorLogin,
+				HeadBranch:    pr.Head.Ref,
+				BaseBranch:    pr.Base.Ref,
+				Additions:     pr.Additions,
+				Deletions:     pr.Deletions,
+				ChangedFiles:  pr.ChangedFiles,
+				EpicKey:       epicKey,
+				CreatedAt:     pr.CreatedAt,
+				MergedAt:      pr.MergedAt,
+				ClosedAt:      pr.ClosedAt,
+				FetchedAt:     runStart,
 			}
 
 			// Reviews — skip the API call for:
@@ -251,12 +252,13 @@ func (s *Syncer) Sync(ctx context.Context) error {
 						st := strings.ToLower(rev.State)
 						reviewerLogin := strings.ToLower(rev.User.Login)
 						reviewBatch = append(reviewBatch, storage.PRReview{
-							ID:                  fmt.Sprintf("%s#%d/r%d", full, pr.Number, rev.ID),
-							PRID:                rec.ID,
-							ReviewerID:          byLogin[reviewerLogin],
-							GitHubReviewerLogin: reviewerLogin,
-							State:               st,
-							SubmittedAt:         rev.SubmittedAt,
+							ID:            fmt.Sprintf("%s#%d/r%d", full, pr.Number, rev.ID),
+							PRID:          rec.ID,
+							Source:        "github",
+							ReviewerID:    byLogin[reviewerLogin],
+							ReviewerLogin: reviewerLogin,
+							State:         st,
+							SubmittedAt:   rev.SubmittedAt,
 						})
 						if first == nil || rev.SubmittedAt.Before(*first) {
 							first = &rev.SubmittedAt

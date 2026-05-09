@@ -88,14 +88,16 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		return fmt.Errorf("clear window: %w", err)
 	}
 
-	// PRs merged, by author × week. Pillar/component empty for now —
+	// PRs/MRs merged, by author × week. Pillar/component empty for now —
 	// requires the repos table to be populated, which B2 fixes.
 	//
 	// Resolution priority for member_id:
-	//   1. members row matched on raw github_login (LEFT JOIN below) —
-	//      reflects the *current* identity link, so editing a member's
-	//      github_login via PATCH retroactively re-links history on the
-	//      next rebuild.
+	//   1. members row matched on raw login (LEFT JOIN below) — reflects
+	//      the *current* identity link, so editing a member's
+	//      github_login or gitlab_username via PATCH retroactively
+	//      re-links history on the next rebuild. The JOIN branches on
+	//      pr.source so a GitHub PR matches members.github_login and a
+	//      GitLab MR matches members.gitlab_username.
 	//   2. pr.author_id frozen at write time — backward-compat fallback
 	//      for rows ingested before migration 0002 (the raw login column
 	//      is NULL on those).
@@ -109,9 +111,14 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		    COUNT(*) AS prs_merged
 		FROM pull_requests pr
 		LEFT JOIN members m
-		       ON m.github_login IS NOT NULL
-		      AND m.github_login <> ''
-		      AND LOWER(m.github_login) = pr.github_author_login
+		       ON (pr.source = 'github'
+		            AND m.github_login IS NOT NULL
+		            AND m.github_login <> ''
+		            AND LOWER(m.github_login) = pr.author_login)
+		       OR (pr.source = 'gitlab'
+		            AND m.gitlab_username IS NOT NULL
+		            AND m.gitlab_username <> ''
+		            AND LOWER(m.gitlab_username) = pr.author_login)
 		WHERE COALESCE(m.id, pr.author_id) IS NOT NULL
 		  AND pr.merged_at IS NOT NULL
 		  AND pr.merged_at >= ?
@@ -124,9 +131,10 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		return fmt.Errorf("aggregate PRs: %w", err)
 	}
 
-	// PRs reviewed, by reviewer × week. Same resolution priority as
-	// the PR aggregation above — the join lets a github_login edit
-	// retroactively populate review counts.
+	// PRs/MRs reviewed, by reviewer × week. Same resolution priority as
+	// the merge aggregation above — the JOIN branches on rv.source so
+	// editing either github_login or gitlab_username retroactively
+	// populates review counts on the next rebuild.
 	reviewSQL := rebind(fmt.Sprintf(`
 		INSERT INTO member_week_metrics (member_id, week_start, pillar_id, component, prs_reviewed)
 		SELECT
@@ -137,9 +145,14 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		    COUNT(DISTINCT pr_id) AS prs_reviewed
 		FROM pr_reviews rv
 		LEFT JOIN members m
-		       ON m.github_login IS NOT NULL
-		      AND m.github_login <> ''
-		      AND LOWER(m.github_login) = rv.github_reviewer_login
+		       ON (rv.source = 'github'
+		            AND m.github_login IS NOT NULL
+		            AND m.github_login <> ''
+		            AND LOWER(m.github_login) = rv.reviewer_login)
+		       OR (rv.source = 'gitlab'
+		            AND m.gitlab_username IS NOT NULL
+		            AND m.gitlab_username <> ''
+		            AND LOWER(m.gitlab_username) = rv.reviewer_login)
 		WHERE COALESCE(m.id, rv.reviewer_id) IS NOT NULL
 		  AND rv.submitted_at >= ?
 		  AND rv.submitted_at <  ?

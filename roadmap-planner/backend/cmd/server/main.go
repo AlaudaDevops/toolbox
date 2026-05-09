@@ -30,6 +30,7 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/contributions"
 	ghclient "github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/github"
+	glclient "github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/gitlab"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/jira"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/jirasync"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
@@ -240,7 +241,9 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 				if err != nil {
 					interval = 30 * time.Minute
 				}
-				go runJiraSync(ctx, syncer, store, aggregator, interval, cfg.TeamAnalytics.GitHubLoginPrefills)
+				go runJiraSync(ctx, syncer, store, aggregator, interval,
+					cfg.TeamAnalytics.GitHubLoginPrefills,
+					cfg.TeamAnalytics.GitLabUsernamePrefills)
 				logger.Info("Jira sync started", zap.Duration("interval", interval), zap.Int("backfill_days", backfill))
 			}
 		} else {
@@ -251,6 +254,11 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 	// Optional GitHub sync goroutine.
 	if cfg.GitHub.Enabled {
 		startGitHubSync(ctx, cfg, store, aggregator)
+	}
+
+	// Optional GitLab sync goroutine.
+	if cfg.GitLab.Enabled {
+		startGitLabSync(ctx, cfg, store, aggregator)
 	}
 
 	go func() {
@@ -328,6 +336,85 @@ func buildGitHubClient(cfg *config.GitHub) (*ghclient.Client, string, error) {
 		return ghclient.New(cfg.BaseURL, "", nil), "unauthenticated", nil
 	}
 	return ghclient.New(cfg.BaseURL, cfg.Token, nil), "pat", nil
+}
+
+// startGitLabSync wires up the GitLab side: PAT-auth client, Syncer,
+// and the goroutine that drives it on the configured interval.
+//
+// Same fail-soft contract as startGitHubSync — bad config logs and
+// continues without a GitLab sync rather than refusing to start.
+func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator) {
+	specs := parseGroupSpecs(cfg.GitLab.Groups)
+	if len(specs) == 0 {
+		logger.Warn("gitlab.enabled but gitlab.groups is empty; skipping sync")
+		return
+	}
+	token := cfg.GitLab.Token
+	if token == "" {
+		token = os.Getenv("GITLAB_TOKEN")
+	}
+	if token == "" {
+		logger.Warn("gitlab.enabled but no token configured (gitlab.token / GITLAB_TOKEN); skipping sync")
+		return
+	}
+	client := glclient.New(cfg.GitLab.BaseURL, token, nil)
+	logger.Info("GitLab auth ready", zap.String("base_url", cfg.GitLab.BaseURL))
+
+	projectKey := cfg.GitLab.ProjectKey
+	if projectKey == "" {
+		projectKey = cfg.Jira.Project
+	}
+	backfill := cfg.GitLab.BackfillDays
+	if backfill <= 0 {
+		backfill = cfg.Storage.BackfillDays
+	}
+	syncer := glclient.NewSyncer(client, store, specs, glclient.DefaultLinker(projectKey), backfill)
+	syncer.HydrateDiff = cfg.GitLab.HydrateDiff
+
+	interval, err := time.ParseDuration(cfg.GitLab.SyncInterval)
+	if err != nil {
+		interval = 30 * time.Minute
+	}
+	go runGitLabSync(ctx, syncer, aggregator, interval)
+	logger.Info("GitLab sync started",
+		zap.Duration("interval", interval),
+		zap.Int("specs", len(specs)),
+		zap.Int("backfill_days", backfill))
+}
+
+func parseGroupSpecs(specs []string) []glclient.GroupSpec {
+	out := make([]glclient.GroupSpec, 0, len(specs))
+	for _, raw := range specs {
+		if g, ok := glclient.ParseGroupSpec(raw); ok {
+			out = append(out, g)
+		} else {
+			logger.Warn("malformed gitlab group spec, skipping", zap.String("spec", raw))
+		}
+	}
+	return out
+}
+
+func runGitLabSync(ctx context.Context, s *glclient.Syncer, agg *contributions.Aggregator, interval time.Duration) {
+	doOne := func(label string) {
+		if err := s.Sync(ctx); err != nil {
+			logger.Error(label+" GitLab sync failed", zap.Error(err))
+			return
+		}
+		if err := agg.RebuildRecent(ctx, 0); err != nil {
+			logger.Warn("aggregator rebuild after GitLab sync failed", zap.Error(err))
+		}
+	}
+	doOne("Initial")
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			doOne("Periodic")
+		}
+	}
 }
 
 // openStore selects the right storage backend based on cfg.Type. We
@@ -413,7 +500,7 @@ func runGitHubSync(ctx context.Context, s *ghclient.Syncer, agg *contributions.A
 // theory that the member table is empty before that first run. New
 // mappings the operator wants applied later land via the drawer
 // in-line, or via a config update + a fresh pod restart.
-func runJiraSync(ctx context.Context, s *jirasync.Syncer, store storage.Store, agg *contributions.Aggregator, interval time.Duration, prefills map[string]string) {
+func runJiraSync(ctx context.Context, s *jirasync.Syncer, store storage.Store, agg *contributions.Aggregator, interval time.Duration, ghPrefills, glPrefills map[string]string) {
 	doOne := func(label string) {
 		res, err := s.Run(ctx)
 		if err != nil {
@@ -435,11 +522,18 @@ func runJiraSync(ctx context.Context, s *jirasync.Syncer, store storage.Store, a
 	// curated jira_id → gh_login mappings can land on the right rows.
 	// Members whose github_login was edited via the drawer have
 	// non-empty values and are skipped.
-	if applied, configured, err := contributions.ApplyGitHubLoginPrefills(ctx, store, prefills); err != nil {
+	if applied, configured, err := contributions.ApplyGitHubLoginPrefills(ctx, store, ghPrefills); err != nil {
 		logger.Warn("github_login prefills: partial failure",
 			zap.Int("applied", applied), zap.Int("configured", configured), zap.Error(err))
 	} else if configured > 0 {
 		logger.Info("github_login prefills applied",
+			zap.Int("applied", applied), zap.Int("configured", configured))
+	}
+	if applied, configured, err := contributions.ApplyGitLabUsernamePrefills(ctx, store, glPrefills); err != nil {
+		logger.Warn("gitlab_username prefills: partial failure",
+			zap.Int("applied", applied), zap.Int("configured", configured), zap.Error(err))
+	} else if configured > 0 {
+		logger.Info("gitlab_username prefills applied",
 			zap.Int("applied", applied), zap.Int("configured", configured))
 	}
 	t := time.NewTicker(interval)
