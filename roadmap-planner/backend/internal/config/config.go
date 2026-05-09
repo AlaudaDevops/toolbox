@@ -61,6 +61,20 @@ type Config struct {
 //	      repos: ["alaudadevops/harbor*", "alaudadevops/helm*"]
 type TeamAnalytics struct {
 	Pillars map[string]PillarMapping `mapstructure:"pillars" yaml:"pillars"`
+	// GitHubLoginPrefills maps a Jira member id to a GitHub login. On
+	// every successful Jira sync the backend walks this map and writes
+	// each gh login onto the corresponding member iff the member's
+	// `github_login` is currently empty — manual edits in the team
+	// drawer always win, so once an operator overrides a value here
+	// the prefill never clobbers it. Empty map disables the feature.
+	//
+	// Example:
+	//
+	//	team_analytics:
+	//	  github_login_prefills:
+	//	    daniel: danielfbm
+	//	    jtcheng: chengjingtao
+	GitHubLoginPrefills map[string]string `mapstructure:"github_login_prefills" yaml:"github_login_prefills"`
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
