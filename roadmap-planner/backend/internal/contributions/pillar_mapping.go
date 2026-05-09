@@ -36,6 +36,10 @@ type PillarMap struct {
 	repoGlobs []repoGlob
 	// component name (lowercased) → pillars.
 	componentToPillars map[string][]string
+	// fixVersion prefix/glob → list of pillars that claim it. Used as the
+	// fallback when an issue has no components set; matched in declaration
+	// order so duplicate-pattern entries collapse predictably.
+	versionPrefixes []versionPrefix
 	// stable pillar order (config map is unordered) — preserves the YAML
 	// declaration order for chart legends. Empty when the user did not
 	// configure any pillars.
@@ -44,6 +48,11 @@ type PillarMap struct {
 
 type repoGlob struct {
 	pattern string // lowercased glob
+	pillars []string
+}
+
+type versionPrefix struct {
+	pattern string // lowercased — bare prefix ("tektoncd-operator") or glob ("tektoncd-*")
 	pillars []string
 }
 
@@ -79,14 +88,22 @@ func NewPillarMap(cfg config.TeamAnalytics) *PillarMap {
 			}
 			pm.componentToPillars[c] = append(pm.componentToPillars[c], name)
 		}
+		for _, v := range mp.VersionPrefixes {
+			v = strings.ToLower(strings.TrimSpace(v))
+			if v == "" {
+				continue
+			}
+			pm.versionPrefixes = append(pm.versionPrefixes, versionPrefix{pattern: v, pillars: []string{name}})
+		}
 	}
 	pm.repoGlobs = compactRepoGlobs(pm.repoGlobs)
+	pm.versionPrefixes = compactVersionPrefixes(pm.versionPrefixes)
 	return pm
 }
 
 // Configured reports whether any pillar mapping is loaded.
 func (p *PillarMap) Configured() bool {
-	return p != nil && (len(p.repoGlobs) > 0 || len(p.componentToPillars) > 0)
+	return p != nil && (len(p.repoGlobs) > 0 || len(p.componentToPillars) > 0 || len(p.versionPrefixes) > 0)
 }
 
 // Order returns the configured pillar names in display order. The
@@ -162,6 +179,66 @@ func (p *PillarMap) PillarsForRepo(fullName string) []string {
 	return out
 }
 
+// PillarsForVersions returns every pillar whose configured
+// version_prefixes match any of the listed Jira fixVersion names.
+//
+// Match rule: a version `name` matches a configured pattern if
+//   - the pattern contains a glob metacharacter (`*` or `?`) and
+//     path.Match succeeds, or
+//   - the version equals the pattern, starts with `<pattern>-`,
+//     or starts with `<pattern>v` (covering the bare-prefix
+//     "tektoncd-operator-v4.11.0" convention).
+//
+// Multi-version issues fan out: every matching pillar is credited
+// once. Comparison is case-insensitive.
+func (p *PillarMap) PillarsForVersions(versions []string) []string {
+	if p == nil || len(p.versionPrefixes) == 0 || len(versions) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, v := range versions {
+		key := strings.ToLower(strings.TrimSpace(v))
+		if key == "" {
+			continue
+		}
+		for _, vp := range p.versionPrefixes {
+			if !versionMatches(vp.pattern, key) {
+				continue
+			}
+			for _, pl := range vp.pillars {
+				if !seen[pl] {
+					seen[pl] = true
+					out = append(out, pl)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// versionMatches checks one fixVersion `name` (lowercased) against one
+// configured pattern (lowercased). See PillarsForVersions for rules.
+func versionMatches(pattern, name string) bool {
+	if pattern == "" || name == "" {
+		return false
+	}
+	if strings.ContainsAny(pattern, "*?[") {
+		ok, err := path.Match(pattern, name)
+		return err == nil && ok
+	}
+	if name == pattern {
+		return true
+	}
+	if strings.HasPrefix(name, pattern+"-") {
+		return true
+	}
+	if strings.HasPrefix(name, pattern+"v") {
+		return true
+	}
+	return false
+}
+
 // PillarsForComponents returns every pillar that claims any of the
 // listed Jira component names. Comparison is case-insensitive.
 func (p *PillarMap) PillarsForComponents(components []string) []string {
@@ -208,6 +285,33 @@ func compactRepoGlobs(in []repoGlob) []repoGlob {
 		}
 		idx[g.pattern] = len(out)
 		out = append(out, g)
+	}
+	return out
+}
+
+// compactVersionPrefixes merges duplicate-pattern entries the same way
+// compactRepoGlobs does.
+func compactVersionPrefixes(in []versionPrefix) []versionPrefix {
+	if len(in) <= 1 {
+		return in
+	}
+	idx := map[string]int{}
+	var out []versionPrefix
+	for _, v := range in {
+		if at, ok := idx[v.pattern]; ok {
+			seen := map[string]bool{}
+			for _, p := range out[at].pillars {
+				seen[p] = true
+			}
+			for _, p := range v.pillars {
+				if !seen[p] {
+					out[at].pillars = append(out[at].pillars, p)
+				}
+			}
+			continue
+		}
+		idx[v.pattern] = len(out)
+		out = append(out, v)
 	}
 	return out
 }

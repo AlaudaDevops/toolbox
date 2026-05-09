@@ -64,9 +64,16 @@ type TeamAnalytics struct {
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
+//
+// VersionPrefixes is the fallback path for issues that have no
+// `components` set but do have `fixVersions`. A version `name` is
+// credited to this pillar if it begins with `<prefix>-` (the
+// "<component>-v<X.Y.Z>" convention used by the DEVOPS Jira project)
+// or matches the entry as a glob via path.Match.
 type PillarMapping struct {
-	Repos      []string `mapstructure:"repos" yaml:"repos"`
-	Components []string `mapstructure:"components" yaml:"components"`
+	Repos           []string `mapstructure:"repos" yaml:"repos"`
+	Components      []string `mapstructure:"components" yaml:"components"`
+	VersionPrefixes []string `mapstructure:"version_prefixes" yaml:"version_prefixes"`
 }
 
 // Storage configures the durable team-analytics store.
