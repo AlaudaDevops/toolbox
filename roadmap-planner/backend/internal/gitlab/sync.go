@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
@@ -26,11 +27,28 @@ type Linker interface {
 }
 
 // DefaultLinker matches against the source branch and the MR title.
+//
+// Compiled regexes are memoised by project-key so repeated DefaultLinker
+// calls (e.g. across tests) skip the recompilation. The cache is small —
+// one entry per Jira project key the process touches in its lifetime.
+var (
+	defaultLinkerCache = map[string]*defaultLinker{}
+	defaultLinkerMu    sync.Mutex
+)
+
 func DefaultLinker(projectKey string) Linker {
-	return &defaultLinker{
-		key: strings.ToUpper(projectKey),
+	key := strings.ToUpper(projectKey)
+	defaultLinkerMu.Lock()
+	defer defaultLinkerMu.Unlock()
+	if l, ok := defaultLinkerCache[key]; ok {
+		return l
+	}
+	l := &defaultLinker{
+		key: key,
 		re:  regexp.MustCompile(`(?i)\b(` + regexp.QuoteMeta(projectKey) + `-\d+)\b`),
 	}
+	defaultLinkerCache[key] = l
+	return l
 }
 
 type defaultLinker struct {

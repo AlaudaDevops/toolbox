@@ -183,14 +183,15 @@ func (g GitHubApp) Configured() bool {
 // fetches. Off by default because the data isn't surfaced on the
 // dashboard yet and it ~doubles the API call budget per cycle.
 type GitLab struct {
-	Enabled      bool     `mapstructure:"enabled"`
-	BaseURL      string   `mapstructure:"base_url"`
-	Token        string   `mapstructure:"token"`
-	SyncInterval string   `mapstructure:"sync_interval"`
-	Groups       []string `mapstructure:"groups"`
-	ProjectKey   string   `mapstructure:"project_key"`
-	BackfillDays int      `mapstructure:"backfill_days"`
-	HydrateDiff  bool     `mapstructure:"hydrate_diff"`
+	Enabled         bool     `mapstructure:"enabled"`
+	BaseURL         string   `mapstructure:"base_url"`
+	Token           string   `mapstructure:"token"`
+	SyncInterval    string   `mapstructure:"sync_interval"`
+	Groups          []string `mapstructure:"groups"`
+	ProjectKey      string   `mapstructure:"project_key"`
+	BackfillDays    int      `mapstructure:"backfill_days"`
+	HydrateDiff     bool     `mapstructure:"hydrate_diff"`
+	IncludeArchived bool     `mapstructure:"include_archived"`
 }
 
 // Logger represents logger configuration settings
@@ -401,6 +402,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("gitlab.groups", []string{})
 	viper.SetDefault("gitlab.backfill_days", 0)
 	viper.SetDefault("gitlab.hydrate_diff", false)
+	viper.SetDefault("gitlab.include_archived", false)
 
 	// GitHub defaults
 	viper.SetDefault("github.enabled", false)

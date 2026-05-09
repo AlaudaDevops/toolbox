@@ -370,6 +370,7 @@ func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Stor
 	}
 	syncer := glclient.NewSyncer(client, store, specs, glclient.DefaultLinker(projectKey), backfill)
 	syncer.HydrateDiff = cfg.GitLab.HydrateDiff
+	syncer.IncludeArchived = cfg.GitLab.IncludeArchived
 
 	interval, err := time.ParseDuration(cfg.GitLab.SyncInterval)
 	if err != nil {
