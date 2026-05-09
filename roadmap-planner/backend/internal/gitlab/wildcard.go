@@ -26,7 +26,7 @@ const DefaultWildcardTTL = 24 * time.Hour
 //
 //   - "group/sub/proj"  — exact project lookup, no wildcard.
 //   - "group/*"         — direct children of `group` only (no recursion
-//                         into subgroups).
+//     into subgroups).
 //   - "group/**"        — entire subtree under `group`, recursively.
 //
 // The "**" form is the common case for an org-wide "everything under

@@ -51,13 +51,14 @@ func (d *defaultLinker) Link(mr MergeRequest) string {
 // the github.Syncer shape: one process-wide instance, run on a ticker.
 //
 // Reviews from notes:
-//   GitLab has no first-class review event. We treat any non-system,
-//   non-author MR note as a review touch. Bodies that match
-//   approvalRegex (`/lgtm` on its own line) are stored as state="approved";
-//   anything else as state="commented". Procedural prow commands
-//   (/retest, /hold, /cherry-pick, /uncc, /assign, /unassign, /label,
-//   /milestone, /retitle, /priority, /kind, /area, /sig) are skipped
-//   entirely — they're noise on the dashboard.
+//
+//	GitLab has no first-class review event. We treat any non-system,
+//	non-author MR note as a review touch. Bodies that match
+//	approvalRegex (`/lgtm` on its own line) are stored as state="approved";
+//	anything else as state="commented". Procedural prow commands
+//	(/retest, /hold, /cherry-pick, /uncc, /assign, /unassign, /label,
+//	/milestone, /retitle, /priority, /kind, /area, /sig) are skipped
+//	entirely — they're noise on the dashboard.
 type Syncer struct {
 	client       *Client
 	store        storage.Store
@@ -213,21 +214,21 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			}
 			id := fmt.Sprintf("%s!%d", p.PathWithNamespace, mr.IID)
 			rec := storage.PullRequest{
-				ID:           id,
-				Source:       "gitlab",
-				RepoID:       p.PathWithNamespace,
-				Number:       mr.IID,
-				Title:        mr.Title,
-				State:        state,
-				AuthorID:     authorID,
-				AuthorLogin:  authorLogin,
-				HeadBranch:   mr.SourceBranch,
-				BaseBranch:   mr.TargetBranch,
-				EpicKey:      epicKey,
-				CreatedAt:    mr.CreatedAt,
-				MergedAt:     mr.MergedAt,
-				ClosedAt:     mr.ClosedAt,
-				FetchedAt:    runStart,
+				ID:          id,
+				Source:      "gitlab",
+				RepoID:      p.PathWithNamespace,
+				Number:      mr.IID,
+				Title:       mr.Title,
+				State:       state,
+				AuthorID:    authorID,
+				AuthorLogin: authorLogin,
+				HeadBranch:  mr.SourceBranch,
+				BaseBranch:  mr.TargetBranch,
+				EpicKey:     epicKey,
+				CreatedAt:   mr.CreatedAt,
+				MergedAt:    mr.MergedAt,
+				ClosedAt:    mr.ClosedAt,
+				FetchedAt:   runStart,
 			}
 			// Optional diff hydration. Off by default — turn on once
 			// the dashboard wants additions/deletions on MRs.

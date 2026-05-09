@@ -68,16 +68,16 @@ type Project struct {
 
 // MergeRequest mirrors what we persist into the shared pull_requests table.
 type MergeRequest struct {
-	IID          int       `json:"iid"`
-	Title        string    `json:"title"`
-	State        string    `json:"state"` // "opened" | "closed" | "merged" | "locked"
-	WebURL       string    `json:"web_url"`
-	Draft        bool      `json:"draft"`
-	WorkInProg   bool      `json:"work_in_progress"`
-	SourceBranch string    `json:"source_branch"`
-	TargetBranch string    `json:"target_branch"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	IID          int        `json:"iid"`
+	Title        string     `json:"title"`
+	State        string     `json:"state"` // "opened" | "closed" | "merged" | "locked"
+	WebURL       string     `json:"web_url"`
+	Draft        bool       `json:"draft"`
+	WorkInProg   bool       `json:"work_in_progress"`
+	SourceBranch string     `json:"source_branch"`
+	TargetBranch string     `json:"target_branch"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 	MergedAt     *time.Time `json:"merged_at"`
 	ClosedAt     *time.Time `json:"closed_at"`
 	Author       struct {
@@ -227,8 +227,8 @@ func (c *Client) GetMergeRequest(ctx context.Context, projectID int64, iid int) 
 	// endpoint, not nested.
 	var raw struct {
 		MergeRequest
-		Additions    int `json:"additions"`
-		Deletions    int `json:"deletions"`
+		Additions    int    `json:"additions"`
+		Deletions    int    `json:"deletions"`
 		ChangesCount string `json:"changes_count"` // "27" — a string for some reason
 	}
 	if err := c.do(ctx, "GET", path, nil, &raw); err != nil {
@@ -281,10 +281,10 @@ func (c *Client) SearchUsers(ctx context.Context, query string) ([]User, error) 
 }
 
 // do is the request engine. Same shape as the github client's:
-//   1. wait if the rate-limit budget is near-exhausted
-//   2. attach PAT
-//   3. honour Retry-After once on 429
-//   4. surface non-2xx with a body excerpt
+//  1. wait if the rate-limit budget is near-exhausted
+//  2. attach PAT
+//  3. honour Retry-After once on 429
+//  4. surface non-2xx with a body excerpt
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, out interface{}) error {
 	const maxAttempts = 2
 	for attempt := 0; attempt < maxAttempts; attempt++ {

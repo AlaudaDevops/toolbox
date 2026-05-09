@@ -53,8 +53,8 @@ func TestClassifyNote(t *testing.T) {
 		{"/lgtm\n", "approved", true},
 		{"  /lgtm  ", "approved", true},
 		{"prefix\n/lgtm\nsuffix", "approved", true}, // /lgtm anywhere on its own line
-		{"/lgtm cancel", "commented", true},          // not an approval, but a real comment
-		{"LGTM", "commented", true},                  // bare text without slash counts as a comment
+		{"/lgtm cancel", "commented", true},         // not an approval, but a real comment
+		{"LGTM", "commented", true},                 // bare text without slash counts as a comment
 		{"", "", false},
 		{"   ", "", false},
 		{"/retest", "", false},
