@@ -68,71 +68,29 @@ const initialsOf = (name) =>
 /*  Pillar derivation — same source the roadmap tab uses                 */
 /* -------------------------------------------------------------------- */
 
-// buildComponentToPillars takes the configured pillar mapping from
-// /api/contributions/pillars (`pillars: [{name, components: []}, ...]`)
-// and returns a Map: lowercased component name → array of pillar names.
-// One component MAY map to multiple pillars (helm/trivy → CI/CD +
-// Tool Deployment). Falls back to the BasicPillar list from /api/basic
-// when the configured mapping is empty.
-const buildComponentToPillars = (configuredPillars, basicPillars) => {
-  const m = new Map();
-  if (configuredPillars && configuredPillars.length) {
-    configuredPillars.forEach((p) => {
-      (p.components || []).forEach((c) => {
-        const key = (c || '').trim().toLowerCase();
-        if (!key) return;
-        const list = m.get(key) || [];
-        if (!list.includes(p.name)) list.push(p.name);
-        m.set(key, list);
-      });
-    });
-    return m;
-  }
-  (basicPillars || []).forEach((p) => {
-    const comp = (p.component || '').trim().toLowerCase();
-    if (!comp) return;
-    const list = m.get(comp) || [];
-    if (!list.includes(p.name)) list.push(p.name);
-    m.set(comp, list);
-  });
-  return m;
-};
-
 // pillarsForMember returns the SET of pillars a member is associated
-// with, derived from their touched components. A dev who works on
-// CI/CD-tagged AND Tool Deployment-tagged components shows up under
-// both. The operator override (`override`, free-form string from the
-// `pillar_id` PATCH endpoint) is honored only when the components map
-// produced no matches — it lets the operator pin members whose work
-// doesn't surface a clear component yet.
-const pillarsForMember = (memberComponents, override, compToPillars) => {
-  const set = new Set();
-  (memberComponents || []).forEach((c) => {
-    const key = (c || '').trim().toLowerCase();
-    (compToPillars.get(key) || []).forEach((p) => set.add(p));
-  });
-  if (set.size === 0 && override) set.add(override);
-  return [...set];
+// with. The backend's /api/contributions/team endpoint precomputes
+// this with the same matcher chain the throughput-by-pillar chart
+// uses (Jira components, falling back to fixVersion prefixes), so
+// the team table and the chart always agree — even when an issue
+// routes to a pillar via the Phase 1 fixVersion-prefix fallback
+// rather than a component hit. The operator override (`override`,
+// free-form string from the `pillar_id` PATCH endpoint) is honored
+// only when the backend's mapping is empty, letting an operator
+// pin members whose work hasn't surfaced a recognizable signal yet.
+const pillarsForMember = (apiPillars, override) => {
+  if (apiPillars && apiPillars.length > 0) return [...apiPillars];
+  return override ? [override] : [];
 };
 
-// dominantPillar picks the single most-frequent pillar match — used
-// only for legacy single-pillar bucketing (the filter pill comparison
-// and color-of-row). The multi-tag display uses pillarsForMember.
-const dominantPillar = (memberComponents, override, compToPillars) => {
-  if (!memberComponents || memberComponents.length === 0) return override || '';
-  const tally = new Map();
-  memberComponents.forEach((c) => {
-    const key = (c || '').trim().toLowerCase();
-    (compToPillars.get(key) || []).forEach((p) => {
-      tally.set(p, (tally.get(p) || 0) + 1);
-    });
-  });
-  if (tally.size === 0) return override || '';
-  let best = '', bestN = -1;
-  for (const [p, n] of tally) {
-    if (n > bestN) { best = p; bestN = n; }
-  }
-  return best;
+// dominantPillar returns a single representative pillar for legacy
+// callers that want one (color-of-row, the dropdown subtitle). It
+// trusts the backend's ordering — pillars[0] — rather than tallying
+// component frequencies, since the backend already knows which
+// pillars actually claimed the member's work.
+const dominantPillar = (apiPillars, override) => {
+  if (apiPillars && apiPillars.length > 0) return apiPillars[0];
+  return override || '';
 };
 
 const colorForPillar = (pillarName, allPillars) => {
@@ -507,13 +465,6 @@ export default function TeamAnalytics() {
     return sorted.map((p) => p.name).filter(Boolean);
   }, [pillarsResp, basicPillars]);
 
-  // Component → pillars map. Source of truth: the backend's configured
-  // mapping (team_analytics.pillars), falling back to BasicPillar.
-  const compToPillars = useMemo(
-    () => buildComponentToPillars(pillarsResp?.pillars, basicPillars),
-    [pillarsResp, basicPillars]
-  );
-
   const rows = useMemo(() => {
     const byID = new Map((team || []).map((t) => [t.member_id, t]));
     const merged = (members || []).map((m) => {
@@ -521,9 +472,10 @@ export default function TeamAnalytics() {
       const t = byID.get(id) || {};
       const week_totals = t.week_totals || [];
       const components = t.components || [];
+      const apiPillars = t.pillars || [];
       const override = pick(m, 'pillar_id', 'PillarID');
-      const pillars = pillarsForMember(components, override, compToPillars);
-      const dom = dominantPillar(components, override, compToPillars);
+      const pillars = pillarsForMember(apiPillars, override);
+      const dom = dominantPillar(apiPillars, override);
       return {
         id,
         name: pick(m, 'display_name', 'DisplayName') || id || 'unknown',
@@ -546,8 +498,9 @@ export default function TeamAnalytics() {
     (team || []).forEach((t) => {
       if (!members.find((m) => pick(m, 'id', 'ID') === t.member_id)) {
         const components = t.components || [];
-        const pillars = pillarsForMember(components, '', compToPillars);
-        const dom = dominantPillar(components, '', compToPillars);
+        const apiPillars = t.pillars || [];
+        const pillars = pillarsForMember(apiPillars, '');
+        const dom = dominantPillar(apiPillars, '');
         merged.push({
           id: t.member_id, name: t.member_id,
           github: '', email: '', jira_account_id: '',
@@ -563,7 +516,7 @@ export default function TeamAnalytics() {
       }
     });
     return merged;
-  }, [members, team, compToPillars]);
+  }, [members, team]);
 
   const filteredRows = useMemo(() => {
     if (pillarFilter === 'all') return rows;
