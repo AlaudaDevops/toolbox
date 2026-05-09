@@ -244,9 +244,11 @@ function PillarStack({ buckets, pillarOrder, metric = 'prs_merged' }) {
   if (weekKeys.length === 0) {
     return <p className="ta-meta">No PRs in this window.</p>;
   }
-  // Stable pillar order: configured order first (any zero-stack pillars
-  // still render so the legend is complete), then extras like "Unassigned".
-  const known = (pillarOrder || []).filter((p) => pillarSet.has(p));
+  // Stable pillar order: every configured pillar first (zero-bucket
+  // pillars like Jenkins / Developer Productivity still render — they
+  // emit zero-height stacks but stay in the legend so the operator can
+  // see the full taxonomy), then synthetic extras like "Unassigned".
+  const known = [...(pillarOrder || [])];
   const extras = [...pillarSet].filter((p) => !(pillarOrder || []).includes(p)).sort();
   const pillarList = [...known, ...extras];
 
