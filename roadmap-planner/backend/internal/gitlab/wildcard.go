@@ -137,7 +137,7 @@ func (s *Syncer) expandSpec(ctx context.Context, spec GroupSpec, now time.Time) 
 	}
 	projects, err := s.client.ListGroupProjects(ctx, spec.Group, ListGroupProjectsOptions{
 		IncludeSubgroups: spec.IncludeSubgroups,
-		IncludeArchived:  false,
+		IncludeArchived:  s.IncludeArchived,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list group %s: %w", spec.Group, err)
