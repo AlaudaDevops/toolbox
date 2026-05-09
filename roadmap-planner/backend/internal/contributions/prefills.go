@@ -66,10 +66,15 @@ func ApplyGitHubLoginPrefills(ctx context.Context, store storage.Store, prefills
 		if m.GitHubLogin != "" {
 			continue
 		}
-		// SetMemberIdentity writes literally — what we pass for
-		// display_name and pillar_id is preserved, so we round-trip
-		// the existing values to leave them untouched.
-		if sErr := store.SetMemberIdentity(ctx, m.ID, m.DisplayName, gh, m.PillarID); sErr != nil {
+		// SetMemberIdentity writes literally — round-trip the other
+		// identity fields so we only flip github_login.
+		ident := storage.MemberIdentity{
+			DisplayName:    m.DisplayName,
+			GitHubLogin:    gh,
+			GitLabUsername: m.GitLabUsername,
+			PillarID:       m.PillarID,
+		}
+		if sErr := store.SetMemberIdentity(ctx, m.ID, ident); sErr != nil {
 			failures = append(failures, fmt.Sprintf("%s→%s: %v", jid, gh, sErr))
 			continue
 		}
@@ -77,6 +82,56 @@ func ApplyGitHubLoginPrefills(ctx context.Context, store storage.Store, prefills
 	}
 	if len(failures) > 0 {
 		return applied, configured, fmt.Errorf("prefills: %d entry write(s) failed: %s", len(failures), strings.Join(failures, "; "))
+	}
+	return applied, configured, nil
+}
+
+// ApplyGitLabUsernamePrefills mirrors ApplyGitHubLoginPrefills for the
+// GitLab side. Walks an operator-curated map (Jira id → GitLab
+// username) and writes each entry onto the matching member iff that
+// member's `gitlab_username` is currently empty. Same one-shot-on-empty
+// semantics — manual UI edits always win.
+func ApplyGitLabUsernamePrefills(ctx context.Context, store storage.Store, prefills map[string]string) (applied int, configured int, err error) {
+	if len(prefills) == 0 {
+		return 0, 0, nil
+	}
+	configured = len(prefills)
+	members, mErr := store.ListMembers(ctx)
+	if mErr != nil {
+		return 0, configured, fmt.Errorf("gitlab prefills: list members: %w", mErr)
+	}
+	by := make(map[string]storage.Member, len(members))
+	for _, m := range members {
+		by[m.ID] = m
+	}
+	var failures []string
+	for jiraID, glUser := range prefills {
+		jid := strings.TrimSpace(jiraID)
+		gl := strings.ToLower(strings.TrimSpace(glUser))
+		if jid == "" || gl == "" {
+			continue
+		}
+		m, ok := by[jid]
+		if !ok {
+			continue
+		}
+		if m.GitLabUsername != "" {
+			continue
+		}
+		ident := storage.MemberIdentity{
+			DisplayName:    m.DisplayName,
+			GitHubLogin:    m.GitHubLogin,
+			GitLabUsername: gl,
+			PillarID:       m.PillarID,
+		}
+		if sErr := store.SetMemberIdentity(ctx, m.ID, ident); sErr != nil {
+			failures = append(failures, fmt.Sprintf("%s→%s: %v", jid, gl, sErr))
+			continue
+		}
+		applied++
+	}
+	if len(failures) > 0 {
+		return applied, configured, fmt.Errorf("gitlab prefills: %d entry write(s) failed: %s", len(failures), strings.Join(failures, "; "))
 	}
 	return applied, configured, nil
 }

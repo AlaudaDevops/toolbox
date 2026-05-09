@@ -122,15 +122,16 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 	defer func() { _ = tx.Rollback() }()
 	q := rebind(s.d, `
 		INSERT INTO pull_requests (
-			id, repo_id, number, title, state, author_id, github_author_login,
+			id, source, repo_id, number, title, state, author_id, author_login,
 			head_branch, base_branch, additions, deletions, changed_files,
 			epic_key, created_at, first_review_at, merged_at, closed_at, fetched_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
+			source = excluded.source,
 			title = excluded.title,
 			state = excluded.state,
 			author_id = excluded.author_id,
-			github_author_login = excluded.github_author_login,
+			author_login = excluded.author_login,
 			additions = excluded.additions,
 			deletions = excluded.deletions,
 			changed_files = excluded.changed_files,
@@ -145,8 +146,12 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 	}
 	defer stmt.Close()
 	for _, p := range prs {
+		source := p.Source
+		if source == "" {
+			source = "github"
+		}
 		_, err := stmt.ExecContext(ctx,
-			p.ID, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID), nullable(p.GitHubAuthorLogin),
+			p.ID, source, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID), nullable(p.AuthorLogin),
 			nullable(p.HeadBranch), nullable(p.BaseBranch), p.Additions, p.Deletions, p.ChangedFiles,
 			nullable(p.EpicKey), p.CreatedAt, p.FirstReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
 		)
@@ -167,11 +172,12 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 	}
 	defer func() { _ = tx.Rollback() }()
 	q := rebind(s.d, `
-		INSERT INTO pr_reviews (id, pr_id, reviewer_id, github_reviewer_login, state, submitted_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO pr_reviews (id, pr_id, source, reviewer_id, reviewer_login, state, submitted_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
+			source = excluded.source,
 			reviewer_id = excluded.reviewer_id,
-			github_reviewer_login = excluded.github_reviewer_login,
+			reviewer_login = excluded.reviewer_login,
 			state = excluded.state,
 			submitted_at = excluded.submitted_at`)
 	stmt, err := tx.PrepareContext(ctx, q)
@@ -180,8 +186,12 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 	}
 	defer stmt.Close()
 	for _, r := range reviews {
-		_, err := stmt.ExecContext(ctx, r.ID, r.PRID, nullable(r.ReviewerID),
-			nullable(r.GitHubReviewerLogin), r.State, r.SubmittedAt)
+		source := r.Source
+		if source == "" {
+			source = "github"
+		}
+		_, err := stmt.ExecContext(ctx, r.ID, r.PRID, source, nullable(r.ReviewerID),
+			nullable(r.ReviewerLogin), r.State, r.SubmittedAt)
 		if err != nil {
 			return fmt.Errorf("upsert review %s: %w", r.ID, err)
 		}
@@ -196,13 +206,13 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 // UpsertMember writes one member row. On conflict (existing id), Jira-
 // derived fields (display_name / email / jira_account_id / active) are
 // always overwritten with the latest value, while *operator-set* fields
-// (github_login, pillar_id) are preserved when the incoming row has them
-// empty. Without this guard, the Jira sync goroutine — which never reads
-// github_login or pillar_id — would clobber them every 30 minutes,
-// silently undoing any PATCH on /api/contributions/members/:id. The PATCH
-// endpoint always passes those fields explicitly, so its writes still
-// land (including intentional clears, which a future iteration would
-// signal differently — today an empty string from PATCH is "no change").
+// (github_login, gitlab_username, pillar_id) are preserved when the
+// incoming row has them empty. Without this guard, the Jira sync
+// goroutine — which never reads those columns — would clobber them
+// every 30 minutes, silently undoing any PATCH on
+// /api/contributions/members/:id. The PATCH endpoint goes through
+// SetMemberIdentity so its writes still land (including intentional
+// clears).
 func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 	now := time.Now().UTC()
 	if m.CreatedAt.IsZero() {
@@ -214,34 +224,36 @@ func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 		active = 1
 	}
 	q := rebind(s.d, `
-		INSERT INTO members (id, display_name, email, jira_account_id, github_login, pillar_id, active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO members (id, display_name, email, jira_account_id, github_login, gitlab_username, pillar_id, active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			display_name = excluded.display_name,
 			email = excluded.email,
 			jira_account_id = excluded.jira_account_id,
 			github_login = COALESCE(NULLIF(excluded.github_login, ''), members.github_login),
+			gitlab_username = COALESCE(NULLIF(excluded.gitlab_username, ''), members.gitlab_username),
 			pillar_id = COALESCE(NULLIF(excluded.pillar_id, ''), members.pillar_id),
 			active = excluded.active,
 			updated_at = excluded.updated_at`)
 	_, err := s.db.ExecContext(ctx, q,
 		m.ID, m.DisplayName, nullable(m.Email),
-		nullable(m.JiraAccountID), nullable(m.GitHubLogin),
+		nullable(m.JiraAccountID), nullable(m.GitHubLogin), nullable(m.GitLabUsername),
 		nullable(m.PillarID), active, m.CreatedAt, m.UpdatedAt)
 	return err
 }
 
 // SetMemberIdentity is the literal-overwrite counterpart to UpsertMember.
 // Used by the PATCH endpoint, where explicit clears are meaningful.
-// All three fields land verbatim (empty string → NULL on the column);
+// All fields land verbatim (empty string → NULL on the column);
 // updated_at is bumped.
-func (s *genericStore) SetMemberIdentity(ctx context.Context, id, displayName, githubLogin, pillarID string) error {
+func (s *genericStore) SetMemberIdentity(ctx context.Context, id string, ident MemberIdentity) error {
 	q := rebind(s.d, `
 		UPDATE members
-		   SET display_name = ?, github_login = ?, pillar_id = ?, updated_at = ?
+		   SET display_name = ?, github_login = ?, gitlab_username = ?, pillar_id = ?, updated_at = ?
 		 WHERE id = ?`)
 	res, err := s.db.ExecContext(ctx, q,
-		displayName, nullable(githubLogin), nullable(pillarID), time.Now().UTC(), id)
+		ident.DisplayName, nullable(ident.GitHubLogin), nullable(ident.GitLabUsername),
+		nullable(ident.PillarID), time.Now().UTC(), id)
 	if err != nil {
 		return err
 	}
@@ -255,8 +267,8 @@ func (s *genericStore) SetMemberIdentity(ctx context.Context, id, displayName, g
 func (s *genericStore) ListMembers(ctx context.Context) ([]Member, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, display_name, COALESCE(email, ''), COALESCE(jira_account_id, ''),
-		       COALESCE(github_login, ''), COALESCE(pillar_id, ''), active,
-		       created_at, updated_at
+		       COALESCE(github_login, ''), COALESCE(gitlab_username, ''),
+		       COALESCE(pillar_id, ''), active, created_at, updated_at
 		FROM members
 		ORDER BY display_name`)
 	if err != nil {
@@ -268,7 +280,7 @@ func (s *genericStore) ListMembers(ctx context.Context) ([]Member, error) {
 		var m Member
 		var active int
 		if err := rows.Scan(&m.ID, &m.DisplayName, &m.Email, &m.JiraAccountID,
-			&m.GitHubLogin, &m.PillarID, &active, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			&m.GitHubLogin, &m.GitLabUsername, &m.PillarID, &active, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, err
 		}
 		m.Active = active != 0

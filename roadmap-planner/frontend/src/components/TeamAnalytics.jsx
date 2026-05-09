@@ -480,6 +480,7 @@ export default function TeamAnalytics() {
         id,
         name: pick(m, 'display_name', 'DisplayName') || id || 'unknown',
         github: pick(m, 'github_login', 'GitHubLogin'),
+        gitlab: pick(m, 'gitlab_username', 'GitLabUsername'),
         email:  pick(m, 'email', 'Email'),
         jira_account_id: pick(m, 'jira_account_id', 'JiraAccountID'),
         pillarOverride: override,
@@ -574,11 +575,12 @@ export default function TeamAnalytics() {
         </div>
         <div>
           <p className="ta-mast__meta">
-            Source <strong>Jira + GitHub</strong> · Window <strong>12 weeks</strong>
+            Source <strong>Jira + GitHub + GitLab</strong> · Window <strong>12 weeks</strong>
           </p>
           <div className="ta-status">
             <StatusBadge source="jira"   info={status?.jira} />
             <StatusBadge source="github" info={status?.github} />
+            <StatusBadge source="gitlab" info={status?.gitlab} />
           </div>
         </div>
       </header>
@@ -724,7 +726,13 @@ function TeamView({ rows, orderedPillarNames, pillarFilter, onPillarFilter, sort
                       <span className="ta-avatar">{initialsOf(m.name)}</span>
                       <div>
                         <div className="ta-name">{m.name}</div>
-                        {m.github && <div className="ta-meta">@{m.github}</div>}
+                        {(m.github || m.gitlab) && (
+                          <div className="ta-meta">
+                            {m.github && <>gh:@{m.github}</>}
+                            {m.github && m.gitlab && ' · '}
+                            {m.gitlab && <>gl:@{m.gitlab}</>}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -783,6 +791,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editGh, setEditGh] = useState('');
+  const [editGl, setEditGl] = useState('');
   const [editPillar, setEditPillar] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -798,6 +807,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
         if (cancelled) return;
         setDetail(d);
         setEditGh(pick(d.info, 'github_login', 'GitHubLogin') || memberRow.github || '');
+        setEditGl(pick(d.info, 'gitlab_username', 'GitLabUsername') || '');
         setEditPillar(pick(d.info, 'pillar_id', 'PillarID') || memberRow.pillarOverride || '');
       } catch (e) {
         if (cancelled) return;
@@ -837,14 +847,16 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
 
   const dirty =
     String(editGh || '').toLowerCase() !== String(pick(info, 'github_login', 'GitHubLogin') || '').toLowerCase() ||
+    String(editGl || '').toLowerCase() !== String(pick(info, 'gitlab_username', 'GitLabUsername') || '').toLowerCase() ||
     String(editPillar || '') !== String(pick(info, 'pillar_id', 'PillarID') || '');
 
   const onSave = async () => {
     setSaving(true);
     try {
       const updated = await contributionsAPI.updateMember(id, {
-        github_login: (editGh || '').trim(),
-        pillar_id:    (editPillar || '').trim(),
+        github_login:    (editGh || '').trim(),
+        gitlab_username: (editGl || '').trim(),
+        pillar_id:       (editPillar || '').trim(),
       });
       toast.success('Saved · rebuilding rollups in background');
       setDetail((prev) => ({ ...(prev || {}), info: updated }));
@@ -882,6 +894,9 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
           <div className="ta-profile-handles">
             <div>github · {memberRow.github
               ? <span className="gh">@{memberRow.github}</span>
+              : <em>not linked</em>}</div>
+            <div>gitlab · {memberRow.gitlab
+              ? <span className="gh">@{memberRow.gitlab}</span>
               : <em>not linked</em>}</div>
             <div>jira · {memberRow.email || pick(info, 'email', 'Email') || '—'}</div>
           </div>
@@ -969,6 +984,16 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
                        autoComplete="off"
                        spellCheck={false} />
                 <span className="ta-field-help">Empty = no GitHub link.</span>
+              </label>
+              <label className="ta-field">
+                <span className="ta-field-label">GitLab username</span>
+                <input className="ta-input"
+                       value={editGl}
+                       onChange={(e) => setEditGl(e.target.value)}
+                       placeholder="alice"
+                       autoComplete="off"
+                       spellCheck={false} />
+                <span className="ta-field-help">Empty = no GitLab link.</span>
               </label>
               <label className="ta-field">
                 <span className="ta-field-label">Pillar override</span>
