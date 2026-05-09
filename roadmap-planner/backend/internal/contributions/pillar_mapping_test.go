@@ -73,6 +73,89 @@ func TestPillarMap_Empty(t *testing.T) {
 	if got := pm.PillarsForComponents([]string{"any"}); len(got) != 0 {
 		t.Fatalf("want empty, got %v", got)
 	}
+	if got := pm.PillarsForVersions([]string{"any-v1.0"}); len(got) != 0 {
+		t.Fatalf("want empty, got %v", got)
+	}
+}
+
+func TestPillarMap_VersionPrefixMatch(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD":            {VersionPrefixes: []string{"tektoncd-operator", "katanomi-operator"}},
+			"Tool Deployment":  {VersionPrefixes: []string{"gitlab-ce-operator", "harbor-ce-operator", "sonarqube-ce-operator"}},
+			"Tool Integration": {VersionPrefixes: []string{"connectors-operator"}},
+		},
+	})
+	if !pm.Configured() {
+		t.Fatal("want configured")
+	}
+	cases := []struct {
+		name     string
+		versions []string
+		want     []string
+	}{
+		{"single prefix match", []string{"tektoncd-operator-v4.11.0"}, []string{"CI/CD"}},
+		{"case insensitive", []string{"Tektoncd-Operator-V4.11.0"}, []string{"CI/CD"}},
+		{"multi-version fan-out", []string{"gitlab-ce-operator-v18.8.0", "harbor-ce-operator-v2.14.3", "sonarqube-ce-operator-v2026.1.2", "nexus-ce-operator-v3.76.12"}, []string{"Tool Deployment"}},
+		{"connectors", []string{"connectors-operator-v1.11.0"}, []string{"Tool Integration"}},
+		{"no match", []string{"thanos-v1.0.0"}, nil},
+		{"meta-only is not a prefix match", []string{"v4.x"}, nil},
+		{"empty input", nil, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := pm.PillarsForVersions(tc.versions)
+			if !equalUnordered(got, tc.want) {
+				t.Fatalf("PillarsForVersions(%v) = %v, want %v", tc.versions, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPillarMap_VersionPrefixGlob(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"NFR": {VersionPrefixes: []string{"thanos-*"}},
+		},
+	})
+	if got := pm.PillarsForVersions([]string{"thanos-v1.0.0"}); !equalUnordered(got, []string{"NFR"}) {
+		t.Fatalf("want [NFR], got %v", got)
+	}
+	if got := pm.PillarsForVersions([]string{"thanos"}); len(got) != 0 {
+		t.Fatalf("bare 'thanos' should not match 'thanos-*'; got %v", got)
+	}
+}
+
+func TestPillarMap_VersionPrefixMultiPillar(t *testing.T) {
+	// Same prefix declared under two pillars credits both (mirrors the
+	// repo-glob multi-pillar behavior).
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD":           {VersionPrefixes: []string{"shared-operator"}},
+			"Tool Deployment": {VersionPrefixes: []string{"shared-operator"}},
+		},
+	})
+	got := pm.PillarsForVersions([]string{"shared-operator-v1.0.0"})
+	if !equalUnordered(got, []string{"CI/CD", "Tool Deployment"}) {
+		t.Fatalf("want both, got %v", got)
+	}
+}
+
+func TestPillarMap_ComponentBeforeVersion(t *testing.T) {
+	// Sanity: PillarsForComponents and PillarsForVersions are independent;
+	// the fallback ordering is enforced at the caller (PillarThroughput),
+	// which we exercise in the route-level test below.
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD": {Components: []string{"Tekton"}, VersionPrefixes: []string{"tektoncd-operator"}},
+		},
+	})
+	if got := pm.PillarsForComponents([]string{"Tekton"}); !equalUnordered(got, []string{"CI/CD"}) {
+		t.Fatalf("component path: want [CI/CD], got %v", got)
+	}
+	if got := pm.PillarsForVersions([]string{"tektoncd-operator-v4.11.0"}); !equalUnordered(got, []string{"CI/CD"}) {
+		t.Fatalf("version path: want [CI/CD], got %v", got)
+	}
 }
 
 func TestPillarMap_OrderIsStableAlpha(t *testing.T) {

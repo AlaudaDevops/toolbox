@@ -60,11 +60,14 @@ func (s *Service) PillarMap() *PillarMap {
 // MemberSummary is one row of the team-overview dashboard.
 //
 // Components is the *flat* set of Jira components seen on this member's
-// issue snapshots in the window. The frontend uses it to derive the
-// member's pillar by matching against BasicPillar.component (same logic
-// the roadmap tab uses), so the team-analytics view stays consistent
-// with the roadmap source-of-truth instead of relying on a free-form
-// operator-set members.pillar_id.
+// issue snapshots in the window — useful as a debugging signal but not
+// authoritative for pillar attribution. Pillars is the set of pillars
+// the member is associated with, computed by the same matcher chain the
+// throughput-by-pillar bucket aggregator uses (PillarsForComponents
+// then PillarsForVersions fallback). Computing pillars server-side
+// keeps the team table in sync with the chart even when an issue routes
+// to its pillar via the Phase 1 fixVersion-prefix fallback rather than
+// a Jira component match.
 type MemberSummary struct {
 	MemberID         string   `json:"member_id"`
 	WeekTotals       []Bucket `json:"week_totals"`
@@ -74,6 +77,7 @@ type MemberSummary struct {
 	PRsReviewed      int      `json:"prs_reviewed"`
 	ReviewLatencyP50 float64  `json:"review_latency_p50_hours,omitempty"`
 	Components       []string `json:"components,omitempty"`
+	Pillars          []string `json:"pillars,omitempty"`
 }
 
 // Bucket is one weekly aggregation point.
@@ -125,17 +129,18 @@ func (s *Service) TeamOverview(ctx context.Context, q storage.MemberWeekQuery) (
 		bk.Reviews += r.PRsReviewed
 	}
 
-	// Components per member — one extra query, joined client-side onto
-	// each MemberSummary. The aggregator's rollup table doesn't carry
-	// component lists (only the {member, week, pillar, component} primary
-	// key with one row per component-tag), so this is the cheapest way
-	// to surface a per-member component list to the frontend without
-	// schema changes.
-	componentsByMember, err := s.componentsByMember(ctx, q)
+	// Components + pillars per member — one extra query that walks each
+	// member's deduped issue set and applies the same pillar matcher
+	// chain as the throughput-by-pillar bucket aggregator. The rollup
+	// table doesn't carry per-member pillar lists, so this is the
+	// cheapest way to surface a directly-readable pillars[] to the
+	// frontend without a schema change.
+	componentsByMember, pillarsByMember, err := s.attributionByMember(ctx, q)
 	if err != nil {
-		// Non-fatal: an empty components list just means the frontend
-		// falls back to the operator-set pillar. Log path: caller logs.
+		// Non-fatal: empty lists just mean the frontend falls back to
+		// the operator-set pillar. Log path: caller logs.
 		componentsByMember = map[string][]string{}
+		pillarsByMember = map[string][]string{}
 	}
 
 	out := make([]MemberSummary, 0, len(byMember))
@@ -147,33 +152,42 @@ func (s *Service) TeamOverview(ctx context.Context, q storage.MemberWeekQuery) (
 		sort.Slice(bks, func(i, j int) bool { return bks[i].WeekStart.Before(bks[j].WeekStart) })
 		ms.WeekTotals = bks
 		ms.Components = componentsByMember[id]
+		ms.Pillars = pillarsByMember[id]
 		out = append(out, *ms)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].MemberID < out[j].MemberID })
 	return out, nil
 }
 
-// componentsByMember tallies the distinct components each member has
-// touched in the [From, To) window. Latest-snapshot-per-issue de-dup
-// (so one issue contributes once even across multiple collection cycles),
-// then a flat union of components across the member's deduped issue
-// set. Order is descending by frequency, then alphabetic — useful when
-// the frontend wants "primary component" without an extra count map.
-func (s *Service) componentsByMember(ctx context.Context, q storage.MemberWeekQuery) (map[string][]string, error) {
+// attributionByMember walks every member's deduped issue set in
+// [From, To) and returns two parallel maps: the flat set of Jira
+// components touched (descending by frequency, then alphabetic) and
+// the union of pillars matched. Pillar matching mirrors the
+// throughput-by-pillar bucket aggregator's chain — try
+// PillarsForComponents on the issue's components, fall back to
+// PillarsForVersions on its fixVersions — so the team table and
+// the chart agree even when an issue routes to a pillar via the
+// Phase 1 fixVersion-prefix fallback rather than a component hit.
+//
+// Latest-snapshot-per-issue de-dup runs in SQL (one row per issue_key,
+// the most recently captured one), so an issue contributes its
+// component/version values exactly once even across multiple
+// collection cycles.
+func (s *Service) attributionByMember(ctx context.Context, q storage.MemberWeekQuery) (map[string][]string, map[string][]string, error) {
 	d, ok := s.store.(interface {
 		Dialect() storage.Dialect
 		DB() *sql.DB
 	})
 	if !ok {
-		return nil, nil
+		return nil, nil, nil
 	}
 	dialect := d.Dialect()
 	db := d.DB()
 
 	sqlStr := rebindSimple(dialect, `
-		SELECT assignee_id, components
+		SELECT assignee_id, components, versions
 		FROM (
-		  SELECT s.assignee_id, s.components, s.issue_key,
+		  SELECT s.assignee_id, s.components, s.versions, s.issue_key,
 		         ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
 		  FROM issue_snapshots s
 		  JOIN collection_runs r ON s.run_id = r.id
@@ -184,39 +198,61 @@ func (s *Service) componentsByMember(ctx context.Context, q storage.MemberWeekQu
 		WHERE rn = 1`)
 	rows, err := db.QueryContext(ctx, sqlStr, q.To, q.From)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
-	tally := map[string]map[string]int{}
+	pm := s.PillarMap()
+	compTally := map[string]map[string]int{}
+	pillarSet := map[string]map[string]struct{}{}
 	for rows.Next() {
 		var memberID string
-		var raw sql.NullString
-		if err := rows.Scan(&memberID, &raw); err != nil {
-			return nil, err
+		var rawComps, rawVers sql.NullString
+		if err := rows.Scan(&memberID, &rawComps, &rawVers); err != nil {
+			return nil, nil, err
 		}
-		if !raw.Valid || raw.String == "" || raw.String == "null" {
-			continue
+		var comps, vers []string
+		if rawComps.Valid && rawComps.String != "" && rawComps.String != "null" {
+			_ = json.Unmarshal([]byte(rawComps.String), &comps)
 		}
-		var comps []string
-		if err := json.Unmarshal([]byte(raw.String), &comps); err != nil {
-			continue
+		if rawVers.Valid && rawVers.String != "" && rawVers.String != "null" {
+			_ = json.Unmarshal([]byte(rawVers.String), &vers)
 		}
-		mp, ok := tally[memberID]
+		mp, ok := compTally[memberID]
 		if !ok {
 			mp = map[string]int{}
-			tally[memberID] = mp
+			compTally[memberID] = mp
 		}
 		for _, c := range comps {
 			if c != "" {
 				mp[c]++
 			}
 		}
+		// Same matcher chain as service_extras.go's pillar bucket
+		// aggregator: components first, fixVersions as the Phase 1
+		// fallback. An issue contributes to every pillar it matches
+		// (multi-pillar components / shared version_prefixes are
+		// honored), and contributes nothing if neither matcher hits.
+		matched := pm.PillarsForComponents(comps)
+		if len(matched) == 0 {
+			matched = pm.PillarsForVersions(vers)
+		}
+		if len(matched) == 0 {
+			continue
+		}
+		pset, ok := pillarSet[memberID]
+		if !ok {
+			pset = map[string]struct{}{}
+			pillarSet[memberID] = pset
+		}
+		for _, p := range matched {
+			pset[p] = struct{}{}
+		}
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	out := make(map[string][]string, len(tally))
-	for mid, counts := range tally {
+	componentsOut := make(map[string][]string, len(compTally))
+	for mid, counts := range compTally {
 		list := make([]string, 0, len(counts))
 		for c := range counts {
 			list = append(list, c)
@@ -227,9 +263,18 @@ func (s *Service) componentsByMember(ctx context.Context, q storage.MemberWeekQu
 			}
 			return list[i] < list[j]
 		})
-		out[mid] = list
+		componentsOut[mid] = list
 	}
-	return out, nil
+	pillarsOut := make(map[string][]string, len(pillarSet))
+	for mid, set := range pillarSet {
+		list := make([]string, 0, len(set))
+		for p := range set {
+			list = append(list, p)
+		}
+		sort.Strings(list)
+		pillarsOut[mid] = list
+	}
+	return componentsOut, pillarsOut, nil
 }
 
 // MemberDetail returns the per-week breakdown for one member.

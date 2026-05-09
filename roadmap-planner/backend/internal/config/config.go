@@ -61,12 +61,33 @@ type Config struct {
 //	      repos: ["alaudadevops/harbor*", "alaudadevops/helm*"]
 type TeamAnalytics struct {
 	Pillars map[string]PillarMapping `mapstructure:"pillars" yaml:"pillars"`
+	// GitHubLoginPrefills maps a Jira member id to a GitHub login. On
+	// every successful Jira sync the backend walks this map and writes
+	// each gh login onto the corresponding member iff the member's
+	// `github_login` is currently empty — manual edits in the team
+	// drawer always win, so once an operator overrides a value here
+	// the prefill never clobbers it. Empty map disables the feature.
+	//
+	// Example:
+	//
+	//	team_analytics:
+	//	  github_login_prefills:
+	//	    daniel: danielfbm
+	//	    jtcheng: chengjingtao
+	GitHubLoginPrefills map[string]string `mapstructure:"github_login_prefills" yaml:"github_login_prefills"`
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
+//
+// VersionPrefixes is the fallback path for issues that have no
+// `components` set but do have `fixVersions`. A version `name` is
+// credited to this pillar if it begins with `<prefix>-` (the
+// "<component>-v<X.Y.Z>" convention used by the DEVOPS Jira project)
+// or matches the entry as a glob via path.Match.
 type PillarMapping struct {
-	Repos      []string `mapstructure:"repos" yaml:"repos"`
-	Components []string `mapstructure:"components" yaml:"components"`
+	Repos           []string `mapstructure:"repos" yaml:"repos"`
+	Components      []string `mapstructure:"components" yaml:"components"`
+	VersionPrefixes []string `mapstructure:"version_prefixes" yaml:"version_prefixes"`
 }
 
 // Storage configures the durable team-analytics store.

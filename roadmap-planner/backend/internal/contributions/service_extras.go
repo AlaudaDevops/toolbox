@@ -255,12 +255,13 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 
 	// Jira issues done by week × components. Latest snapshot per issue,
 	// resolved_at in window, then expand the JSON components array and
-	// route to the matching pillars. Issues with no component or no
-	// configured mapping land under "Unassigned".
+	// route to the matching pillars. Issues with no component fall
+	// through to fixVersion-prefix matching; only when both miss does
+	// the issue land under "Unassigned".
 	jiraSQL := rebindSimple(dialect, fmt.Sprintf(`
-		SELECT %s AS week_start, components, story_points
+		SELECT %s AS week_start, components, versions, story_points
 		FROM (
-		  SELECT s.resolved_at, s.components, s.story_points, s.issue_key,
+		  SELECT s.resolved_at, s.components, s.versions, s.story_points, s.issue_key,
 		         ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
 		  FROM issue_snapshots s
 		  JOIN collection_runs r ON s.run_id = r.id
@@ -276,9 +277,9 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 	defer jRows.Close()
 	for jRows.Next() {
 		var weekRaw string
-		var rawComponents sql.NullString
+		var rawComponents, rawVersions sql.NullString
 		var pts sql.NullFloat64
-		if err := jRows.Scan(&weekRaw, &rawComponents, &pts); err != nil {
+		if err := jRows.Scan(&weekRaw, &rawComponents, &rawVersions, &pts); err != nil {
 			return nil, err
 		}
 		week, perr := parseWeek(weekRaw)
@@ -289,11 +290,18 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 		if rawComponents.Valid && rawComponents.String != "" && rawComponents.String != "null" {
 			_ = json.Unmarshal([]byte(rawComponents.String), &comps)
 		}
+		var vers []string
+		if rawVersions.Valid && rawVersions.String != "" && rawVersions.String != "null" {
+			_ = json.Unmarshal([]byte(rawVersions.String), &vers)
+		}
 		var points float64
 		if pts.Valid {
 			points = pts.Float64
 		}
 		pillars := pm.PillarsForComponents(comps)
+		if len(pillars) == 0 {
+			pillars = pm.PillarsForVersions(vers)
+		}
 		if len(pillars) == 0 {
 			bump("Unassigned", week, 0, 1, points)
 			continue

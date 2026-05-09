@@ -240,7 +240,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 				if err != nil {
 					interval = 30 * time.Minute
 				}
-				go runJiraSync(ctx, syncer, aggregator, interval)
+				go runJiraSync(ctx, syncer, store, aggregator, interval, cfg.TeamAnalytics.GitHubLoginPrefills)
 				logger.Info("Jira sync started", zap.Duration("interval", interval), zap.Int("backfill_days", backfill))
 			}
 		} else {
@@ -407,7 +407,13 @@ func runGitHubSync(ctx context.Context, s *ghclient.Syncer, agg *contributions.A
 // runJiraSync mirrors runGitHubSync: one initial cycle, then a ticker.
 // Each successful run triggers an aggregator rebuild so the rollups
 // stay in step with the snapshot data.
-func runJiraSync(ctx context.Context, s *jirasync.Syncer, agg *contributions.Aggregator, interval time.Duration) {
+//
+// `prefills` is the team-analytics github_login_prefills map. It is
+// applied exactly once, immediately after the initial sync, on the
+// theory that the member table is empty before that first run. New
+// mappings the operator wants applied later land via the drawer
+// in-line, or via a config update + a fresh pod restart.
+func runJiraSync(ctx context.Context, s *jirasync.Syncer, store storage.Store, agg *contributions.Aggregator, interval time.Duration, prefills map[string]string) {
 	doOne := func(label string) {
 		res, err := s.Run(ctx)
 		if err != nil {
@@ -424,6 +430,18 @@ func runJiraSync(ctx context.Context, s *jirasync.Syncer, agg *contributions.Agg
 		}
 	}
 	doOne("Initial")
+	// One-shot github_login prefill: the member table now reflects
+	// whoever assigned issues during the initial sync, so any operator
+	// curated jira_id → gh_login mappings can land on the right rows.
+	// Members whose github_login was edited via the drawer have
+	// non-empty values and are skipped.
+	if applied, configured, err := contributions.ApplyGitHubLoginPrefills(ctx, store, prefills); err != nil {
+		logger.Warn("github_login prefills: partial failure",
+			zap.Int("applied", applied), zap.Int("configured", configured), zap.Error(err))
+	} else if configured > 0 {
+		logger.Info("github_login prefills applied",
+			zap.Int("applied", applied), zap.Int("configured", configured))
+	}
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	for {
