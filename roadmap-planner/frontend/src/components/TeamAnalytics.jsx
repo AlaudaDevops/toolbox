@@ -900,123 +900,156 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
 
   return (
     <>
-      <button type="button" className="ta-backlink" onClick={onBack}>
-        ← Back to team overview
-      </button>
+      {/* Member-profile shell mirrors the Dashboard tab's structure: a top
+       * header strip, a 5-tile KPI strip, then a panel grid. Each section
+       * is its own .ta-panel with the standard head + body. The "back to
+       * team overview" backlink was redundant with the tab nav above, so
+       * it's gone too. */}
+      <header className="ta-prof-header">
+        <span className="ta-avatar ta-avatar--lg">{initialsOf(memberRow.name)}</span>
+        <h2 className="ta-prof-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</h2>
+        <button type="button" className="ta-switcher-chip"
+                onClick={() => { setSwitchFilter(''); setShowSwitch(true); }}>
+          <span>Switch member</span><span className="caret">▼</span>
+        </button>
+        <div className="ta-prof-actions">
+          <button type="button" className="ta-btn" onClick={() => setShowEdit(true)}>✎ Edit identity</button>
+        </div>
+        <div className="ta-prof-meta">
+          {pillarLabel}
+          {(pillarsList.length > 0 || memberRow.pillarOverride)
+            ? <span style={{ color: 'var(--fg-faint)' }}> · {pillarSource}</span>
+            : null}
+          {memberRow.github && <> · gh:<span style={{ color: 'var(--accent)' }}>@{memberRow.github}</span></>}
+          {memberRow.gitlab && <> · gl:<span style={{ color: 'var(--accent)' }}>@{memberRow.gitlab}</span></>}
+          {(memberRow.email || pick(info, 'email', 'Email')) && <> · {memberRow.email || pick(info, 'email', 'Email')}</>}
+        </div>
+      </header>
 
-      <div className="ta-panel">
-        <header className="ta-prof-header">
-          <span className="ta-avatar ta-avatar--lg">{initialsOf(memberRow.name)}</span>
-          <h2 className="ta-prof-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</h2>
-          <button type="button" className="ta-switcher-chip"
-                  onClick={() => { setSwitchFilter(''); setShowSwitch(true); }}>
-            <span>Switch member</span><span className="caret">▼</span>
-          </button>
-          <div className="ta-prof-actions">
-            <button type="button" className="ta-btn" onClick={() => setShowEdit(true)}>✎ Edit identity</button>
-          </div>
-          <div className="ta-prof-meta">
-            {pillarLabel}
-            {(pillarsList.length > 0 || memberRow.pillarOverride)
-              ? <span style={{ color: 'var(--fg-faint)' }}> · {pillarSource}</span>
-              : null}
-            {memberRow.github && <> · gh:<span style={{ color: 'var(--accent)' }}>@{memberRow.github}</span></>}
-            {memberRow.gitlab && <> · gl:<span style={{ color: 'var(--accent)' }}>@{memberRow.gitlab}</span></>}
-            {(memberRow.email || pick(info, 'email', 'Email')) && <> · {memberRow.email || pick(info, 'email', 'Email')}</>}
-          </div>
-        </header>
+      <div className="ta-kpis">
+        {MEMBER_METRICS.map((m) => {
+          const v = kpiTotals[m.key] || 0;
+          return (
+            <button key={m.key} type="button"
+                    className={`ta-kpi ta-kpi--btn${activeMetric === m.key ? ' is-active' : ''}`}
+                    onClick={() => setActiveMetric(m.key)}>
+              <div className="ta-kpi__lbl">{m.label}</div>
+              <div className="ta-kpi__val">{Number.isInteger(+v) ? v : (+v).toFixed(1)}</div>
+            </button>
+          );
+        })}
+      </div>
 
-        <div className="ta-panel__body ta-prof-body">
-          <div className="ta-kpis">
-            {MEMBER_METRICS.map((m) => {
-              const v = kpiTotals[m.key] || 0;
-              return (
-                <button key={m.key} type="button"
-                        className={`ta-kpi ta-kpi--btn${activeMetric === m.key ? ' is-active' : ''}`}
-                        onClick={() => setActiveMetric(m.key)}>
-                  <div className="ta-kpi__lbl">{m.label}</div>
-                  <div className="ta-kpi__val">{Number.isInteger(+v) ? v : (+v).toFixed(1)}</div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="ta-card">
-            <h3 className="ta-card__title">Weekly contribution
-              <span className="ta-legend">
-                {MEMBER_METRICS.map((m) => (
-                  <button key={m.key} type="button"
-                          className={`ta-legend__item${activeMetric === m.key ? ' is-active' : ''}`}
-                          onClick={() => setActiveMetric(m.key)}>
-                    <i style={{ background: m.color }} />{m.label}
-                  </button>
-                ))}
-              </span>
-            </h3>
-            <div className="ta-card__sub">
-              Last {weeks.length || 12} weeks · counts per ISO week ·
-              highlighted: {MEMBER_METRICS.find((m) => m.key === activeMetric)?.label}
+      <div className="ta-dash-grid">
+        <div className="ta-panel ta-dash-grid__span">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Weekly contribution · <span style={{ color: MEMBER_METRICS.find((m) => m.key === activeMetric)?.color }}>{MEMBER_METRICS.find((m) => m.key === activeMetric)?.label}</span></div>
+              <div className="ta-panel__sub">Last {weeks.length || 12} weeks · counts per ISO week</div>
             </div>
-            <MemberMultiLine weeks={weeks} highlight={activeMetric} />
+            <div className="ta-legend">
+              {MEMBER_METRICS.map((m) => (
+                <button key={m.key} type="button"
+                        className={`ta-legend__item${activeMetric === m.key ? ' is-active' : ''}`}
+                        onClick={() => setActiveMetric(m.key)}>
+                  <i style={{ background: m.color }} />{m.label}
+                </button>
+              ))}
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <MemberMultiLine weeks={weeks} highlight={activeMetric} />
+            </div>
           </div>
+        </div>
 
-          <div className="ta-dash-grid">
-            <div className="ta-card">
-              <h3 className="ta-card__title">Components touched
-                <span className="ta-meta">Each row = one component · width = issues</span>
-              </h3>
-              <div className="ta-card__sub">Where this member spent their work in the window</div>
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Components touched</div>
+              <div className="ta-panel__sub">Each row = one component · width = issues</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
               {components.length === 0 ? (
                 <p className="ta-meta">No components recorded for this member yet — Jira issues need a Component value.</p>
               ) : (
-                components.map((c) => (
-                  <div key={c.component} className="ta-bar-row">
-                    <div className="ta-bar-label">{c.component}</div>
-                    <div className="ta-bar-track">
-                      <div className="ta-bar-fill" style={{ width: `${(c.issues / compMax) * 100}%` }} />
+                <div className="ta-bars">
+                  {components.map((c) => (
+                    <div key={c.component} className="ta-bar-row">
+                      <div className="ta-bar-label">{c.component}</div>
+                      <div className="ta-bar-track">
+                        <div className="ta-bar-fill" style={{ width: `${(c.issues / compMax) * 100}%` }} />
+                      </div>
+                      <div className="ta-bar-num">{c.issues}</div>
                     </div>
-                    <div className="ta-bar-num">{c.issues}</div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
+          </div>
+        </div>
 
-            <div className="ta-card">
-              <h3 className="ta-card__title">Rank vs team</h3>
-              <div className="ta-card__sub">Where this member sits on each metric</div>
-              {rankRows.map((r) => (
-                <div key={r.key} className="ta-bar-row">
-                  <div className="ta-bar-label">{r.label}</div>
-                  <div className="ta-bar-track">
-                    <div className="ta-bar-fill" style={{ width: `${(r.mySum / r.max) * 100}%`, background: r.color }} />
-                  </div>
-                  <div className="ta-bar-num">#{r.rank}/{r.total}</div>
-                </div>
-              ))}
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Rank vs team</div>
+              <div className="ta-panel__sub">Where this member sits on each metric</div>
             </div>
-
-            <div className="ta-card">
-              <h3 className="ta-card__title">Week-over-week pulse</h3>
-              <div className="ta-card__sub">Recent half vs prior half · per metric</div>
-              {pulseRows.map((p) => (
-                <div key={p.key} className="ta-bar-row">
-                  <div className="ta-bar-label">{p.label}</div>
-                  <div className="ta-bar-track" style={{ display: 'flex', gap: 2, background: 'transparent' }}>
-                    <div className="ta-bar-fill" style={{ width: `${(p.prior / p.max) * 50}%`, background: 'var(--fg-faint)' }} />
-                    <div className="ta-bar-fill" style={{ width: `${(p.recent / p.max) * 50}%`, background: p.color }} />
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <div className="ta-bars">
+                {rankRows.map((r) => (
+                  <div key={r.key} className="ta-bar-row">
+                    <div className="ta-bar-label">{r.label}</div>
+                    <div className="ta-bar-track">
+                      <div className="ta-bar-fill" style={{ width: `${(r.mySum / r.max) * 100}%`, background: r.color }} />
+                    </div>
+                    <div className="ta-bar-num">#{r.rank}/{r.total}</div>
                   </div>
-                  <div className="ta-bar-num">{p.prior}→{p.recent}</div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+          </div>
+        </div>
 
-            <div className="ta-card">
-              <h3 className="ta-card__title">This sprint
-                <span className="ta-pill" style={{ background: 'var(--bg-sunken)' }}>
-                  {sprint?.name || '—'}
-                </span>
-              </h3>
-              <div className="ta-card__sub">Live · refreshes with the next collection cycle</div>
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Week-over-week pulse</div>
+              <div className="ta-panel__sub">Recent half vs prior half · per metric</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <div className="ta-bars">
+                {pulseRows.map((p) => (
+                  <div key={p.key} className="ta-bar-row">
+                    <div className="ta-bar-label">{p.label}</div>
+                    <div className="ta-bar-track" style={{ display: 'flex', gap: 2, background: 'transparent' }}>
+                      <div className="ta-bar-fill" style={{ width: `${(p.prior / p.max) * 50}%`, background: 'var(--fg-faint)' }} />
+                      <div className="ta-bar-fill" style={{ width: `${(p.recent / p.max) * 50}%`, background: p.color }} />
+                    </div>
+                    <div className="ta-bar-num">{p.prior}→{p.recent}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">This sprint</div>
+              <div className="ta-panel__sub">{sprint?.name || 'Live · refreshes with the next collection cycle'}</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
               <div className="ta-sprint-grid">
                 <div><div className="ta-kpi__lbl">In progress</div><div className="ta-num ta-num--lg">{sprint?.wip ?? '—'}</div></div>
                 <div><div className="ta-kpi__lbl">Done</div><div className="ta-num ta-num--lg">{sprint?.done ?? '—'}</div></div>

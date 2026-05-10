@@ -827,19 +827,24 @@
 .ta-donut-legend .row .pct { text-align: right; color: var(--fg-muted); }
 .ta-donut-legend .swatch { width: 10px; height: 10px; border-radius: var(--radius-sm, 2px); }
 
-/* ---------- Member Profile header (new shape) ----------
+/* ---------- Member Profile header ----------
+ * Standalone panel-style strip at the top of the Member Profile tab.
+ * Mirrors the Dashboard tab's masthead/toolbar shape so both tabs share
+ * a polished visual register: bordered, padded, sits above its own KPI
+ * strip + panel grid (no double-nested cards).
+ *
  * Two-row CSS grid:
  *   col 1 = avatar (spans both rows, centered)
  *   col 2 = name (row 1) + meta (row 2 spans into col 4)
  *   col 3 = switcher chip (row 1)
- *   col 4 = edit-identity button (row 1)
- * Pre-fix this was a flexbox with a nested name+meta div that pushed
- * the long meta line under the name and dragged the right-side buttons
- * out of vertical alignment. */
+ *   col 4 = edit-identity button (row 1) */
 .ta-prof-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-soft);
-  background: var(--bg-sunken);
+  padding: 14px 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-default, 4px);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   column-gap: 16px;
@@ -913,29 +918,10 @@
 .ta-switcher-chip .caret { font-size: 9px; color: var(--fg-muted); }
 .ta-prof-actions .ta-btn { height: 28px; padding: 0 14px; }
 
-/* Member-profile body: a flex column with a single 18px gap so all
- * children — KPI strip, weekly chart, the 2×2 sub-grid — share the
- * same vertical rhythm. The dash-grid below uses the same 18px gap
- * horizontally, so spacing is uniform in both axes.
- *
- * Inner .ta-card sheds its own border/shadow/background here — the
- * outer panel is already the boundary. Pre-fix this looked like a
- * card-inside-a-card with doubled rules and uneven margins. */
-.ta-prof-body {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-.ta-prof-body > .ta-kpis { margin-bottom: 0; }
-.ta-prof-body .ta-card {
-  border: 0;
-  box-shadow: none;
-  background: transparent;
-  padding: 0;
-}
-.ta-prof-body .ta-card + .ta-card { margin-top: 0; }
-.ta-prof-body .ta-card__title { margin-bottom: 4px; }
-.ta-prof-body .ta-card__sub   { margin-bottom: 8px; }
+/* (Member Profile no longer wraps its sections in an outer .ta-panel —
+ * each section is now a standalone .ta-panel inside the .ta-dash-grid,
+ * mirroring the Dashboard tab's structure. The earlier .ta-prof-body
+ * helper class is therefore unused.) */
 
 /* ---------- Modal ---------- */
 .ta-modal-overlay {
