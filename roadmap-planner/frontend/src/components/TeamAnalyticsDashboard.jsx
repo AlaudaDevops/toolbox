@@ -65,9 +65,12 @@ const metricOf = (bucket, metric) => {
   return 0;
 };
 
+// week_start in API responses is a full ISO timestamp ("2025-11-03T00:00:00Z");
+// the dashboard's `weeks` array uses 10-char dates ("2025-11-03"). Compare on
+// the date prefix so overlapping data lines up.
 const memberSum = (member, weeks, metric) =>
   weeks.reduce((acc, w) => {
-    const b = (member.week_totals || []).find((x) => x.week_start === w);
+    const b = (member.week_totals || []).find((x) => (x.week_start || '').slice(0, 10) === w);
     return acc + metricOf(b, metric);
   }, 0);
 
@@ -365,12 +368,18 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
     pillarKeys.forEach((p) => { stack[p] = weeks.map(() => 0); });
     filteredMembers.forEach((m) => {
       const p = pillarOf(m);
+      // A member's primary pillar may be one not present in pillarKeys
+      // (e.g. orderedPillarNames came back empty before basic data loaded
+      // — falling back to "Unassigned" mapping isn't right either, since
+      // the data should still render once the labels arrive). Lazily seed
+      // a row so we never index into undefined.
+      if (!stack[p]) stack[p] = weeks.map(() => 0);
       weeks.forEach((wk, i) => {
-        const b = (m.week_totals || []).find((x) => x.week_start === wk);
+        const b = (m.week_totals || []).find((x) => (x.week_start || '').slice(0, 10) === wk);
         stack[p][i] += metricOf(b, metric);
       });
     });
-    const used = pillarKeys.filter((p) => stack[p].some((v) => v > 0));
+    const used = Object.keys(stack).filter((p) => stack[p].some((v) => v > 0));
     return { stack, used };
   }, [filteredMembers, weeks, metric, pillarKeys]);
 
@@ -382,12 +391,18 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
   const donutSlices = useMemo(() => {
     const totals = {};
     pillarKeys.forEach((p) => { totals[p] = 0; });
-    filteredMembers.forEach((m) => { totals[pillarOf(m)] += memberSum(m, weeks, metric); });
-    return pillarKeys
-      .map((p) => ({ label: p, value: totals[p], color: pillarColor[p] }))
+    filteredMembers.forEach((m) => {
+      const p = pillarOf(m);
+      // Same defensive seed as pillarStack — a member can carry a pillar
+      // we haven't pre-keyed.
+      if (totals[p] == null) totals[p] = 0;
+      totals[p] += memberSum(m, weeks, metric);
+    });
+    return Object.keys(totals)
+      .map((p) => ({ label: p, value: totals[p], color: pillarColor[p] || colorForPillar(p, orderedPillarNames) }))
       .filter((s) => s.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [filteredMembers, weeks, metric, pillarKeys, pillarColor]);
+  }, [filteredMembers, weeks, metric, pillarKeys, pillarColor, orderedPillarNames]);
   const donutTotal = donutSlices.reduce((a, s) => a + s.value, 0);
 
   /* ---- Top movers (recent half vs prior half) ---- */
