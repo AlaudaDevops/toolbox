@@ -131,6 +131,38 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		return fmt.Errorf("aggregate PRs: %w", err)
 	}
 
+	// PRs/MRs opened, by author × week. Mirrors the merged pass but
+	// buckets on created_at — the dashboard's Inflow vs Outflow panel
+	// reads opened-vs-merged together to spot review-queue buildup.
+	openedSQL := rebind(fmt.Sprintf(`
+		INSERT INTO member_week_metrics (member_id, week_start, pillar_id, component, prs_opened)
+		SELECT
+		    COALESCE(m.id, pr.author_id) AS member_id,
+		    %s AS week_start,
+		    '' AS pillar_id,
+		    '' AS component,
+		    COUNT(*) AS prs_opened
+		FROM pull_requests pr
+		LEFT JOIN members m
+		       ON (pr.source = 'github'
+		            AND m.github_login IS NOT NULL
+		            AND m.github_login <> ''
+		            AND LOWER(m.github_login) = pr.author_login)
+		       OR (pr.source = 'gitlab'
+		            AND m.gitlab_username IS NOT NULL
+		            AND m.gitlab_username <> ''
+		            AND LOWER(m.gitlab_username) = pr.author_login)
+		WHERE COALESCE(m.id, pr.author_id) IS NOT NULL
+		  AND pr.created_at >= ?
+		  AND pr.created_at <  ?
+		GROUP BY 1, 2
+		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
+		    prs_opened = excluded.prs_opened`, dialect.WeekStart("pr.created_at")))
+
+	if _, err := db.ExecContext(ctx, openedSQL, from, to); err != nil {
+		return fmt.Errorf("aggregate opened PRs: %w", err)
+	}
+
 	// PRs/MRs reviewed, by reviewer × week. Same resolution priority as
 	// the merge aggregation above — the JOIN branches on rv.source so
 	// editing either github_login or gitlab_username retroactively

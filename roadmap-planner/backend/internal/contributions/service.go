@@ -74,6 +74,7 @@ type MemberSummary struct {
 	JiraIssuesDone   int      `json:"jira_issues_done"`
 	JiraPointsDone   float64  `json:"jira_points_done"`
 	PRsMerged        int      `json:"prs_merged"`
+	PRsOpened        int      `json:"prs_opened"`
 	PRsReviewed      int      `json:"prs_reviewed"`
 	ReviewLatencyP50 float64  `json:"review_latency_p50_hours,omitempty"`
 	Components       []string `json:"components,omitempty"`
@@ -86,6 +87,7 @@ type Bucket struct {
 	JiraDone  int       `json:"jira_done"`
 	Points    float64   `json:"points"`
 	PRsMerged int       `json:"prs_merged"`
+	PRsOpened int       `json:"prs_opened"`
 	Reviews   int       `json:"reviews"`
 }
 
@@ -110,6 +112,7 @@ func (s *Service) TeamOverview(ctx context.Context, q storage.MemberWeekQuery) (
 		ms.JiraIssuesDone += r.JiraIssuesDone
 		ms.JiraPointsDone += r.JiraPointsDone
 		ms.PRsMerged += r.PRsMerged
+		ms.PRsOpened += r.PRsOpened
 		ms.PRsReviewed += r.PRsReviewed
 		// We pick the latest non-nil latency seen as a representative;
 		// proper aggregation across weeks happens in the Aggregator.
@@ -126,6 +129,7 @@ func (s *Service) TeamOverview(ctx context.Context, q storage.MemberWeekQuery) (
 		bk.JiraDone += r.JiraIssuesDone
 		bk.Points += r.JiraPointsDone
 		bk.PRsMerged += r.PRsMerged
+		bk.PRsOpened += r.PRsOpened
 		bk.Reviews += r.PRsReviewed
 	}
 
