@@ -691,4 +691,334 @@
   .ta-row { grid-template-columns: 1fr; }
   .ta-profile-grid { grid-template-columns: 1fr; }
   .ta-sprint-grid { grid-template-columns: repeat(2, 1fr); }
+  .ta-dash-grid { grid-template-columns: 1fr !important; }
+  .ta-dash-grid__span { grid-column: 1 / -1 !important; }
+  .ta-kpis { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ---------- Dashboard tab ------------------------------------- */
+
+.ta-toolbar {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-default, 4px);
+  background: var(--bg-sunken);
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.ta-kpis {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1px;
+  background: var(--border-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-default, 4px);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.ta-kpis-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--fg-muted);
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+
+.ta-kpis .ta-kpi {
+  background: var(--bg-elevated);
+  padding: 14px 18px;
+  text-align: left;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+.ta-kpi--btn {
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.ta-kpi--btn:hover { background: var(--bg-sunken); }
+.ta-kpi--btn.is-active {
+  background: var(--accent-tint);
+}
+.ta-kpi--btn.is-active .ta-kpi__lbl { color: var(--accent); }
+
+.ta-kpi__delta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.ta-dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.ta-dash-grid__span { grid-column: 1 / -1; }
+
+/* Make .ta-legend items clickable when used as buttons (for legend-as-toggle). */
+.ta-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.55;
+  letter-spacing: 0.06em;
+}
+.ta-legend__item:hover { opacity: 0.85; }
+.ta-legend__item.is-active { opacity: 1; color: var(--fg); }
+.ta-legend__item i {
+  display: inline-block; width: 10px; height: 10px;
+  border-radius: var(--radius-sm, 2px);
+}
+
+/* Bar rows that double as drill-down buttons. */
+.ta-bar-row--btn {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm, 2px);
+  transition: background var(--dur-fast) var(--ease);
+}
+.ta-bar-row--btn:hover { background: var(--bg-sunken); }
+
+.ta-bars { display: flex; flex-direction: column; gap: 6px; }
+
+/* Donut layout */
+.ta-donut-row {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+}
+.ta-donut-row svg { flex: 0 0 auto; }
+.ta-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.ta-donut-legend .row {
+  display: grid;
+  grid-template-columns: 12px 1fr 50px 40px;
+  align-items: center;
+  gap: 8px;
+}
+.ta-donut-legend .row .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ta-donut-legend .row .v { text-align: right; font-variant-numeric: tabular-nums; }
+.ta-donut-legend .row .pct { text-align: right; color: var(--fg-muted); }
+.ta-donut-legend .swatch { width: 10px; height: 10px; border-radius: var(--radius-sm, 2px); }
+
+/* ---------- Member Profile header ----------
+ * Standalone panel-style strip at the top of the Member Profile tab.
+ * Mirrors the Dashboard tab's masthead/toolbar shape so both tabs share
+ * a polished visual register: bordered, padded, sits above its own KPI
+ * strip + panel grid (no double-nested cards).
+ *
+ * Two-row CSS grid:
+ *   col 1 = avatar (spans both rows, centered)
+ *   col 2 = name (row 1) + meta (row 2 spans into col 4)
+ *   col 3 = switcher chip (row 1)
+ *   col 4 = edit-identity button (row 1) */
+.ta-prof-header {
+  padding: 14px 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-default, 4px);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-card);
+  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  column-gap: 16px;
+  row-gap: 6px;
+  align-items: center;
+}
+.ta-prof-header > .ta-avatar         { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+.ta-prof-header > .ta-prof-name      { grid-column: 2; grid-row: 1; min-width: 0; }
+.ta-prof-header > .ta-switcher-chip  { grid-column: 3; grid-row: 1; }
+.ta-prof-header > .ta-prof-actions   { grid-column: 4; grid-row: 1; }
+.ta-prof-header > .ta-prof-meta      { grid-column: 2 / -1; grid-row: 2; min-width: 0; }
+
+@media (max-width: 900px) {
+  .ta-prof-header {
+    grid-template-columns: auto 1fr auto;
+    row-gap: 8px;
+  }
+  .ta-prof-header > .ta-prof-name      { grid-column: 2 / -1; }
+  .ta-prof-header > .ta-switcher-chip  { grid-column: 2; grid-row: 3; justify-self: start; }
+  .ta-prof-header > .ta-prof-actions   { grid-column: 3; grid-row: 3; }
+  .ta-prof-header > .ta-prof-meta      { grid-column: 2 / -1; }
+}
+
+.ta-avatar--lg { width: 40px; height: 40px; font-size: 13px; }
+.ta-prof-name {
+  font-family: var(--font-display);
+  font-style: var(--display-style, normal);
+  font-weight: var(--display-weight, 600);
+  font-size: 22px;
+  margin: 0;
+  line-height: 1.1;
+  color: var(--fg);
+}
+.ta-prof-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  word-break: break-word;
+}
+.ta-prof-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Switcher chip + edit button now share the same height + sit on the
+ * same baseline. Chip keeps its pill shape to read as a dropdown
+ * affordance; button keeps its square corners to read as an action. */
+.ta-switcher-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--bg-elevated);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.ta-switcher-chip:hover {
+  color: var(--fg);
+  border-color: var(--fg-faint);
+  background: var(--bg-sunken);
+}
+.ta-switcher-chip .caret { font-size: 9px; color: var(--fg-muted); }
+.ta-prof-actions .ta-btn { height: 28px; padding: 0 14px; }
+
+/* (Member Profile no longer wraps its sections in an outer .ta-panel —
+ * each section is now a standalone .ta-panel inside the .ta-dash-grid,
+ * mirroring the Dashboard tab's structure. The earlier .ta-prof-body
+ * helper class is therefore unused.)
+ *
+ * Match the gap between (KPI strip → dash-grid) to the (header → KPI
+ * strip) gap so both transitions read the same visually. .ta-kpis's
+ * default 6px margin-bottom was right for the Dashboard (where a hint
+ * row sits underneath) but too tight in this layout. */
+.ta-prof-header + .ta-kpis {
+  margin-bottom: 18px;
+}
+
+/* ---------- Modal ---------- */
+.ta-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: var(--z-modal, 1000);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 60px;
+  animation: ta-fade-in var(--dur, 200ms) var(--ease) both;
+}
+@keyframes ta-fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.ta-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-default, 4px);
+  min-width: 420px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow-plate);
+}
+.ta-modal__head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-sunken);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.ta-modal__title {
+  font-family: var(--font-display);
+  font-style: var(--display-style, normal);
+  font-weight: var(--display-weight, 600);
+  font-size: 18px;
+}
+.ta-modal__sub {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.ta-modal__body {
+  padding: 18px 22px;
+  overflow-y: auto;
+  flex: 1;
+}
+.ta-modal__foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  background: var(--bg-sunken);
+  align-items: center;
+}
+
+.ta-btn--ghost {
+  background: transparent;
+  border: 0;
+  color: var(--fg-muted);
+}
+.ta-btn--ghost:hover { color: var(--fg); background: transparent; }
+
+.ta-picker-list { display: flex; flex-direction: column; gap: 0; }
+.ta-picker-item {
+  display: grid;
+  grid-template-columns: 1fr 60px;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: transparent;
+  cursor: pointer;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  transition: background var(--dur-fast) var(--ease);
+}
+.ta-picker-item:hover { background: var(--bg-sunken); }
+.ta-picker-item.is-active { background: var(--accent-tint); }
+.ta-picker-item.is-active .ta-name { color: var(--accent); }

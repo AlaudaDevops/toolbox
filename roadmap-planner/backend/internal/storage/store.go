@@ -199,6 +199,7 @@ type MemberWeekRow struct {
 	JiraIssuesDone        int       `json:"jira_issues_done"`
 	JiraPointsDone        float64   `json:"jira_points_done"`
 	PRsMerged             int       `json:"prs_merged"`
+	PRsOpened             int       `json:"prs_opened"`
 	PRsReviewed           int       `json:"prs_reviewed"`
 	ReviewLatencyP50Hours *float64  `json:"review_latency_p50_hours,omitempty"`
 }

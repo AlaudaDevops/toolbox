@@ -23,20 +23,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { contributionsAPI, handleAPIError, roadmapAPI } from '../services/api';
+import DashboardView from './TeamAnalyticsDashboard';
 import './TeamAnalytics.css';
 
 /* -------------------------------------------------------------------- */
 /*  Generic helpers                                                      */
 /* -------------------------------------------------------------------- */
 
-// Theme-token series colors. CSS custom properties resolve at paint-time
-// against the active [data-theme]/[data-mode], so dark mode + Atlas
-// theme just work without per-mode branching here.
-const SERIES_COLOR = {
-  prs:     'var(--accent)',
-  jira:    'var(--ocean)',
-  reviews: 'var(--amber)',
-};
+// Theme-token palette for the pillar throughput stack. CSS custom
+// properties resolve at paint time against the active [data-theme] /
+// [data-mode], so dark mode and the Atlas theme need no per-mode
+// branching here.
 const PILLAR_PALETTE = ['var(--accent)', 'var(--ocean)', 'var(--amber)', 'var(--forest)', 'var(--crimson)'];
 
 const formatHours = (h) => (h == null ? '—' : `${(+h).toFixed(1)}h`);
@@ -109,24 +106,25 @@ const colorForPillar = (pillarName, allPillars) => {
 /*  URL state — ?tab=&member=                                            */
 /* -------------------------------------------------------------------- */
 
-const VALID_TABS = new Set(['team', 'member', 'slice']);
+const VALID_TABS = new Set(['dashboard', 'team', 'member', 'slice']);
+const DEFAULT_TAB = 'dashboard';
 const readURLState = () => {
-  if (typeof window === 'undefined') return { tab: 'team', id: '' };
+  if (typeof window === 'undefined') return { tab: DEFAULT_TAB, id: '' };
   try {
     const p = new URLSearchParams(window.location.search);
     let tab = p.get('tab') || '';
     const id = p.get('member') || p.get('id') || '';
-    if (!VALID_TABS.has(tab)) tab = id ? 'member' : 'team';
+    if (!VALID_TABS.has(tab)) tab = id ? 'member' : DEFAULT_TAB;
     return { tab, id };
   } catch {
-    return { tab: 'team', id: '' };
+    return { tab: DEFAULT_TAB, id: '' };
   }
 };
 const writeURLState = ({ tab, id }) => {
   if (typeof window === 'undefined') return;
   try {
     const url = new URL(window.location.href);
-    if (tab && tab !== 'team') url.searchParams.set('tab', tab);
+    if (tab && tab !== DEFAULT_TAB) url.searchParams.set('tab', tab);
     else url.searchParams.delete('tab');
     if (id) url.searchParams.set('member', id);
     else url.searchParams.delete('member');
@@ -303,65 +301,6 @@ function NetworkPanel({ network }) {
         <div>→ orphan PRs (no review)   · <b>{formatPctOne(network.orphan_pct)}</b> of {network.prs_considered}</div>
       </div>
     </div>
-  );
-}
-
-/* -------------------------------------------------------------------- */
-/*  Multi-line trend chart                                               */
-/* -------------------------------------------------------------------- */
-
-function TrendChart({ weeks }) {
-  if (!weeks || weeks.length === 0) {
-    return <p className="ta-meta">No activity in window.</p>;
-  }
-  const W = 720, H = 220, pad = { l: 40, r: 12, t: 14, b: 30 };
-  const allMax = Math.max(1, ...weeks.flatMap((w) => [w.jira_done || 0, w.prs_merged || 0, w.reviews || 0]));
-  const xStep = (W - pad.l - pad.r) / Math.max(1, weeks.length - 1);
-  const yOf = (v) => H - pad.b - (v / allMax) * (H - pad.t - pad.b);
-  const xOf = (i) => pad.l + i * xStep;
-
-  const lines = [
-    { key: 'jira_done',  color: SERIES_COLOR.jira    },
-    { key: 'reviews',    color: SERIES_COLOR.reviews },
-    { key: 'prs_merged', color: SERIES_COLOR.prs     },
-  ];
-
-  return (
-    <>
-      <svg className="ta-chart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-        {[0, 1, 2, 3, 4].map((g) => {
-          const y = pad.t + (H - pad.t - pad.b) * (g / 4);
-          const v = Math.round(allMax * (1 - g / 4));
-          return (
-            <g key={g}>
-              <line className="ta-chart-grid" x1={pad.l} x2={W - pad.r} y1={y} y2={y} />
-              <text className="ta-chart-axis" x={pad.l - 6} y={y + 3} textAnchor="end">{v}</text>
-            </g>
-          );
-        })}
-        {weeks.map((w, i) => (
-          <text key={i} className="ta-chart-axis"
-                x={xOf(i)} y={H - 10} textAnchor="middle">w{i + 1}</text>
-        ))}
-        {lines.map((ln) => {
-          const pts = weeks.map((w, i) => `${xOf(i)},${yOf(w[ln.key] || 0)}`);
-          return (
-            <g key={ln.key}>
-              <polyline fill="none" stroke={ln.color} strokeWidth="1.7" points={pts.join(' ')} />
-              {pts.map((p, i) => {
-                const [cx, cy] = p.split(',');
-                return <circle key={i} cx={cx} cy={cy} r="2.5" fill={ln.color} />;
-              })}
-            </g>
-          );
-        })}
-      </svg>
-      <div className="ta-legend" style={{ marginTop: 6 }}>
-        <span><i style={{ background: SERIES_COLOR.prs }} />PRs merged</span>
-        <span><i style={{ background: SERIES_COLOR.jira }} />Jira done</span>
-        <span><i style={{ background: SERIES_COLOR.reviews }} />Reviews</span>
-      </div>
-    </>
   );
 }
 
@@ -547,8 +486,8 @@ export default function TeamAnalytics() {
 
   const goToTab = useCallback((next, id = selectedID) => {
     if (next === 'member' && !id) {
-      setTab('team');
-      writeURLState({ tab: 'team', id: '' });
+      setTab(DEFAULT_TAB);
+      writeURLState({ tab: DEFAULT_TAB, id: '' });
       return;
     }
     setTab(next);
@@ -587,11 +526,18 @@ export default function TeamAnalytics() {
 
       <nav className="ta-tabs" role="tablist">
         <button
+          className={`ta-tab${tab === 'dashboard' ? ' is-active' : ''}`}
+          onClick={() => goToTab('dashboard')}
+          role="tab"
+        >
+          <span className="ta-tab__num">01</span>Dashboard
+        </button>
+        <button
           className={`ta-tab${tab === 'team' ? ' is-active' : ''}`}
           onClick={() => goToTab('team')}
           role="tab"
         >
-          <span className="ta-tab__num">01</span>Team overview
+          <span className="ta-tab__num">02</span>Team overview
         </button>
         <button
           className={`ta-tab${tab === 'member' ? ' is-active' : ''}`}
@@ -600,14 +546,14 @@ export default function TeamAnalytics() {
           role="tab"
           title={selectedID ? '' : 'Select a member from the team table first'}
         >
-          <span className="ta-tab__num">02</span>Member profile
+          <span className="ta-tab__num">03</span>Member profile
         </button>
         <button
           className={`ta-tab${tab === 'slice' ? ' is-active' : ''}`}
           onClick={() => goToTab('slice')}
           role="tab"
         >
-          <span className="ta-tab__num">03</span>Slice explorer
+          <span className="ta-tab__num">04</span>Slice explorer
         </button>
       </nav>
 
@@ -618,6 +564,14 @@ export default function TeamAnalytics() {
           <h3>No analytics data yet</h3>
           <p>This view shows once <code>storage.enabled</code> is on and the collector has captured at least one cycle.</p>
         </div>
+      )}
+
+      {!empty && tab === 'dashboard' && (
+        <DashboardView
+          rows={rows}
+          orderedPillarNames={orderedPillarNames}
+          onMemberClick={openMember}
+        />
       )}
 
       {!empty && tab === 'team' && (
@@ -787,6 +741,17 @@ function TeamView({ rows, orderedPillarNames, pillarFilter, onPillarFilter, sort
 /*  Member Profile tab                                                   */
 /* -------------------------------------------------------------------- */
 
+// Member-profile metric set used by the KPI strip + new graphs grid.
+// Order matters: it dictates KPI tile order and the "active metric"
+// highlight cycle when the user clicks a tile.
+const MEMBER_METRICS = [
+  { key: 'prs_merged', label: 'PRs merged', color: 'var(--accent)'  },
+  { key: 'prs_opened', label: 'PRs opened', color: 'var(--ocean)'   },
+  { key: 'reviews',    label: 'Reviews',    color: 'var(--amber)'   },
+  { key: 'jira_done',  label: 'Jira done',  color: 'var(--forest)'  },
+  { key: 'points',     label: 'Story pts',  color: 'var(--crimson)' },
+];
+
 function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, onSwitchMember }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -794,6 +759,16 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
   const [editGl, setEditGl] = useState('');
   const [editPillar, setEditPillar] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Metric the KPI strip / new graphs filter on. Only the per-pillar mix
+  // and week-over-week pulse panels react; the multi-line weekly chart
+  // overlays all five and just highlights the chosen line.
+  const [activeMetric, setActiveMetric] = useState('prs_merged');
+
+  // Modal visibility for the new switcher + edit-identity overlays.
+  const [showSwitch, setShowSwitch] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [switchFilter, setSwitchFilter] = useState('');
 
   const id = memberRow?.id;
 
@@ -880,155 +855,376 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
       ? 'derived from components'
       : 'no match';
 
+  /* ---- new-graphs derived data ---- */
+  const half = Math.floor(weeks.length / 2);
+  const recentWks = weeks.slice(half);
+  const priorWks  = weeks.slice(0, half);
+  const sumOver = (arr, key) => arr.reduce((acc, w) => acc + (w ? (w[key] || 0) : 0), 0);
+
+  // Rank vs team — same metric across all members in the prefetched roster.
+  const rankRows = MEMBER_METRICS.map((m) => {
+    const mySum = sumOver(weeks, m.key);
+    const allSums = (allRows || []).map((r) => (r.week_totals || []).reduce((a, w) => a + (w[m.key] || 0), 0));
+    const max = Math.max(1, ...allSums);
+    const sorted = [...allSums].sort((a, b) => b - a);
+    const rank = sorted.indexOf(mySum) + 1;
+    return { ...m, mySum, rank, total: allSums.length, max };
+  });
+
+  // Pulse: prior-half vs recent-half per metric.
+  const pulseRows = MEMBER_METRICS.map((m) => {
+    const r = sumOver(recentWks, m.key);
+    const p = sumOver(priorWks, m.key);
+    const max = Math.max(1, r, p);
+    return { ...m, prior: p, recent: r, max };
+  });
+
+  // KPI tiles — use detail rollups when present, otherwise fall back to
+  // summing the weekly array (so prs_opened works even if memberRow's
+  // legacy fields haven't been populated yet).
+  const kpiTotals = {
+    prs_merged: detail?.prs_merged ?? totals.prs ?? sumOver(weeks, 'prs_merged'),
+    prs_opened: detail?.prs_opened ?? sumOver(weeks, 'prs_opened'),
+    reviews:    detail?.prs_reviewed ?? totals.reviews ?? sumOver(weeks, 'reviews'),
+    jira_done:  detail?.jira_issues_done ?? totals.jira ?? sumOver(weeks, 'jira_done'),
+    points:     detail?.jira_points_done ?? totals.points ?? sumOver(weeks, 'points'),
+  };
+
+  const filteredRoster = sortedRoster.filter((r) => {
+    if (!switchFilter) return true;
+    const f = switchFilter.toLowerCase();
+    return r.name.toLowerCase().includes(f)
+        || (r.id || '').toLowerCase().includes(f)
+        || (r.pillar || '').toLowerCase().includes(f);
+  });
+
   return (
     <>
-      <button type="button" className="ta-backlink" onClick={onBack}>
-        ← Back to team overview
-      </button>
+      {/* Member-profile shell mirrors the Dashboard tab's structure: a top
+       * header strip, a 5-tile KPI strip, then a panel grid. Each section
+       * is its own .ta-panel with the standard head + body. The "back to
+       * team overview" backlink was redundant with the tab nav above, so
+       * it's gone too. */}
+      <header className="ta-prof-header">
+        <span className="ta-avatar ta-avatar--lg">{initialsOf(memberRow.name)}</span>
+        <h2 className="ta-prof-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</h2>
+        <button type="button" className="ta-switcher-chip"
+                onClick={() => { setSwitchFilter(''); setShowSwitch(true); }}>
+          <span>Switch member</span><span className="caret">▼</span>
+        </button>
+        <div className="ta-prof-actions">
+          <button type="button" className="ta-btn" onClick={() => setShowEdit(true)}>✎ Edit identity</button>
+        </div>
+        <div className="ta-prof-meta">
+          {pillarLabel}
+          {(pillarsList.length > 0 || memberRow.pillarOverride)
+            ? <span style={{ color: 'var(--fg-faint)' }}> · {pillarSource}</span>
+            : null}
+          {memberRow.github && <> · gh:<span style={{ color: 'var(--accent)' }}>@{memberRow.github}</span></>}
+          {memberRow.gitlab && <> · gl:<span style={{ color: 'var(--accent)' }}>@{memberRow.gitlab}</span></>}
+          {(memberRow.email || pick(info, 'email', 'Email')) && <> · {memberRow.email || pick(info, 'email', 'Email')}</>}
+        </div>
+      </header>
 
-      <div className="ta-profile-grid">
-        <aside className="ta-profile-card">
-          <div className="ta-profile-avatar">{initialsOf(memberRow.name)}</div>
-          <div className="ta-profile-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</div>
-          <div className="ta-profile-pillar">{pillarLabel.toUpperCase()}{' '}<span style={{ color: 'var(--fg-faint)' }}>· {pillarSource}</span></div>
-          <div className="ta-profile-handles">
-            <div>github · {memberRow.github
-              ? <span className="gh">@{memberRow.github}</span>
-              : <em>not linked</em>}</div>
-            <div>gitlab · {memberRow.gitlab
-              ? <span className="gh">@{memberRow.gitlab}</span>
-              : <em>not linked</em>}</div>
-            <div>jira · {memberRow.email || pick(info, 'email', 'Email') || '—'}</div>
-          </div>
-          <div className="ta-kpi-grid">
-            <div className="ta-kpi"><div className="ta-kpi__lbl">Jira done</div><div className="ta-kpi__val">{totals.jira}</div></div>
-            <div className="ta-kpi"><div className="ta-kpi__lbl">Story pts</div><div className="ta-kpi__val">{Number.isFinite(totals.points) ? (+totals.points).toFixed(0) : '0'}</div></div>
-            <div className="ta-kpi"><div className="ta-kpi__lbl">PRs merged</div><div className="ta-kpi__val">{totals.prs}</div></div>
-            <div className="ta-kpi"><div className="ta-kpi__lbl">Reviews</div><div className="ta-kpi__val">{totals.reviews}</div></div>
-          </div>
-        </aside>
+      <div className="ta-kpis">
+        {MEMBER_METRICS.map((m) => {
+          const v = kpiTotals[m.key] || 0;
+          return (
+            <button key={m.key} type="button"
+                    className={`ta-kpi ta-kpi--btn${activeMetric === m.key ? ' is-active' : ''}`}
+                    onClick={() => setActiveMetric(m.key)}>
+              <div className="ta-kpi__lbl">{m.label}</div>
+              <div className="ta-kpi__val">{Number.isInteger(+v) ? v : (+v).toFixed(1)}</div>
+            </button>
+          );
+        })}
+      </div>
 
-        <div>
-          <div className="ta-card">
-            <h3 className="ta-card__title">Weekly contribution
-              <span className="ta-legend">
-                <span><i style={{ background: SERIES_COLOR.prs }} />PRs merged</span>
-                <span><i style={{ background: SERIES_COLOR.jira }} />Jira done</span>
-                <span><i style={{ background: SERIES_COLOR.reviews }} />Reviews</span>
-              </span>
-            </h3>
-            <div className="ta-card__sub">Last {weeks.length || 12} weeks · counts per ISO week</div>
-            <TrendChart weeks={weeks} />
-          </div>
-
-          <div className="ta-card">
-            <h3 className="ta-card__title">Components touched
-              <span className="ta-meta">Each row = one component · width = issues</span>
-            </h3>
-            <div className="ta-card__sub">Where this member spent their work in the window</div>
-            {components.length === 0 ? (
-              <p className="ta-meta">No components recorded for this member yet — Jira issues need a Component value.</p>
-            ) : (
-              components.map((c) => (
-                <div key={c.component} className="ta-bar-row">
-                  <div className="ta-bar-label">{c.component}</div>
-                  <div className="ta-bar-track">
-                    <div className="ta-bar-fill" style={{ width: `${(c.issues / compMax) * 100}%` }} />
-                  </div>
-                  <div className="ta-bar-num">{c.issues}</div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="ta-card">
-            <h3 className="ta-card__title">This sprint
-              <span className="ta-pill" style={{ background: 'var(--bg-sunken)' }}>
-                {sprint?.name || '—'}
-              </span>
-            </h3>
-            <div className="ta-card__sub">Live · refreshes with the next collection cycle</div>
-            <div className="ta-sprint-grid">
-              <div><div className="ta-kpi__lbl">In progress</div><div className="ta-num ta-num--lg">{sprint?.wip ?? '—'}</div></div>
-              <div><div className="ta-kpi__lbl">Done</div><div className="ta-num ta-num--lg">{sprint?.done ?? '—'}</div></div>
-              <div><div className="ta-kpi__lbl">PRs open</div><div className="ta-num ta-num--lg">{sprint?.prs_open ?? '—'}</div></div>
-              <div><div className="ta-kpi__lbl">PRs merged</div><div className="ta-num ta-num--lg">{sprint?.prs_merged ?? '—'}</div></div>
+      <div className="ta-dash-grid">
+        <div className="ta-panel ta-dash-grid__span">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Weekly contribution · <span style={{ color: MEMBER_METRICS.find((m) => m.key === activeMetric)?.color }}>{MEMBER_METRICS.find((m) => m.key === activeMetric)?.label}</span></div>
+              <div className="ta-panel__sub">Last {weeks.length || 12} weeks · counts per ISO week</div>
             </div>
-          </div>
-
-          <div className="ta-card">
-            <h3 className="ta-card__title">Identity
-              <span className="ta-meta">edit · save triggers an aggregator rebuild</span>
-            </h3>
-            <div className="ta-card__sub">Map this member to a GitHub login + (optional) pillar override</div>
-            <div className="ta-edit-grid">
-              <label className="ta-field">
-                <span className="ta-field-label">Member ID</span>
-                <input className="ta-input ta-input--ro" value={memberRow.id} readOnly />
-                <span className="ta-field-help">Stable internal slug — derived from email at first sync.</span>
-              </label>
-              <label className="ta-field">
-                <span className="ta-field-label">Email (Jira)</span>
-                <input className="ta-input ta-input--ro" value={pick(info, 'email', 'Email') || memberRow.email || ''} readOnly />
-              </label>
-              <label className="ta-field">
-                <span className="ta-field-label">Jira Account ID</span>
-                <input className="ta-input ta-input--ro" value={pick(info, 'jira_account_id', 'JiraAccountID') || memberRow.jira_account_id || ''} readOnly />
-              </label>
-              <label className="ta-field">
-                <span className="ta-field-label">GitHub login</span>
-                <input className="ta-input"
-                       value={editGh}
-                       onChange={(e) => setEditGh(e.target.value)}
-                       placeholder="alicetan"
-                       autoComplete="off"
-                       spellCheck={false} />
-                <span className="ta-field-help">Empty = no GitHub link.</span>
-              </label>
-              <label className="ta-field">
-                <span className="ta-field-label">GitLab username</span>
-                <input className="ta-input"
-                       value={editGl}
-                       onChange={(e) => setEditGl(e.target.value)}
-                       placeholder="alice"
-                       autoComplete="off"
-                       spellCheck={false} />
-                <span className="ta-field-help">Empty = no GitLab link.</span>
-              </label>
-              <label className="ta-field">
-                <span className="ta-field-label">Pillar override</span>
-                <select className="ta-input"
-                        value={editPillar}
-                        onChange={(e) => setEditPillar(e.target.value)}>
-                  <option value="">— derive from Jira components —</option>
-                  {orderedPillarNames.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-                <span className="ta-field-help">Empty falls back to component-derived pillar.</span>
-              </label>
-            </div>
-            <div className="ta-form-actions">
-              {loading && <span className="ta-field-help">Loading…</span>}
-              {saving && <span className="ta-field-help">Saving…</span>}
-              <button type="button" className="ta-btn" onClick={onBack}>Cancel</button>
-              <button type="button" className="ta-btn ta-btn--primary" onClick={onSave}
-                      disabled={!dirty || saving || loading}>Save</button>
-            </div>
-          </div>
-
-          <div className="ta-card">
-            <h3 className="ta-card__title">Switch member</h3>
-            <div className="ta-card__sub">Jump straight to another profile without going back</div>
-            <select className="ta-input" value={memberRow.id} onChange={(e) => onSwitchMember(e.target.value)}>
-              {sortedRoster.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}{r.pillar ? ` · ${r.pillar}` : ''}</option>
+            <div className="ta-legend">
+              {MEMBER_METRICS.map((m) => (
+                <button key={m.key} type="button"
+                        className={`ta-legend__item${activeMetric === m.key ? ' is-active' : ''}`}
+                        onClick={() => setActiveMetric(m.key)}>
+                  <i style={{ background: m.color }} />{m.label}
+                </button>
               ))}
-            </select>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <MemberMultiLine weeks={weeks} highlight={activeMetric} />
+            </div>
+          </div>
+        </div>
+
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Components touched</div>
+              <div className="ta-panel__sub">Each row = one component · width = issues</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              {components.length === 0 ? (
+                <p className="ta-meta">No components recorded for this member yet — Jira issues need a Component value.</p>
+              ) : (
+                <div className="ta-bars">
+                  {components.map((c) => (
+                    <div key={c.component} className="ta-bar-row">
+                      <div className="ta-bar-label">{c.component}</div>
+                      <div className="ta-bar-track">
+                        <div className="ta-bar-fill" style={{ width: `${(c.issues / compMax) * 100}%` }} />
+                      </div>
+                      <div className="ta-bar-num">{c.issues}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Rank vs team</div>
+              <div className="ta-panel__sub">Where this member sits on each metric</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <div className="ta-bars">
+                {rankRows.map((r) => (
+                  <div key={r.key} className="ta-bar-row">
+                    <div className="ta-bar-label">{r.label}</div>
+                    <div className="ta-bar-track">
+                      <div className="ta-bar-fill" style={{ width: `${(r.mySum / r.max) * 100}%`, background: r.color }} />
+                    </div>
+                    <div className="ta-bar-num">#{r.rank}/{r.total}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">Week-over-week pulse</div>
+              <div className="ta-panel__sub">Recent half vs prior half · per metric</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <div className="ta-bars">
+                {pulseRows.map((p) => (
+                  <div key={p.key} className="ta-bar-row">
+                    <div className="ta-bar-label">{p.label}</div>
+                    <div className="ta-bar-track" style={{ display: 'flex', gap: 2, background: 'transparent' }}>
+                      <div className="ta-bar-fill" style={{ width: `${(p.prior / p.max) * 50}%`, background: 'var(--fg-faint)' }} />
+                      <div className="ta-bar-fill" style={{ width: `${(p.recent / p.max) * 50}%`, background: p.color }} />
+                    </div>
+                    <div className="ta-bar-num">{p.prior}→{p.recent}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="ta-panel">
+          <header className="ta-panel__head">
+            <div>
+              <div className="ta-panel__title">This sprint</div>
+              <div className="ta-panel__sub">{sprint?.name || 'Live · refreshes with the next collection cycle'}</div>
+            </div>
+          </header>
+          <div className="ta-panel__body">
+            <div className="ta-chartwrap">
+              <div className="ta-sprint-grid">
+                <div><div className="ta-kpi__lbl">In progress</div><div className="ta-num ta-num--lg">{sprint?.wip ?? '—'}</div></div>
+                <div><div className="ta-kpi__lbl">Done</div><div className="ta-num ta-num--lg">{sprint?.done ?? '—'}</div></div>
+                <div><div className="ta-kpi__lbl">PRs open</div><div className="ta-num ta-num--lg">{sprint?.prs_open ?? '—'}</div></div>
+                <div><div className="ta-kpi__lbl">PRs merged</div><div className="ta-num ta-num--lg">{sprint?.prs_merged ?? '—'}</div></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {showSwitch && (
+        <div className="ta-modal-overlay" onClick={() => setShowSwitch(false)}>
+          <div className="ta-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="ta-modal__head">
+              <div>
+                <div className="ta-modal__title">Switch member</div>
+                <div className="ta-modal__sub">Jump straight to another profile</div>
+              </div>
+              <button className="ta-btn ta-btn--ghost" onClick={() => setShowSwitch(false)}>✕</button>
+            </header>
+            <div className="ta-modal__body">
+              <input type="text" className="ta-input" autoFocus
+                     placeholder="Filter by name, id, or pillar…"
+                     value={switchFilter}
+                     onChange={(e) => setSwitchFilter(e.target.value)}
+                     style={{ width: '100%', marginBottom: 12 }} />
+              <div className="ta-picker-list">
+                {filteredRoster.length === 0 ? (
+                  <p className="ta-meta">No matches.</p>
+                ) : filteredRoster.map((r) => (
+                  <button key={r.id} type="button"
+                          className={`ta-picker-item${r.id === memberRow.id ? ' is-active' : ''}`}
+                          onClick={() => { setShowSwitch(false); onSwitchMember(r.id); }}>
+                    <div>
+                      <div className="ta-name">{r.name}</div>
+                      <div className="ta-meta">{r.pillar || 'unassigned'}</div>
+                    </div>
+                    <div className="ta-meta" style={{ textAlign: 'right' }}>
+                      {((r.prs || 0) + (r.reviews || 0) + (r.jira || 0))}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEdit && (
+        <div className="ta-modal-overlay" onClick={() => setShowEdit(false)}>
+          <div className="ta-modal" onClick={(e) => e.stopPropagation()}>
+            <header className="ta-modal__head">
+              <div>
+                <div className="ta-modal__title">Edit identity</div>
+                <div className="ta-modal__sub">Save triggers an aggregator rebuild</div>
+              </div>
+              <button className="ta-btn ta-btn--ghost" onClick={() => setShowEdit(false)}>✕</button>
+            </header>
+            <div className="ta-modal__body">
+              <div className="ta-edit-grid">
+                <label className="ta-field">
+                  <span className="ta-field-label">Member ID</span>
+                  <input className="ta-input ta-input--ro" value={memberRow.id} readOnly />
+                  <span className="ta-field-help">Stable internal slug — derived from email at first sync.</span>
+                </label>
+                <label className="ta-field">
+                  <span className="ta-field-label">Email (Jira)</span>
+                  <input className="ta-input ta-input--ro" value={pick(info, 'email', 'Email') || memberRow.email || ''} readOnly />
+                </label>
+                <label className="ta-field">
+                  <span className="ta-field-label">Jira Account ID</span>
+                  <input className="ta-input ta-input--ro" value={pick(info, 'jira_account_id', 'JiraAccountID') || memberRow.jira_account_id || ''} readOnly />
+                </label>
+                <label className="ta-field">
+                  <span className="ta-field-label">GitHub login</span>
+                  <input className="ta-input"
+                         value={editGh}
+                         onChange={(e) => setEditGh(e.target.value)}
+                         placeholder="alicetan"
+                         autoComplete="off"
+                         spellCheck={false} />
+                  <span className="ta-field-help">Empty = no GitHub link.</span>
+                </label>
+                <label className="ta-field">
+                  <span className="ta-field-label">GitLab username</span>
+                  <input className="ta-input"
+                         value={editGl}
+                         onChange={(e) => setEditGl(e.target.value)}
+                         placeholder="alice"
+                         autoComplete="off"
+                         spellCheck={false} />
+                  <span className="ta-field-help">Empty = no GitLab link.</span>
+                </label>
+                <label className="ta-field">
+                  <span className="ta-field-label">Pillar override</span>
+                  <select className="ta-input"
+                          value={editPillar}
+                          onChange={(e) => setEditPillar(e.target.value)}>
+                    <option value="">— derive from Jira components —</option>
+                    {orderedPillarNames.map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  <span className="ta-field-help">Empty falls back to component-derived pillar.</span>
+                </label>
+              </div>
+            </div>
+            <footer className="ta-modal__foot">
+              {loading && <span className="ta-field-help" style={{ marginRight: 'auto' }}>Loading…</span>}
+              {saving && <span className="ta-field-help" style={{ marginRight: 'auto' }}>Saving…</span>}
+              <button type="button" className="ta-btn" onClick={() => setShowEdit(false)}>Cancel</button>
+              <button type="button" className="ta-btn ta-btn--primary"
+                      onClick={async () => { await onSave(); setShowEdit(false); }}
+                      disabled={!dirty || saving || loading}>Save</button>
+            </footer>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+/* -------------------------------------------------------------------- */
+/*  MemberMultiLine — five-metric overlay with a highlighted line.       */
+/* -------------------------------------------------------------------- */
+
+function MemberMultiLine({ weeks, highlight }) {
+  if (!weeks || weeks.length === 0) {
+    return <p className="ta-meta">No activity in window.</p>;
+  }
+  const W = 720, H = 220, pad = { l: 40, r: 12, t: 14, b: 30 };
+  const series = MEMBER_METRICS.map((m) => ({
+    ...m,
+    values: weeks.map((w) => w[m.key] || 0),
+  }));
+  const allMax = Math.max(1, ...series.flatMap((s) => s.values));
+  const xStep = (W - pad.l - pad.r) / Math.max(1, weeks.length - 1);
+  const yOf = (v) => H - pad.b - (v / allMax) * (H - pad.t - pad.b);
+  const xOf = (i) => pad.l + i * xStep;
+  return (
+    <svg className="ta-chart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      {[0, 1, 2, 3, 4].map((g) => {
+        const y = pad.t + (H - pad.t - pad.b) * (g / 4);
+        const v = Math.round(allMax * (1 - g / 4));
+        return (
+          <g key={g}>
+            <line className="ta-chart-grid" x1={pad.l} x2={W - pad.r} y1={y} y2={y} />
+            <text className="ta-chart-axis" x={pad.l - 6} y={y + 3} textAnchor="end">{v}</text>
+          </g>
+        );
+      })}
+      {weeks.map((_, i) => (
+        (i % 4 === 0 || i === weeks.length - 1) && (
+          <text key={i} className="ta-chart-axis"
+                x={xOf(i)} y={H - 10} textAnchor="middle">w{i + 1}</text>
+        )
+      ))}
+      {series.map((s) => {
+        const isHi = !highlight || s.key === highlight;
+        const op = highlight && !isHi ? 0.18 : 0.95;
+        const sw = isHi ? 1.9 : 1.1;
+        const pts = s.values.map((v, i) => `${xOf(i)},${yOf(v)}`);
+        return (
+          <g key={s.key}>
+            <polyline fill="none" stroke={s.color}
+                      strokeOpacity={op} strokeWidth={sw} points={pts.join(' ')} />
+            {isHi && pts.map((p, i) => {
+              const [cx, cy] = p.split(',');
+              return <circle key={i} cx={cx} cy={cy} r="2.4" fill={s.color} />;
+            })}
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
@@ -1166,7 +1362,8 @@ function SliceView({ rows, orderedPillarNames, pillarBuckets }) {
     const max = Math.max(1, ...cells);
     const total = cells.reduce((a, b) => a + b, 0);
     return { rowKey: rk, cells, max, total };
-  }), [rowKeys, cols, rows, rowsAxis, colsAxis, metric, seriesByMember, seriesByPillar, allWeeks, metricGetter]);
+    // metric is captured by metricGetter, which is itself a dep below.
+  }), [rowKeys, cols, rows, rowsAxis, colsAxis, seriesByMember, seriesByPillar, allWeeks, metricGetter]);
 
   const labelOfRow = (rk) => {
     if (rowsAxis === 'member') {

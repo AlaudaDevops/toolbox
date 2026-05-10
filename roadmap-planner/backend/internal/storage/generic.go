@@ -320,7 +320,7 @@ func (s *genericStore) MemberWeekMetrics(ctx context.Context, q MemberWeekQuery)
 
 	query := rebind(s.d, `
 		SELECT member_id, week_start, pillar_id, component,
-		       jira_issues_done, jira_points_done, prs_merged, prs_reviewed,
+		       jira_issues_done, jira_points_done, prs_merged, prs_opened, prs_reviewed,
 		       review_latency_p50_hours
 		FROM member_week_metrics
 		WHERE `+strings.Join(conds, " AND ")+`
@@ -335,7 +335,7 @@ func (s *genericStore) MemberWeekMetrics(ctx context.Context, q MemberWeekQuery)
 		var r MemberWeekRow
 		var lat sql.NullFloat64
 		if err := rows.Scan(&r.MemberID, &r.WeekStart, &r.PillarID, &r.Component,
-			&r.JiraIssuesDone, &r.JiraPointsDone, &r.PRsMerged, &r.PRsReviewed, &lat); err != nil {
+			&r.JiraIssuesDone, &r.JiraPointsDone, &r.PRsMerged, &r.PRsOpened, &r.PRsReviewed, &lat); err != nil {
 			return nil, err
 		}
 		if lat.Valid {

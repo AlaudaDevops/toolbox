@@ -298,10 +298,7 @@ func (s *Service) PillarThroughput(ctx context.Context, q storage.MemberWeekQuer
 		if pts.Valid {
 			points = pts.Float64
 		}
-		pillars := pm.PillarsForComponents(comps)
-		if len(pillars) == 0 {
-			pillars = pm.PillarsForVersions(vers)
-		}
+		pillars := pm.PillarsFor(comps, vers)
 		if len(pillars) == 0 {
 			bump("Unassigned", week, 0, 1, points)
 			continue
@@ -380,10 +377,17 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 	// the window, decode the JSON components array, and tally. We use
 	// only the latest snapshot per issue (ROW_NUMBER() over captured_at)
 	// so an issue isn't counted N times across collection cycles.
+	//
+	// In DEVOPS, Jira tickets rarely carry components, so we run the
+	// same components→fixVersion fallback chain the pillar matcher uses
+	// (PillarMap.ComponentsFor): direct components win when present,
+	// otherwise we derive a component name per fixVersion via a
+	// longest-prefix match against the configured pillar's components[].
+	// We pull `versions` alongside `components` for that step.
 	compSQL := rebindSimple(dialect, `
-		SELECT components
+		SELECT components, versions
 		FROM (
-		  SELECT s.components,
+		  SELECT s.components, s.versions,
 		         ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
 		  FROM issue_snapshots s
 		  JOIN collection_runs r ON s.run_id = r.id
@@ -397,23 +401,39 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 		return nil, fmt.Errorf("components: %w", err)
 	}
 	defer rows.Close()
+	pm := s.PillarMap()
 	tally := map[string]int{}
 	for rows.Next() {
-		var raw sql.NullString
-		if err := rows.Scan(&raw); err != nil {
+		var rawComps, rawVers sql.NullString
+		if err := rows.Scan(&rawComps, &rawVers); err != nil {
 			return nil, err
 		}
-		if !raw.Valid || raw.String == "" || raw.String == "null" {
+		var comps, vers []string
+		if rawComps.Valid && rawComps.String != "" && rawComps.String != "null" {
+			if err := json.Unmarshal([]byte(rawComps.String), &comps); err != nil {
+				comps = nil // malformed; treat as empty and let fallback try
+			}
+		}
+		if rawVers.Valid && rawVers.String != "" && rawVers.String != "null" {
+			if err := json.Unmarshal([]byte(rawVers.String), &vers); err != nil {
+				vers = nil
+			}
+		}
+		derived := pm.ComponentsFor(comps, vers)
+		if len(derived) == 0 {
+			// No direct components and no fixVersion fallback hit —
+			// preserve old behaviour (tally direct comps verbatim) so
+			// the unconfigured-pillar path still works in installs that
+			// don't use TeamAnalytics at all.
+			for _, c := range comps {
+				if c != "" {
+					tally[c]++
+				}
+			}
 			continue
 		}
-		var comps []string
-		if err := json.Unmarshal([]byte(raw.String), &comps); err != nil {
-			continue // malformed; skip
-		}
-		for _, c := range comps {
-			if c != "" {
-				tally[c]++
-			}
+		for _, c := range derived {
+			tally[c]++
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -436,6 +456,13 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 	// with a non-empty sprint_id for this member. That gives us the
 	// sprint id + name; we then count WIP / Done by joining all rows
 	// with the same sprint id.
+	//
+	// We scan MAX(r.captured_at) into a sql.NullString rather than
+	// sql.NullTime: SQLite's aggregate functions strip the column type
+	// affinity and hand the value back as a TEXT, which the Go driver
+	// rejects when the destination is *time.Time. We never use the
+	// value in Go code anyway (it only drives the SQL ORDER BY), so a
+	// string scan is sufficient.
 	sprintSQL := rebindSimple(dialect, `
 		SELECT s.sprint_id, MAX(r.captured_at)
 		FROM issue_snapshots s
@@ -445,17 +472,20 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 		ORDER BY MAX(r.captured_at) DESC
 		LIMIT 1`)
 	var sprintID sql.NullString
-	var lastSeen sql.NullTime
+	var lastSeen sql.NullString
 	err = db.QueryRowContext(ctx, sprintSQL, memberID).Scan(&sprintID, &lastSeen)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("sprint pick: %w", err)
+		// Best-effort: log and continue. Components-touched is still
+		// populated above, and the profile page is useful without the
+		// sprint card. Pre-fix this short-circuited the whole call,
+		// dropping components from the response too.
+		return out, nil
 	}
 	if sprintID.Valid && sprintID.String != "" {
 		stats, err := s.sprintCounts(ctx, db, dialect, memberID, sprintID.String)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			out.Sprint = stats
 		}
-		out.Sprint = stats
 	}
 	return out, nil
 }
