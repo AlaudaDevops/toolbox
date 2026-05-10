@@ -921,7 +921,15 @@
 /* (Member Profile no longer wraps its sections in an outer .ta-panel —
  * each section is now a standalone .ta-panel inside the .ta-dash-grid,
  * mirroring the Dashboard tab's structure. The earlier .ta-prof-body
- * helper class is therefore unused.) */
+ * helper class is therefore unused.)
+ *
+ * Match the gap between (KPI strip → dash-grid) to the (header → KPI
+ * strip) gap so both transitions read the same visually. .ta-kpis's
+ * default 6px margin-bottom was right for the Dashboard (where a hint
+ * row sits underneath) but too tight in this layout. */
+.ta-prof-header + .ta-kpis {
+  margin-bottom: 18px;
+}
 
 /* ---------- Modal ---------- */
 .ta-modal-overlay {

@@ -128,6 +128,7 @@ func (h *ContributionsHandler) MemberDetail(c *gin.Context) {
 		"jira_issues_done":         summary.JiraIssuesDone,
 		"jira_points_done":         summary.JiraPointsDone,
 		"prs_merged":               summary.PRsMerged,
+		"prs_opened":               summary.PRsOpened,
 		"prs_reviewed":             summary.PRsReviewed,
 		"review_latency_p50_hours": summary.ReviewLatencyP50,
 	}

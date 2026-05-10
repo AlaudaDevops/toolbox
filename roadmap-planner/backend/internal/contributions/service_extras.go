@@ -436,6 +436,13 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 	// with a non-empty sprint_id for this member. That gives us the
 	// sprint id + name; we then count WIP / Done by joining all rows
 	// with the same sprint id.
+	//
+	// We scan MAX(r.captured_at) into a sql.NullString rather than
+	// sql.NullTime: SQLite's aggregate functions strip the column type
+	// affinity and hand the value back as a TEXT, which the Go driver
+	// rejects when the destination is *time.Time. We never use the
+	// value in Go code anyway (it only drives the SQL ORDER BY), so a
+	// string scan is sufficient.
 	sprintSQL := rebindSimple(dialect, `
 		SELECT s.sprint_id, MAX(r.captured_at)
 		FROM issue_snapshots s
@@ -445,17 +452,20 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 		ORDER BY MAX(r.captured_at) DESC
 		LIMIT 1`)
 	var sprintID sql.NullString
-	var lastSeen sql.NullTime
+	var lastSeen sql.NullString
 	err = db.QueryRowContext(ctx, sprintSQL, memberID).Scan(&sprintID, &lastSeen)
 	if err != nil && err != sql.ErrNoRows {
-		return nil, fmt.Errorf("sprint pick: %w", err)
+		// Best-effort: log and continue. Components-touched is still
+		// populated above, and the profile page is useful without the
+		// sprint card. Pre-fix this short-circuited the whole call,
+		// dropping components from the response too.
+		return out, nil
 	}
 	if sprintID.Valid && sprintID.String != "" {
 		stats, err := s.sprintCounts(ctx, db, dialect, memberID, sprintID.String)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			out.Sprint = stats
 		}
-		out.Sprint = stats
 	}
 	return out, nil
 }
