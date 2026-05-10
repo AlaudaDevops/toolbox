@@ -827,16 +827,42 @@
 .ta-donut-legend .row .pct { text-align: right; color: var(--fg-muted); }
 .ta-donut-legend .swatch { width: 10px; height: 10px; border-radius: var(--radius-sm, 2px); }
 
-/* ---------- Member Profile header (new shape) ---------- */
+/* ---------- Member Profile header (new shape) ----------
+ * Two-row CSS grid:
+ *   col 1 = avatar (spans both rows, centered)
+ *   col 2 = name (row 1) + meta (row 2 spans into col 4)
+ *   col 3 = switcher chip (row 1)
+ *   col 4 = edit-identity button (row 1)
+ * Pre-fix this was a flexbox with a nested name+meta div that pushed
+ * the long meta line under the name and dragged the right-side buttons
+ * out of vertical alignment. */
 .ta-prof-header {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border-soft);
   background: var(--bg-sunken);
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  column-gap: 16px;
+  row-gap: 6px;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
 }
+.ta-prof-header > .ta-avatar         { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+.ta-prof-header > .ta-prof-name      { grid-column: 2; grid-row: 1; min-width: 0; }
+.ta-prof-header > .ta-switcher-chip  { grid-column: 3; grid-row: 1; }
+.ta-prof-header > .ta-prof-actions   { grid-column: 4; grid-row: 1; }
+.ta-prof-header > .ta-prof-meta      { grid-column: 2 / -1; grid-row: 2; min-width: 0; }
+
+@media (max-width: 900px) {
+  .ta-prof-header {
+    grid-template-columns: auto 1fr auto;
+    row-gap: 8px;
+  }
+  .ta-prof-header > .ta-prof-name      { grid-column: 2 / -1; }
+  .ta-prof-header > .ta-switcher-chip  { grid-column: 2; grid-row: 3; justify-self: start; }
+  .ta-prof-header > .ta-prof-actions   { grid-column: 3; grid-row: 3; }
+  .ta-prof-header > .ta-prof-meta      { grid-column: 2 / -1; }
+}
+
 .ta-avatar--lg { width: 40px; height: 40px; font-size: 13px; }
 .ta-prof-name {
   font-family: var(--font-display);
@@ -847,17 +873,28 @@
   line-height: 1.1;
   color: var(--fg);
 }
+.ta-prof-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  word-break: break-word;
+}
 .ta-prof-actions {
-  margin-left: auto;
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
+/* Switcher chip + edit button now share the same height + sit on the
+ * same baseline. Chip keeps its pill shape to read as a dropdown
+ * affordance; button keeps its square corners to read as an action. */
 .ta-switcher-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: 28px;
+  padding: 0 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill, 999px);
   background: var(--bg-elevated);
@@ -865,7 +902,8 @@
   font-size: 11px;
   color: var(--fg-subtle);
   cursor: pointer;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 .ta-switcher-chip:hover {
   color: var(--fg);
@@ -873,6 +911,31 @@
   background: var(--bg-sunken);
 }
 .ta-switcher-chip .caret { font-size: 9px; color: var(--fg-muted); }
+.ta-prof-actions .ta-btn { height: 28px; padding: 0 14px; }
+
+/* Member-profile body: a flex column with a single 18px gap so all
+ * children — KPI strip, weekly chart, the 2×2 sub-grid — share the
+ * same vertical rhythm. The dash-grid below uses the same 18px gap
+ * horizontally, so spacing is uniform in both axes.
+ *
+ * Inner .ta-card sheds its own border/shadow/background here — the
+ * outer panel is already the boundary. Pre-fix this looked like a
+ * card-inside-a-card with doubled rules and uneven margins. */
+.ta-prof-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.ta-prof-body > .ta-kpis { margin-bottom: 0; }
+.ta-prof-body .ta-card {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+.ta-prof-body .ta-card + .ta-card { margin-top: 0; }
+.ta-prof-body .ta-card__title { margin-bottom: 4px; }
+.ta-prof-body .ta-card__sub   { margin-bottom: 8px; }
 
 /* ---------- Modal ---------- */
 .ta-modal-overlay {

@@ -907,18 +907,7 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
       <div className="ta-panel">
         <header className="ta-prof-header">
           <span className="ta-avatar ta-avatar--lg">{initialsOf(memberRow.name)}</span>
-          <div>
-            <h2 className="ta-prof-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</h2>
-            <div className="ta-meta">
-              {pillarLabel}
-              {(pillarsList.length > 0 || memberRow.pillarOverride)
-                ? <span style={{ color: 'var(--fg-faint)' }}> · {pillarSource}</span>
-                : null}
-              {memberRow.github && <> · gh:<span style={{ color: 'var(--accent)' }}>@{memberRow.github}</span></>}
-              {memberRow.gitlab && <> · gl:<span style={{ color: 'var(--accent)' }}>@{memberRow.gitlab}</span></>}
-              {(memberRow.email || pick(info, 'email', 'Email')) && <> · {memberRow.email || pick(info, 'email', 'Email')}</>}
-            </div>
-          </div>
+          <h2 className="ta-prof-name">{pick(info, 'display_name', 'DisplayName') || memberRow.name}</h2>
           <button type="button" className="ta-switcher-chip"
                   onClick={() => { setSwitchFilter(''); setShowSwitch(true); }}>
             <span>Switch member</span><span className="caret">▼</span>
@@ -926,9 +915,18 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
           <div className="ta-prof-actions">
             <button type="button" className="ta-btn" onClick={() => setShowEdit(true)}>✎ Edit identity</button>
           </div>
+          <div className="ta-prof-meta">
+            {pillarLabel}
+            {(pillarsList.length > 0 || memberRow.pillarOverride)
+              ? <span style={{ color: 'var(--fg-faint)' }}> · {pillarSource}</span>
+              : null}
+            {memberRow.github && <> · gh:<span style={{ color: 'var(--accent)' }}>@{memberRow.github}</span></>}
+            {memberRow.gitlab && <> · gl:<span style={{ color: 'var(--accent)' }}>@{memberRow.gitlab}</span></>}
+            {(memberRow.email || pick(info, 'email', 'Email')) && <> · {memberRow.email || pick(info, 'email', 'Email')}</>}
+          </div>
         </header>
 
-        <div className="ta-panel__body">
+        <div className="ta-panel__body ta-prof-body">
           <div className="ta-kpis">
             {MEMBER_METRICS.map((m) => {
               const v = kpiTotals[m.key] || 0;
