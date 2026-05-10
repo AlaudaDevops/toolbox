@@ -231,15 +231,11 @@ func (s *Service) attributionByMember(ctx context.Context, q storage.MemberWeekQ
 				mp[c]++
 			}
 		}
-		// Same matcher chain as service_extras.go's pillar bucket
-		// aggregator: components first, fixVersions as the Phase 1
+		// Shared chain: components-first, fixVersions as the Phase 1
 		// fallback. An issue contributes to every pillar it matches
 		// (multi-pillar components / shared version_prefixes are
 		// honored), and contributes nothing if neither matcher hits.
-		matched := pm.PillarsForComponents(comps)
-		if len(matched) == 0 {
-			matched = pm.PillarsForVersions(vers)
-		}
+		matched := pm.PillarsFor(comps, vers)
 		if len(matched) == 0 {
 			continue
 		}

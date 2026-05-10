@@ -36,6 +36,12 @@ type PillarMap struct {
 	repoGlobs []repoGlob
 	// component name (lowercased) → pillars.
 	componentToPillars map[string][]string
+	// pillar name → its configured component names (lowercased), in
+	// config declaration order. Used by ComponentsFor's longest-prefix
+	// match to derive a component from a fixVersion when the issue has
+	// no components set. Forward index of componentToPillars; built once
+	// at construction time.
+	pillarToComponents map[string][]string
 	// fixVersion prefix/glob → list of pillars that claim it. Used as the
 	// fallback when an issue has no components set; matched in declaration
 	// order so duplicate-pattern entries collapse predictably.
@@ -62,6 +68,7 @@ type versionPrefix struct {
 func NewPillarMap(cfg config.TeamAnalytics) *PillarMap {
 	pm := &PillarMap{
 		componentToPillars: map[string][]string{},
+		pillarToComponents: map[string][]string{},
 	}
 	if len(cfg.Pillars) == 0 {
 		return pm
@@ -87,6 +94,7 @@ func NewPillarMap(cfg config.TeamAnalytics) *PillarMap {
 				continue
 			}
 			pm.componentToPillars[c] = append(pm.componentToPillars[c], name)
+			pm.pillarToComponents[name] = append(pm.pillarToComponents[name], c)
 		}
 		for _, v := range mp.VersionPrefixes {
 			v = strings.ToLower(strings.TrimSpace(v))
@@ -258,6 +266,109 @@ func (p *PillarMap) PillarsForComponents(components []string) []string {
 				out = append(out, pl)
 			}
 		}
+	}
+	return out
+}
+
+// PillarsFor runs the components→fixVersion fallback chain that the
+// per-issue aggregators (PillarThroughput, attributionByMember) all
+// repeat: try PillarsForComponents on the issue's own components first,
+// then fall back to PillarsForVersions on its fixVersions. Returns the
+// union of pillars matched in step 1 OR step 2 — never both, since
+// step 2 only runs when step 1 returned nothing. Empty result means
+// neither matcher hit; the caller decides whether to bucket under
+// "Unassigned" or skip.
+func (p *PillarMap) PillarsFor(directComps, versions []string) []string {
+	if p == nil {
+		return nil
+	}
+	if pillars := p.PillarsForComponents(directComps); len(pillars) > 0 {
+		return pillars
+	}
+	return p.PillarsForVersions(versions)
+}
+
+// ComponentsFor derives a component-name set for one issue using the
+// same components→fixVersion fallback chain. Step 1 returns the issue's
+// own components (trimmed and de-duped, original case preserved). Step 2
+// runs only when step 1 is empty: for every fixVersion we find which
+// pillar(s) claim it (via the same PillarsForVersions match rules) and
+// pick the *longest* component name from each matched pillar's
+// configured components[] that is itself a versionMatches() prefix of
+// the fixVersion. Longest wins so e.g. components `[tekton, tekton-cli]`
+// against version `tekton-cli-v1.0.0` returns `tekton-cli`, not both.
+//
+// Empty return means neither step produced anything — useful as a
+// signal that this issue's components-touched cell should stay blank.
+//
+// Step-2 outputs are lowercased (matching the configured-component
+// storage), step-1 outputs preserve the case Jira returned.
+func (p *PillarMap) ComponentsFor(directComps, versions []string) []string {
+	if p == nil {
+		return nil
+	}
+	// Step 1: issue's own components win when present.
+	if out := dedupNonEmpty(directComps); len(out) > 0 {
+		return out
+	}
+	if len(p.versionPrefixes) == 0 || len(versions) == 0 || len(p.pillarToComponents) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, v := range versions {
+		key := strings.ToLower(strings.TrimSpace(v))
+		if key == "" {
+			continue
+		}
+		matchedPillars := map[string]bool{}
+		for _, vp := range p.versionPrefixes {
+			if !versionMatches(vp.pattern, key) {
+				continue
+			}
+			for _, pl := range vp.pillars {
+				matchedPillars[pl] = true
+			}
+		}
+		for pillar := range matchedPillars {
+			best := ""
+			for _, c := range p.pillarToComponents[pillar] {
+				if !versionMatches(c, key) {
+					continue
+				}
+				if len(c) > len(best) {
+					best = c
+				}
+			}
+			if best == "" || seen[best] {
+				continue
+			}
+			seen[best] = true
+			out = append(out, best)
+		}
+	}
+	return out
+}
+
+// dedupNonEmpty trims, drops empty entries, and de-dupes case-insensitively
+// while preserving the first occurrence's original case.
+func dedupNonEmpty(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, s := range in {
+		t := strings.TrimSpace(s)
+		if t == "" {
+			continue
+		}
+		key := strings.ToLower(t)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, t)
 	}
 	return out
 }

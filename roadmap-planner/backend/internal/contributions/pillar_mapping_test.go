@@ -178,6 +178,113 @@ func TestPillarMap_OrderIsStableAlpha(t *testing.T) {
 	}
 }
 
+func TestPillarMap_PillarsFor_ComponentsWin(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD":           {Components: []string{"Tekton"}, VersionPrefixes: []string{"tektoncd-operator"}},
+			"Tool Deployment": {VersionPrefixes: []string{"harbor-ce-operator"}},
+		},
+	})
+	// Components match → version fallback should NOT run, even if
+	// versions would also match a different pillar.
+	got := pm.PillarsFor([]string{"Tekton"}, []string{"harbor-ce-operator-v2.14.3"})
+	if !equalUnordered(got, []string{"CI/CD"}) {
+		t.Fatalf("components-win failed: %v", got)
+	}
+}
+
+func TestPillarMap_PillarsFor_VersionFallback(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD": {Components: []string{"Tekton"}, VersionPrefixes: []string{"tektoncd-operator"}},
+		},
+	})
+	got := pm.PillarsFor(nil, []string{"tektoncd-operator-v4.11.0"})
+	if !equalUnordered(got, []string{"CI/CD"}) {
+		t.Fatalf("version-fallback failed: %v", got)
+	}
+	// Empty components AND empty versions → empty result.
+	if got := pm.PillarsFor(nil, nil); len(got) != 0 {
+		t.Fatalf("want empty, got %v", got)
+	}
+}
+
+func TestPillarMap_ComponentsFor_DirectComponentsWin(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD": {Components: []string{"tektoncd-operator"}, VersionPrefixes: []string{"tektoncd-operator"}},
+		},
+	})
+	got := pm.ComponentsFor([]string{"Tekton", " ", "Tekton", "Triggers"}, []string{"tektoncd-operator-v4.11.0"})
+	// Verbatim case preserved, dedup case-insensitive, empties dropped,
+	// and the version fallback does NOT run when direct components are
+	// present.
+	if !equalUnordered(got, []string{"Tekton", "Triggers"}) {
+		t.Fatalf("direct-components-win failed: %v", got)
+	}
+}
+
+func TestPillarMap_ComponentsFor_LongestPrefixWins(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD": {
+				Components:      []string{"tekton", "tekton-cli", "tektoncd-operator"},
+				VersionPrefixes: []string{"tektoncd-operator", "tekton-cli"},
+			},
+		},
+	})
+	cases := []struct {
+		name     string
+		versions []string
+		want     []string
+	}{
+		{"longest match — full operator", []string{"tektoncd-operator-v4.11.0"}, []string{"tektoncd-operator"}},
+		{"longest match — cli", []string{"tekton-cli-v1.0.0"}, []string{"tekton-cli"}},
+		{"multi-version dedupes", []string{"tektoncd-operator-v4.11.0", "tektoncd-operator-v4.10.0"}, []string{"tektoncd-operator"}},
+		{"no version match", []string{"unknown-v1.0.0"}, nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := pm.ComponentsFor(nil, tc.versions)
+			if !equalUnordered(got, tc.want) {
+				t.Fatalf("ComponentsFor(nil, %v) = %v, want %v", tc.versions, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestPillarMap_ComponentsFor_PillarMatchedByVersionPrefixOnly(t *testing.T) {
+	// Pillar matches the version (via versionPrefixes) but its
+	// components[] doesn't contain anything that's a prefix of the
+	// version. Expected: no derived component (we don't invent one,
+	// and we don't return the whole components[] list).
+	pm := contributions.NewPillarMap(config.TeamAnalytics{
+		Pillars: map[string]config.PillarMapping{
+			"CI/CD": {
+				Components:      []string{"tekton"},
+				VersionPrefixes: []string{"tektoncd-operator"},
+			},
+		},
+	})
+	got := pm.ComponentsFor(nil, []string{"tektoncd-operator-v4.11.0"})
+	// "tekton" is NOT a versionMatches() prefix of "tektoncd-operator-v4.11.0"
+	// (would need "tekton-" or "tektonv" boundary). So we return nothing
+	// rather than guessing.
+	if len(got) != 0 {
+		t.Fatalf("want empty (no longest-prefix candidate), got %v", got)
+	}
+}
+
+func TestPillarMap_ComponentsFor_Empty(t *testing.T) {
+	pm := contributions.NewPillarMap(config.TeamAnalytics{})
+	if got := pm.ComponentsFor(nil, nil); len(got) != 0 {
+		t.Fatalf("want empty, got %v", got)
+	}
+	if got := pm.ComponentsFor([]string{"X"}, nil); !equalUnordered(got, []string{"X"}) {
+		t.Fatalf("direct comps should pass through even without config, got %v", got)
+	}
+}
+
 func equalUnordered(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
