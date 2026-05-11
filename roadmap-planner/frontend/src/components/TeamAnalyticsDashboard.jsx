@@ -18,8 +18,46 @@
  * — no hex literals, no theme branching here. Light/Dark/Atlas swap
  * automatically.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { HelpCircle } from 'lucide-react';
 import { contributionsAPI } from '../services/api';
+
+/* ChartHelp — small info-icon button that toggles a popover with prose
+ * explaining what a chart shows, how its metric is derived, and how to
+ * read it. Click-outside or Escape closes. Anchored to the panel head
+ * so the popover doesn't get clipped by the panel's overflow:hidden. */
+function ChartHelp({ title, children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <span className="ta-help" ref={ref}>
+      <button type="button"
+              className="ta-help__btn"
+              aria-label={`What is ${title}?`}
+              aria-expanded={open}
+              onClick={() => setOpen((v) => !v)}>
+        <HelpCircle size={14} aria-hidden="true" />
+      </button>
+      {open && (
+        <div className="ta-help__pop" role="dialog" aria-label={`${title} explained`}>
+          <div className="ta-help__pop-title">{title}</div>
+          <div className="ta-help__pop-body">{children}</div>
+        </div>
+      )}
+    </span>
+  );
+}
 
 const METRIC_OPTIONS = [
   { val: 'prs',     label: 'PRs merged' },
@@ -29,16 +67,42 @@ const METRIC_OPTIONS = [
   { val: 'points',  label: 'Story pts'  },
 ];
 
-// CSS-variable colors so light/dark/Atlas all resolve at paint time.
+// Metric colors. Theme tokens don't work here for the same reason they
+// don't for pillars — in the default light theme --accent and --ocean
+// both resolve to blue, so the PRs-merged and PRs-opened lines on the
+// Throughput trend (and the Opened/Merged bars on Inflow vs outflow)
+// rendered identically. Absolute hex values from d3's schemeCategory10
+// guarantee five distinct hues across light / dark / Atlas modes.
 const METRIC_COLOR = {
-  prs:     'var(--accent)',
-  opened:  'var(--ocean)',
-  reviews: 'var(--amber)',
-  jira:    'var(--forest)',
-  points:  'var(--crimson)',
+  prs:     '#1F77B4', // blue
+  opened:  '#9467BD', // purple
+  reviews: '#FF7F0E', // orange
+  jira:    '#2CA02C', // green
+  points:  '#D62728', // red
 };
 
-const PILLAR_PALETTE = ['var(--accent)', 'var(--ocean)', 'var(--amber)', 'var(--forest)', 'var(--crimson)'];
+// Categorical palette for pillar bands. Theme semantic tokens fall short
+// here for two reasons: (1) in the default light theme --accent and
+// --ocean both resolve to blue, so two pillars sharing the first two
+// slots look identical; (2) the DEVOPS project routinely has 7+ pillars,
+// past the 5-token semantic palette, and modulo wrapping forces explicit
+// duplicates. These values are tuned for perceptual distance (Tableau-10
+// inspired) and survive the 0.85 opacity used by the stacked-area /
+// donut paints. Fixed values are fine here because pillar colors carry
+// no theme semantics — they're purely categorical codes.
+const PILLAR_PALETTE = [
+  '#4E79A7', // blue
+  '#F28E2B', // orange
+  '#59A14F', // green
+  '#E15759', // red
+  '#8E44AD', // purple — darkened from Tableau's muted #B07AA1 for stronger separation from magenta/pink slots
+  '#EDC948', // yellow
+  '#76B7B2', // teal
+  '#E377C2', // magenta — replaces Tableau pink #FF9DA7, which washed out next to orange at 0.85 opacity
+  '#9C755F', // brown
+  '#17BECF', // cyan
+  '#7F7F7F', // gray
+];
 const colorForPillar = (pillarName, allPillars) => {
   if (!pillarName || pillarName === 'Unassigned') return 'var(--fg-faint)';
   const idx = (allPillars || []).indexOf(pillarName);
@@ -474,7 +538,21 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
           </button>
         ))}
       </div>
-      <p className="ta-kpis-hint">Click a metric tile to drive the panels below.</p>
+      <div className="ta-kpis-hint">
+        Click a metric tile to drive the panels below.
+        <ChartHelp title="Metric KPI tiles">
+          <p>Five clickable tiles, one per metric. Each tile shows the team‑wide total for the selected window and filter, plus a delta vs the prior half of the same window.</p>
+          <ul>
+            <li><strong>PRs merged</strong> — pull/merge requests with a merged state. The headline throughput metric.</li>
+            <li><strong>PRs opened</strong> — PRs/MRs created in the period, regardless of whether they were merged.</li>
+            <li><strong>Reviews</strong> — code reviews left on others' PRs (non‑self review comments / approvals).</li>
+            <li><strong>Jira done</strong> — Jira issues transitioned to a Done state (resolution timestamp falls in the window).</li>
+            <li><strong>Story pts</strong> — sum of story points on the Jira issues counted above.</li>
+          </ul>
+          <p>The arrow + percentage compares the most recent half of the window to the earlier half (e.g. for 26 weeks: last 13 vs prior 13). <strong>(new)</strong> means there was zero activity in the prior half.</p>
+          <p>Click any tile to make that metric the <em>active metric</em> — the Throughput trend highlights its line, and the Pillar mix, Donut, Top movers, and Ranking panels all switch to it.</p>
+        </ChartHelp>
+      </div>
 
       <div className="ta-dash-grid">
         <div className="ta-panel ta-dash-grid__span">
@@ -482,6 +560,16 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
             <div>
               <div className="ta-panel__title">
                 Throughput trend · <span style={{ color: METRIC_COLOR[metric] }}>{METRIC_OPTIONS.find((o) => o.val === metric)?.label}</span>
+                <ChartHelp title="Throughput trend">
+                  <p>Weekly team‑wide totals for <strong>all five metrics</strong> on the same axis, so you can spot when activity surges, dips, or rotates between PR throughput, reviews, and Jira completion.</p>
+                  <ul>
+                    <li>Each line is the sum across the currently filtered members for that ISO week (Monday‑to‑Sunday, UTC).</li>
+                    <li>The <strong>active metric</strong>'s line is drawn bold with dots; the others are dimmed for reference. Click any tile or legend entry to switch which line is highlighted.</li>
+                    <li>The Y axis auto‑scales to the largest series across all five metrics — so a small metric next to a large one will look flat. That's intentional: it preserves cross‑metric comparison.</li>
+                    <li>X‑axis labels show MM‑DD of every 4th week plus the latest week.</li>
+                  </ul>
+                  <p>Look for sustained slopes (capacity changes), notch‑shaped weeks (releases, holidays), and divergence between <em>PRs opened</em> and <em>PRs merged</em> (queue buildup vs catch‑up).</p>
+                </ChartHelp>
               </div>
               <div className="ta-panel__sub">Team aggregate · weekly</div>
             </div>
@@ -504,7 +592,19 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
         <div className="ta-panel">
           <header className="ta-panel__head">
             <div>
-              <div className="ta-panel__title">Pillar mix over time</div>
+              <div className="ta-panel__title">
+                Pillar mix over time
+                <ChartHelp title="Pillar mix over time">
+                  <p>Stacked area showing how the <strong>active metric</strong> is distributed across pillars, week by week. Each colored band is one pillar; the total height is the team aggregate for that week.</p>
+                  <ul>
+                    <li>A member is counted under their <strong>primary pillar</strong> — derived on the backend from the Jira components their work touches (with a fixVersion‑prefix fallback). Members with no signal yet show under <em>Unassigned</em>.</li>
+                    <li>Bands only appear for pillars that actually contributed in the window; empty pillars are dropped.</li>
+                    <li>Changing the <em>active metric</em> reshapes the whole chart — story points and PRs merged don't share scale.</li>
+                    <li>The Pillar filter at the top still applies. With a single pillar selected, this becomes a single‑band area chart for that pillar's trend.</li>
+                  </ul>
+                  <p>Use it to see whether a single pillar is carrying total throughput, or whether the mix is rotating across teams over time.</p>
+                </ChartHelp>
+              </div>
               <div className="ta-panel__sub">Stacked area · {METRIC_OPTIONS.find((o) => o.val === metric)?.label}</div>
             </div>
           </header>
@@ -524,22 +624,45 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
         <div className="ta-panel">
           <header className="ta-panel__head">
             <div>
-              <div className="ta-panel__title">Inflow vs outflow</div>
-              <div className="ta-panel__sub">PRs opened (blue) vs PRs merged (red) · per week</div>
+              <div className="ta-panel__title">
+                Inflow vs outflow
+                <ChartHelp title="Inflow vs outflow">
+                  <p>Paired weekly bars: <strong>PRs opened</strong> (left, purple) vs <strong>PRs merged</strong> (right, blue). This panel is intentionally fixed to opened‑vs‑merged — it answers "is the team merging what it's opening?" and the question doesn't translate to other metrics.</p>
+                  <ul>
+                    <li><strong>Opened &gt; Merged</strong> for many weeks → queue is growing; PRs are piling up faster than they ship.</li>
+                    <li><strong>Merged &gt; Opened</strong> → the team is catching up on an existing backlog, or shipping work opened earlier in the window.</li>
+                    <li>Roughly balanced → steady state.</li>
+                    <li>Both at zero → a quiet week (holiday, freeze, release pause).</li>
+                  </ul>
+                  <p>Both bars respect the Window and Pillar filters but ignore the active metric selection.</p>
+                </ChartHelp>
+              </div>
+              <div className="ta-panel__sub">PRs opened (purple) vs PRs merged (blue) · per week</div>
             </div>
           </header>
           <div className="ta-chartwrap">
             <GroupedBarChart weeks={weeks}
                              seriesA={flowOpened} seriesB={flowMerged}
                              labelA="Opened" labelB="Merged"
-                             colorA="var(--ocean)" colorB="var(--accent)" />
+                             colorA={METRIC_COLOR.opened} colorB={METRIC_COLOR.prs} />
           </div>
         </div>
 
         <div className="ta-panel">
           <header className="ta-panel__head">
             <div>
-              <div className="ta-panel__title">Distribution by pillar</div>
+              <div className="ta-panel__title">
+                Distribution by pillar
+                <ChartHelp title="Distribution by pillar">
+                  <p>Donut chart of the <strong>active metric</strong> summed over the whole window, sliced by pillar. The number in the center is the team total; each legend row shows the pillar's count and percent of total.</p>
+                  <ul>
+                    <li>Same pillar derivation as the Pillar mix chart — primary pillar per member, from Jira component matches with a fixVersion‑prefix fallback.</li>
+                    <li>Pillars with zero contribution are omitted from both the donut and the legend.</li>
+                    <li>Slices are sorted largest‑first so the biggest contributor is always at 12 o'clock.</li>
+                  </ul>
+                  <p>Where Pillar mix over time shows <em>when</em> a pillar contributes, this shows <em>how much</em> in aggregate. Use it to sanity‑check whether one pillar dominates the metric you're looking at.</p>
+                </ChartHelp>
+              </div>
               <div className="ta-panel__sub">{METRIC_OPTIONS.find((o) => o.val === metric)?.label}</div>
             </div>
           </header>
@@ -561,7 +684,20 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
         <div className="ta-panel">
           <header className="ta-panel__head">
             <div>
-              <div className="ta-panel__title">Top movers</div>
+              <div className="ta-panel__title">
+                Top movers
+                <ChartHelp title="Top movers">
+                  <p>Per‑member <em>delta</em> on the active metric: the recent half of the window minus the prior half. Top 8 by absolute delta — biggest swings in either direction, not biggest totals.</p>
+                  <ul>
+                    <li>Bar length is normalized to the largest absolute delta in the list.</li>
+                    <li>Numeric label: <strong>+N</strong> means the member's count grew compared to the prior half; a bare <strong>N</strong> (no sign) means it dropped; <strong>±</strong> means it didn't move.</li>
+                    <li>Bar color reflects direction — the active metric's color for growth, muted gray for a drop — so improvements and slowdowns are visually distinct.</li>
+                    <li>Members with zero activity in both halves are excluded.</li>
+                    <li>Click any row to jump to that member's profile.</li>
+                  </ul>
+                  <p>Best read together with the ranking panel below: a member can rank near the top of the team yet have a negative mover delta (great in absolute terms, slowing down), or vice‑versa.</p>
+                </ChartHelp>
+              </div>
               <div className="ta-panel__sub">Recent half vs prior half · per-member delta</div>
             </div>
           </header>
@@ -589,7 +725,19 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
         <div className="ta-panel ta-dash-grid__span">
           <header className="ta-panel__head">
             <div>
-              <div className="ta-panel__title">Per-member ranking</div>
+              <div className="ta-panel__title">
+                Per-member ranking
+                <ChartHelp title="Per-member ranking">
+                  <p>Every member who contributed at least one unit of the <strong>active metric</strong> in the window, sorted high to low. Bar length is the member's total; the number on the right is the raw count.</p>
+                  <ul>
+                    <li>The pillar tag next to each name uses the same pillar derivation as the Pillar mix and Donut charts. The bar is colored with that pillar's swatch, so the ranking doubles as a quick pillar‑contribution view.</li>
+                    <li>Filtered by the Window and Pillar selectors at the top — pick a pillar to get a leaderboard within that pillar.</li>
+                    <li>Members with zero activity for the active metric are hidden; switching to a different metric will reshuffle (and may shrink) the list.</li>
+                    <li>Click a row to drill into that member's profile.</li>
+                  </ul>
+                  <p>This is a totals view. For who's accelerating vs slowing down, use the Top movers panel above.</p>
+                </ChartHelp>
+              </div>
               <div className="ta-panel__sub">Selected window · {METRIC_OPTIONS.find((o) => o.val === metric)?.label} · click to drill into profile</div>
             </div>
           </header>
