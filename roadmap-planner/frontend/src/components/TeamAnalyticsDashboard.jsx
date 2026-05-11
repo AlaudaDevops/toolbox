@@ -67,13 +67,18 @@ const METRIC_OPTIONS = [
   { val: 'points',  label: 'Story pts'  },
 ];
 
-// CSS-variable colors so light/dark/Atlas all resolve at paint time.
+// Metric colors. Theme tokens don't work here for the same reason they
+// don't for pillars — in the default light theme --accent and --ocean
+// both resolve to blue, so the PRs-merged and PRs-opened lines on the
+// Throughput trend (and the Opened/Merged bars on Inflow vs outflow)
+// rendered identically. Absolute hex values from d3's schemeCategory10
+// guarantee five distinct hues across light / dark / Atlas modes.
 const METRIC_COLOR = {
-  prs:     'var(--accent)',
-  opened:  'var(--ocean)',
-  reviews: 'var(--amber)',
-  jira:    'var(--forest)',
-  points:  'var(--crimson)',
+  prs:     '#1F77B4', // blue
+  opened:  '#9467BD', // purple
+  reviews: '#FF7F0E', // orange
+  jira:    '#2CA02C', // green
+  points:  '#D62728', // red
 };
 
 // Categorical palette for pillar bands. Theme semantic tokens fall short
@@ -90,13 +95,13 @@ const PILLAR_PALETTE = [
   '#F28E2B', // orange
   '#59A14F', // green
   '#E15759', // red
-  '#B07AA1', // purple
+  '#8E44AD', // purple — darkened from Tableau's muted #B07AA1 for stronger separation from magenta/pink slots
   '#EDC948', // yellow
   '#76B7B2', // teal
-  '#FF9DA7', // pink
+  '#E377C2', // magenta — replaces Tableau pink #FF9DA7, which washed out next to orange at 0.85 opacity
   '#9C755F', // brown
   '#17BECF', // cyan
-  '#BAB0AC', // gray
+  '#7F7F7F', // gray
 ];
 const colorForPillar = (pillarName, allPillars) => {
   if (!pillarName || pillarName === 'Unassigned') return 'var(--fg-faint)';
@@ -622,7 +627,7 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
               <div className="ta-panel__title">
                 Inflow vs outflow
                 <ChartHelp title="Inflow vs outflow">
-                  <p>Paired weekly bars: <strong>PRs opened</strong> (left, blue) vs <strong>PRs merged</strong> (right, red). This panel is intentionally fixed to opened‑vs‑merged — it answers "is the team merging what it's opening?" and the question doesn't translate to other metrics.</p>
+                  <p>Paired weekly bars: <strong>PRs opened</strong> (left, purple) vs <strong>PRs merged</strong> (right, blue). This panel is intentionally fixed to opened‑vs‑merged — it answers "is the team merging what it's opening?" and the question doesn't translate to other metrics.</p>
                   <ul>
                     <li><strong>Opened &gt; Merged</strong> for many weeks → queue is growing; PRs are piling up faster than they ship.</li>
                     <li><strong>Merged &gt; Opened</strong> → the team is catching up on an existing backlog, or shipping work opened earlier in the window.</li>
@@ -632,14 +637,14 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
                   <p>Both bars respect the Window and Pillar filters but ignore the active metric selection.</p>
                 </ChartHelp>
               </div>
-              <div className="ta-panel__sub">PRs opened (blue) vs PRs merged (red) · per week</div>
+              <div className="ta-panel__sub">PRs opened (purple) vs PRs merged (blue) · per week</div>
             </div>
           </header>
           <div className="ta-chartwrap">
             <GroupedBarChart weeks={weeks}
                              seriesA={flowOpened} seriesB={flowMerged}
                              labelA="Opened" labelB="Merged"
-                             colorA="var(--ocean)" colorB="var(--accent)" />
+                             colorA={METRIC_COLOR.opened} colorB={METRIC_COLOR.prs} />
           </div>
         </div>
 

@@ -48,13 +48,13 @@ const PILLAR_PALETTE = [
   '#F28E2B', // orange
   '#59A14F', // green
   '#E15759', // red
-  '#B07AA1', // purple
+  '#8E44AD', // purple
   '#EDC948', // yellow
   '#76B7B2', // teal
-  '#FF9DA7', // pink
+  '#E377C2', // magenta
   '#9C755F', // brown
   '#17BECF', // cyan
-  '#BAB0AC', // gray
+  '#7F7F7F', // gray
 ];
 
 const formatHours = (h) => (h == null ? '—' : `${(+h).toFixed(1)}h`);
