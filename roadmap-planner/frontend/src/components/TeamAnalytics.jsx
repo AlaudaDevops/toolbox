@@ -34,7 +34,28 @@ import './TeamAnalytics.css';
 // properties resolve at paint time against the active [data-theme] /
 // [data-mode], so dark mode and the Atlas theme need no per-mode
 // branching here.
-const PILLAR_PALETTE = ['var(--accent)', 'var(--ocean)', 'var(--amber)', 'var(--forest)', 'var(--crimson)'];
+// Categorical palette for pillar bands. The semantic theme tokens
+// (--accent / --ocean / …) don't work here: in the default light theme
+// --accent and --ocean both resolve to blue (first two slots collide),
+// and the project routinely has more pillars than the 5-token semantic
+// palette, so modulo wrapping causes explicit duplicates. These values
+// are tuned for perceptual distance (Tableau-10 inspired) and survive
+// the 0.85 opacity used by the stacked-area paint. Pillar colors carry
+// no theme semantics — they're purely categorical codes — so fixed
+// values are appropriate. Keep in sync with TeamAnalyticsDashboard.jsx.
+const PILLAR_PALETTE = [
+  '#4E79A7', // blue
+  '#F28E2B', // orange
+  '#59A14F', // green
+  '#E15759', // red
+  '#B07AA1', // purple
+  '#EDC948', // yellow
+  '#76B7B2', // teal
+  '#FF9DA7', // pink
+  '#9C755F', // brown
+  '#17BECF', // cyan
+  '#BAB0AC', // gray
+];
 
 const formatHours = (h) => (h == null ? '—' : `${(+h).toFixed(1)}h`);
 const formatPct = (p) => (p == null || isNaN(p) ? '—' : `${Math.round(p)}%`);

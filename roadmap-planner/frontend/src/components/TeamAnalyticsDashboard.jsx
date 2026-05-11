@@ -76,7 +76,28 @@ const METRIC_COLOR = {
   points:  'var(--crimson)',
 };
 
-const PILLAR_PALETTE = ['var(--accent)', 'var(--ocean)', 'var(--amber)', 'var(--forest)', 'var(--crimson)'];
+// Categorical palette for pillar bands. Theme semantic tokens fall short
+// here for two reasons: (1) in the default light theme --accent and
+// --ocean both resolve to blue, so two pillars sharing the first two
+// slots look identical; (2) the DEVOPS project routinely has 7+ pillars,
+// past the 5-token semantic palette, and modulo wrapping forces explicit
+// duplicates. These values are tuned for perceptual distance (Tableau-10
+// inspired) and survive the 0.85 opacity used by the stacked-area /
+// donut paints. Fixed values are fine here because pillar colors carry
+// no theme semantics — they're purely categorical codes.
+const PILLAR_PALETTE = [
+  '#4E79A7', // blue
+  '#F28E2B', // orange
+  '#59A14F', // green
+  '#E15759', // red
+  '#B07AA1', // purple
+  '#EDC948', // yellow
+  '#76B7B2', // teal
+  '#FF9DA7', // pink
+  '#9C755F', // brown
+  '#17BECF', // cyan
+  '#BAB0AC', // gray
+];
 const colorForPillar = (pillarName, allPillars) => {
   if (!pillarName || pillarName === 'Unassigned') return 'var(--fg-faint)';
   const idx = (allPillars || []).indexOf(pillarName);
@@ -493,42 +514,40 @@ export default function DashboardView({ rows, orderedPillarNames, onMemberClick 
         </div>
       </div>
 
-      <div className="ta-kpis-wrap">
-        <div className="ta-kpis">
-          {kpis.map((k) => (
-            <button key={k.val}
-                    className={`ta-kpi ta-kpi--btn${metric === k.val ? ' is-active' : ''}`}
-                    onClick={() => setMetric(k.val)}
-                    type="button">
-              <div className="ta-kpi__lbl">{k.label}</div>
-              <div className="ta-kpi__val">{fmt(k.total)}</div>
-              {k.delta && (
-                <div className={`ta-kpi__delta ta-delta ${k.delta.kind}`}>
-                  {k.delta.kind === 'flat'
-                    ? `±${k.delta.pct}%`
-                    : `${k.delta.kind === 'up' ? '▲' : '▼'} ${k.delta.pct}%${k.delta.novel ? ' (new)' : ''}`}
-                  {' vs prior half'}
-                </div>
-              )}
-            </button>
-          ))}
-        </div>
-        <div className="ta-kpis-help">
-          <ChartHelp title="Metric KPI tiles">
-            <p>Five clickable tiles, one per metric. Each tile shows the team‑wide total for the selected window and filter, plus a delta vs the prior half of the same window.</p>
-            <ul>
-              <li><strong>PRs merged</strong> — pull/merge requests with a merged state. The headline throughput metric.</li>
-              <li><strong>PRs opened</strong> — PRs/MRs created in the period, regardless of whether they were merged.</li>
-              <li><strong>Reviews</strong> — code reviews left on others' PRs (non‑self review comments / approvals).</li>
-              <li><strong>Jira done</strong> — Jira issues transitioned to a Done state (resolution timestamp falls in the window).</li>
-              <li><strong>Story pts</strong> — sum of story points on the Jira issues counted above.</li>
-            </ul>
-            <p>The arrow + percentage compares the most recent half of the window to the earlier half (e.g. for 26 weeks: last 13 vs prior 13). <strong>(new)</strong> means there was zero activity in the prior half.</p>
-            <p>Click any tile to make that metric the <em>active metric</em> — the Throughput trend highlights its line, and the Pillar mix, Donut, Top movers, and Ranking panels all switch to it.</p>
-          </ChartHelp>
-        </div>
+      <div className="ta-kpis">
+        {kpis.map((k) => (
+          <button key={k.val}
+                  className={`ta-kpi ta-kpi--btn${metric === k.val ? ' is-active' : ''}`}
+                  onClick={() => setMetric(k.val)}
+                  type="button">
+            <div className="ta-kpi__lbl">{k.label}</div>
+            <div className="ta-kpi__val">{fmt(k.total)}</div>
+            {k.delta && (
+              <div className={`ta-kpi__delta ta-delta ${k.delta.kind}`}>
+                {k.delta.kind === 'flat'
+                  ? `±${k.delta.pct}%`
+                  : `${k.delta.kind === 'up' ? '▲' : '▼'} ${k.delta.pct}%${k.delta.novel ? ' (new)' : ''}`}
+                {' vs prior half'}
+              </div>
+            )}
+          </button>
+        ))}
       </div>
-      <p className="ta-kpis-hint">Click a metric tile to drive the panels below.</p>
+      <div className="ta-kpis-hint">
+        Click a metric tile to drive the panels below.
+        <ChartHelp title="Metric KPI tiles">
+          <p>Five clickable tiles, one per metric. Each tile shows the team‑wide total for the selected window and filter, plus a delta vs the prior half of the same window.</p>
+          <ul>
+            <li><strong>PRs merged</strong> — pull/merge requests with a merged state. The headline throughput metric.</li>
+            <li><strong>PRs opened</strong> — PRs/MRs created in the period, regardless of whether they were merged.</li>
+            <li><strong>Reviews</strong> — code reviews left on others' PRs (non‑self review comments / approvals).</li>
+            <li><strong>Jira done</strong> — Jira issues transitioned to a Done state (resolution timestamp falls in the window).</li>
+            <li><strong>Story pts</strong> — sum of story points on the Jira issues counted above.</li>
+          </ul>
+          <p>The arrow + percentage compares the most recent half of the window to the earlier half (e.g. for 26 weeks: last 13 vs prior 13). <strong>(new)</strong> means there was zero activity in the prior half.</p>
+          <p>Click any tile to make that metric the <em>active metric</em> — the Throughput trend highlights its line, and the Pillar mix, Donut, Top movers, and Ranking panels all switch to it.</p>
+        </ChartHelp>
+      </div>
 
       <div className="ta-dash-grid">
         <div className="ta-panel ta-dash-grid__span">

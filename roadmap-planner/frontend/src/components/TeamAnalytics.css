@@ -879,17 +879,13 @@
 .ta-help__pop-body strong { color: var(--fg); font-weight: 600; }
 .ta-help__pop-body em { color: var(--fg-subtle); font-style: italic; }
 
-/* KPI-strip help anchor: keeps the icon to the right of the strip
- * without breaking the 5-column grid. */
-.ta-kpis-wrap {
+/* KPI-strip hint row sits directly under the 5-tile grid and carries
+ * the help icon inline. Flex layout keeps the icon vertically centered
+ * against the small-caps hint text. */
+.ta-kpis-hint {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
-}
-.ta-kpis-wrap .ta-kpis { flex: 1; margin-bottom: 0; }
-.ta-kpis-help {
-  padding-top: 16px; /* visually align with KPI tile labels */
 }
 
 /* Donut layout */
