@@ -493,7 +493,7 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 // sprintCounts gathers (wip, done, prs_open, prs_merged) for a member
 // scoped to one sprint. WIP / Done come from the *latest* snapshot
 // per issue under that sprint id; PR counts come from pull_requests
-// linked via epic_key (best-effort).
+// linked via jira_key (best-effort).
 func (s *Service) sprintCounts(ctx context.Context, db *sql.DB, dialect storage.Dialect, memberID, sprintID string) (*SprintStats, error) {
 	out := &SprintStats{Name: sprintID} // default name = id; we overwrite below if we see something better
 
@@ -529,8 +529,8 @@ func (s *Service) sprintCounts(ctx context.Context, db *sql.DB, dialect storage.
 	}
 
 	// PR counts: look at pull_requests opened by this member that
-	// reference any issue assigned to the sprint via epic_key. This
-	// only works for projects where the linker resolves an epic key
+	// reference any issue assigned to the sprint via jira_key. This
+	// only works for projects where the linker resolves a jira key
 	// onto every PR — when it doesn't, the counts stay at zero.
 	prQ := rebindSimple(dialect, `
 		SELECT
@@ -538,7 +538,7 @@ func (s *Service) sprintCounts(ctx context.Context, db *sql.DB, dialect storage.
 		  SUM(CASE WHEN merged_at IS NULL AND closed_at IS NULL THEN 1 ELSE 0 END)
 		FROM pull_requests
 		WHERE author_id = ?
-		  AND epic_key IN (
+		  AND jira_key IN (
 		    SELECT DISTINCT issue_key FROM issue_snapshots
 		    WHERE sprint_id = ? AND assignee_id = ?
 		  )`)

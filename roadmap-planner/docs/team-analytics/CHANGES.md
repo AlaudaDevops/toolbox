@@ -8,6 +8,37 @@ should consult this when upgrading.
 
 Newest entries first.
 
+## W5 — `pull_requests.epic_key` → `jira_key` rename
+
+**What changed**
+
+- Migration `0006_rename_epic_key_to_jira_key.sql` renames the column
+  via `ALTER TABLE pull_requests RENAME COLUMN epic_key TO jira_key`
+  (portable in both SQLite ≥3.25 and Postgres), drops the
+  `idx_pr_epic` index, and re-creates it as `idx_pr_jira`.
+- Go struct field `PullRequest.EpicKey` → `PullRequest.JiraKey`, with
+  no alias (hard rename).
+- Every SQL reference and assignment in the github / gitlab syncers,
+  the storage upsert, and the `sprintCounts` join updates in lock-step.
+
+**Why**
+
+The column was misnamed at birth: the linker pulls *any* Jira key out
+of the source branch / title via `[A-Z]+-\d+`, so the value is mostly
+a Story or Bug, never an Epic. Audit on prod (4411 linked PRs) showed
+**zero** rows pointing at an actual Epic. The misnomer wasted reader
+time and was load-bearing in one place — `sprintCounts` happened to be
+correct only because most sprint members are Stories.
+
+**Backward compatibility**
+
+The JSON tag `epic_key` flips to `jira_key`. We grep'd `frontend/` and
+no API consumer reads it (the PR list endpoint never exposed it; only
+counts are surfaced). Safe one-shot rename.
+
+**Audit cross-reference:** `docs/team-analytics/audit-2026-05-19/REPORT.md`
+finding B8.
+
 ## W6 — GitLab parity: `hydrate_diff` default flips to `true`
 
 **What changed**
@@ -43,37 +74,6 @@ merged MRs.
 
 **Audit cross-reference:** `docs/team-analytics/audit-2026-05-19/REPORT.md`
 finding B12.
-
-## W5 — `pull_requests.epic_key` → `jira_key` rename
-
-**What changed**
-
-- Migration `0006_rename_epic_key_to_jira_key.sql` renames the column
-  via `ALTER TABLE pull_requests RENAME COLUMN epic_key TO jira_key`
-  (portable in both SQLite ≥3.25 and Postgres), drops the
-  `idx_pr_epic` index, and re-creates it as `idx_pr_jira`.
-- Go struct field `PullRequest.EpicKey` → `PullRequest.JiraKey`, with
-  no alias (hard rename).
-- Every SQL reference and assignment in the github / gitlab syncers,
-  the storage upsert, and the `sprintCounts` join updates in lock-step.
-
-**Why**
-
-The column was misnamed at birth: the linker pulls *any* Jira key out
-of the source branch / title via `[A-Z]+-\d+`, so the value is mostly
-a Story or Bug, never an Epic. Audit on prod (4411 linked PRs) showed
-**zero** rows pointing at an actual Epic. The misnomer wasted reader
-time and was load-bearing in one place — `sprintCounts` happened to be
-correct only because most sprint members are Stories.
-
-**Backward compatibility**
-
-The JSON tag `epic_key` flips to `jira_key`. We grep'd `frontend/` and
-no API consumer reads it (the PR list endpoint never exposed it; only
-counts are surfaced). Safe one-shot rename.
-
-**Audit cross-reference:** `docs/team-analytics/audit-2026-05-19/REPORT.md`
-finding B8.
 
 ## W2 — Bot consolidation under one synthetic `bot` member
 

@@ -248,7 +248,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 				AuthorLogin: authorLogin,
 				HeadBranch:  mr.SourceBranch,
 				BaseBranch:  mr.TargetBranch,
-				EpicKey:     epicKey,
+				JiraKey:     epicKey,
 				CreatedAt:   mr.CreatedAt,
 				MergedAt:    mr.MergedAt,
 				ClosedAt:    mr.ClosedAt,

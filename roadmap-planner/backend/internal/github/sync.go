@@ -221,7 +221,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 				Additions:    pr.Additions,
 				Deletions:    pr.Deletions,
 				ChangedFiles: pr.ChangedFiles,
-				EpicKey:      epicKey,
+				JiraKey:      epicKey,
 				CreatedAt:    pr.CreatedAt,
 				MergedAt:     pr.MergedAt,
 				ClosedAt:     pr.ClosedAt,
