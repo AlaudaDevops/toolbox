@@ -342,12 +342,19 @@ type ComponentBucket struct {
 // pragmatic heuristic — there is no canonical "current sprint" in
 // Jira's data model that we can read without an extra API. The name
 // is whatever the latest snapshot recorded.
+// SprintStats is the W4 (2026-05-19) four-lane sprint card payload.
+// `WIP` is a derived alias kept for one release so any caller that
+// hasn't yet adopted the new lanes keeps working — it equals
+// `Todo + InProgress`. New callers should read the individual lanes.
 type SprintStats struct {
-	Name      string `json:"name,omitempty"`
-	WIP       int    `json:"wip"`
-	Done      int    `json:"done"`
-	PRsOpen   int    `json:"prs_open"`
-	PRsMerged int    `json:"prs_merged"`
+	Name       string `json:"name,omitempty"`
+	Todo       int    `json:"todo"`
+	InProgress int    `json:"in_progress"`
+	Done       int    `json:"done"`
+	Cancelled  int    `json:"cancelled"`
+	WIP        int    `json:"wip"` // deprecated: Todo + InProgress; remove in the next release
+	PRsOpen    int    `json:"prs_open"`
+	PRsMerged  int    `json:"prs_merged"`
 }
 
 // MemberExtras packages everything the profile page wants beyond the
@@ -490,17 +497,22 @@ func (s *Service) MemberExtras(ctx context.Context, memberID string, q storage.M
 	return out, nil
 }
 
-// sprintCounts gathers (wip, done, prs_open, prs_merged) for a member
-// scoped to one sprint. WIP / Done come from the *latest* snapshot
-// per issue under that sprint id; PR counts come from pull_requests
-// linked via jira_key (best-effort).
+// sprintCounts gathers (todo, in_progress, done, cancelled, prs_open,
+// prs_merged) for a member scoped to one sprint. Lanes come from the
+// *latest* snapshot per issue under that sprint id, classified via
+// the StatusClassifier (W4 2026-05-19); PR counts come from
+// pull_requests linked via jira_key (best-effort).
+//
+// `WIP` is a derived alias for `Todo + InProgress` so callers that
+// haven't yet adopted the four-lane shape keep working — slated for
+// removal in the next release.
 func (s *Service) sprintCounts(ctx context.Context, db *sql.DB, dialect storage.Dialect, memberID, sprintID string) (*SprintStats, error) {
 	out := &SprintStats{Name: sprintID} // default name = id; we overwrite below if we see something better
 
 	q := rebindSimple(dialect, `
-		SELECT s.status, s.resolved_at
+		SELECT s.status
 		FROM (
-		  SELECT s.status, s.resolved_at, s.issue_key, s.sprint_id, s.assignee_id,
+		  SELECT s.status, s.issue_key, s.sprint_id, s.assignee_id,
 		         ROW_NUMBER() OVER (PARTITION BY s.issue_key ORDER BY r.captured_at DESC) AS rn
 		  FROM issue_snapshots s
 		  JOIN collection_runs r ON s.run_id = r.id
@@ -514,19 +526,25 @@ func (s *Service) sprintCounts(ctx context.Context, db *sql.DB, dialect storage.
 	defer rows.Close()
 	for rows.Next() {
 		var status string
-		var resolved sql.NullTime
-		if err := rows.Scan(&status, &resolved); err != nil {
+		if err := rows.Scan(&status); err != nil {
 			return nil, err
 		}
-		if resolved.Valid {
+		lane, _ := s.statuses.Classify(status)
+		switch lane {
+		case LaneTodo:
+			out.Todo++
+		case LaneDone:
 			out.Done++
-		} else {
-			out.WIP++
+		case LaneCancelled:
+			out.Cancelled++
+		default:
+			out.InProgress++
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	out.WIP = out.Todo + out.InProgress
 
 	// PR counts: look at pull_requests opened by this member that
 	// reference any issue assigned to the sprint via jira_key. This

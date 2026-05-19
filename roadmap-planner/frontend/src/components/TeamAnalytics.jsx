@@ -1072,8 +1072,10 @@ function MemberView({ memberRow, onBack, onSaved, allRows, orderedPillarNames, o
           <div className="ta-panel__body">
             <div className="ta-chartwrap">
               <div className="ta-sprint-grid">
-                <div><div className="ta-kpi__lbl">In progress</div><div className="ta-num ta-num--lg">{sprint?.wip ?? '—'}</div></div>
+                <div><div className="ta-kpi__lbl">To do</div><div className="ta-num ta-num--lg">{sprint?.todo ?? '—'}</div></div>
+                <div><div className="ta-kpi__lbl">In progress</div><div className="ta-num ta-num--lg">{sprint?.in_progress ?? sprint?.wip ?? '—'}</div></div>
                 <div><div className="ta-kpi__lbl">Done</div><div className="ta-num ta-num--lg">{sprint?.done ?? '—'}</div></div>
+                <div><div className="ta-kpi__lbl">Cancelled</div><div className="ta-num ta-num--lg">{sprint?.cancelled ?? '—'}</div></div>
                 <div><div className="ta-kpi__lbl">PRs open</div><div className="ta-num ta-num--lg">{sprint?.prs_open ?? '—'}</div></div>
                 <div><div className="ta-kpi__lbl">PRs merged</div><div className="ta-num ta-num--lg">{sprint?.prs_merged ?? '—'}</div></div>
               </div>

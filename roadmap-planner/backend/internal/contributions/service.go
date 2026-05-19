@@ -33,10 +33,24 @@ import (
 type Service struct {
 	store    storage.Store
 	pillarMP *PillarMap
+	statuses StatusClassifier
 }
 
 func NewService(store storage.Store) *Service {
-	return &Service{store: store, pillarMP: &PillarMap{}}
+	return &Service{
+		store:    store,
+		pillarMP: &PillarMap{},
+		// W4 default: built-in lanes always populated so SprintCounts
+		// classifies correctly even when SetStatusClassifier is never
+		// called (e.g. tests).
+		statuses: NewStatusClassifier(DefaultStatusLanes()),
+	}
+}
+
+// SetStatusClassifier installs the W4 sprint-lane classifier. Safe to
+// call once at startup; not safe to swap at runtime.
+func (s *Service) SetStatusClassifier(c StatusClassifier) {
+	s.statuses = c
 }
 
 // SetPillarMap installs the pillar attribution map. Called from main.go
