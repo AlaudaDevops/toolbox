@@ -88,6 +88,7 @@ type TeamAnalytics struct {
 	//	    daniel: daniel
 	//	    jtcheng: chengjingtao
 	GitLabUsernamePrefills map[string]string `mapstructure:"gitlab_username_prefills" yaml:"gitlab_username_prefills"`
+<<<<<<< HEAD
 	// Statuses is the W4 (2026-05-19) configurable status → lane map
 	// used by the sprint card. Status names match Jira's `status.name`
 	// case-folded; an unknown status falls back to `in_progress` and
@@ -103,6 +104,28 @@ type StatusLanes struct {
 	InProgress []string `mapstructure:"in_progress" yaml:"in_progress"`
 	Done       []string `mapstructure:"done" yaml:"done"`
 	Cancelled  []string `mapstructure:"cancelled" yaml:"cancelled"`
+=======
+	// MemberDenylist is the operator-curated list of Jira member ids
+	// (slugified email — the same key shape used in the prefill maps)
+	// that should be excluded from the team-analytics rollups and from
+	// every contributions API response, regardless of whether they have
+	// an entry in the prefill maps.
+	//
+	// This is the W1 escape hatch for people who appear in Jira (so the
+	// auto-discovery picks them up) but should not count toward the
+	// dashboard — bots that aren't on the bot allowlist, people who
+	// left the team, contractors loaned out to another pillar, etc.
+	//
+	// Example:
+	//
+	//	team_analytics:
+	//	  member_denylist:
+	//	    - gxjiao
+	//	    - lmhe
+	//	    - zhwang
+	//	    - chaozhou
+	MemberDenylist []string `mapstructure:"member_denylist" yaml:"member_denylist"`
+>>>>>>> 39ec53a (feat(roadmap-planner): W1 — member allowlist + GitLab instance-wide sweep)
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
@@ -207,6 +230,12 @@ type GitLab struct {
 	BackfillDays    int      `mapstructure:"backfill_days"`
 	HydrateDiff     bool     `mapstructure:"hydrate_diff"`
 	IncludeArchived bool     `mapstructure:"include_archived"`
+	// MemberInstanceSweep turns on the W1 Pass B: after the group-scoped
+	// fetch finishes, sweep `/merge_requests?scope=all&author_username=<u>`
+	// for every allowlisted member whose GitLab username we know. Off
+	// by default so existing installs upgrade with no behaviour change;
+	// flip on once `team_analytics.gitlab_username_prefills` is curated.
+	MemberInstanceSweep bool `mapstructure:"member_instance_sweep"`
 }
 
 // Logger represents logger configuration settings
@@ -418,6 +447,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("gitlab.backfill_days", 0)
 	viper.SetDefault("gitlab.hydrate_diff", true)
 	viper.SetDefault("gitlab.include_archived", false)
+	viper.SetDefault("gitlab.member_instance_sweep", false)
 
 	// GitHub defaults
 	viper.SetDefault("github.enabled", false)
@@ -490,6 +520,18 @@ func Load() (*Config, error) {
 				TeamAnalytics TeamAnalytics `yaml:"team_analytics"`
 			}
 			if uerr := yaml.Unmarshal(raw, &preserve); uerr == nil && len(preserve.TeamAnalytics.Pillars) > 0 {
+				// Preserve the YAML-side pillar names (case-sensitive),
+				// but merge back the viper-loaded denylist + prefills
+				// so they aren't lost when the YAML file omits them.
+				if len(preserve.TeamAnalytics.MemberDenylist) == 0 {
+					preserve.TeamAnalytics.MemberDenylist = config.TeamAnalytics.MemberDenylist
+				}
+				if len(preserve.TeamAnalytics.GitHubLoginPrefills) == 0 {
+					preserve.TeamAnalytics.GitHubLoginPrefills = config.TeamAnalytics.GitHubLoginPrefills
+				}
+				if len(preserve.TeamAnalytics.GitLabUsernamePrefills) == 0 {
+					preserve.TeamAnalytics.GitLabUsernamePrefills = config.TeamAnalytics.GitLabUsernamePrefills
+				}
 				config.TeamAnalytics = preserve.TeamAnalytics
 			}
 		}

@@ -10,6 +10,7 @@ package contributions
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
@@ -28,9 +29,14 @@ import (
 // The intended cadence is: every successful Collect() in the Jira side
 // triggers a Rebuild for the affected window. Manual rebuild is also
 // exposed via the API for operators.
+//
+// SetAllowlist (W1) gates which members get rolled up; when disabled,
+// Rebuild reverts to the pre-W1 "everyone with a Jira id" behaviour so
+// the upgrade is opt-in.
 type Aggregator struct {
-	store  storage.Store
-	logger *zap.Logger
+	store     storage.Store
+	logger    *zap.Logger
+	allowlist Allowlist
 }
 
 func NewAggregator(store storage.Store) *Aggregator {
@@ -39,6 +45,11 @@ func NewAggregator(store storage.Store) *Aggregator {
 		logger: logger.WithComponent("contributions-aggregator"),
 	}
 }
+
+// SetAllowlist installs the W1 "who counts" filter. Pass a zero-value
+// Allowlist (Enabled() == false) to disable the filter and preserve the
+// pre-W1 rollup shape — that's the safe rollback knob.
+func (a *Aggregator) SetAllowlist(al Allowlist) { a.allowlist = al }
 
 // Rebuild deletes existing rollup rows in [from, to) and recomputes them
 // from raw tables. Cheap because the rollup table is small; we use it as
@@ -88,6 +99,15 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		return fmt.Errorf("clear window: %w", err)
 	}
 
+	// W1 allowlist: when enabled, the four INSERTs below all carry an
+	// `AND <member_expr> IN (?, …)` clause. The fragment is composed
+	// per-INSERT (the member expression differs: COALESCE(m.id,
+	// pr.author_id) for the PR passes, COALESCE(m.id, rv.reviewer_id)
+	// for the review pass, assignee_id for the Jira pass). The bound
+	// arguments are the same for every INSERT and get appended to each
+	// param slice.
+	allowArgs := a.allowArgs()
+
 	// PRs/MRs merged, by author × week. Pillar/component empty for now —
 	// requires the repos table to be populated, which B2 fixes.
 	//
@@ -119,15 +139,17 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		            AND m.gitlab_username IS NOT NULL
 		            AND m.gitlab_username <> ''
 		            AND LOWER(m.gitlab_username) = pr.author_login)
-		WHERE COALESCE(m.id, pr.author_id) IS NOT NULL
+		WHERE COALESCE(m.id, pr.author_id) IS NOT NULL%s
 		  AND pr.merged_at IS NOT NULL
 		  AND pr.merged_at >= ?
 		  AND pr.merged_at <  ?
 		GROUP BY 1, 2
 		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
-		    prs_merged = excluded.prs_merged`, dialect.WeekStart("merged_at")))
+		    prs_merged = excluded.prs_merged`, dialect.WeekStart("merged_at"), a.allowFragment("COALESCE(m.id, pr.author_id)")))
 
-	if _, err := db.ExecContext(ctx, prSQL, from, to); err != nil {
+	prArgs := append([]any{}, allowArgs...)
+	prArgs = append(prArgs, from, to)
+	if _, err := db.ExecContext(ctx, prSQL, prArgs...); err != nil {
 		return fmt.Errorf("aggregate PRs: %w", err)
 	}
 
@@ -152,14 +174,16 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		            AND m.gitlab_username IS NOT NULL
 		            AND m.gitlab_username <> ''
 		            AND LOWER(m.gitlab_username) = pr.author_login)
-		WHERE COALESCE(m.id, pr.author_id) IS NOT NULL
+		WHERE COALESCE(m.id, pr.author_id) IS NOT NULL%s
 		  AND pr.created_at >= ?
 		  AND pr.created_at <  ?
 		GROUP BY 1, 2
 		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
-		    prs_opened = excluded.prs_opened`, dialect.WeekStart("pr.created_at")))
+		    prs_opened = excluded.prs_opened`, dialect.WeekStart("pr.created_at"), a.allowFragment("COALESCE(m.id, pr.author_id)")))
 
-	if _, err := db.ExecContext(ctx, openedSQL, from, to); err != nil {
+	openedArgs := append([]any{}, allowArgs...)
+	openedArgs = append(openedArgs, from, to)
+	if _, err := db.ExecContext(ctx, openedSQL, openedArgs...); err != nil {
 		return fmt.Errorf("aggregate opened PRs: %w", err)
 	}
 
@@ -185,14 +209,16 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		            AND m.gitlab_username IS NOT NULL
 		            AND m.gitlab_username <> ''
 		            AND LOWER(m.gitlab_username) = rv.reviewer_login)
-		WHERE COALESCE(m.id, rv.reviewer_id) IS NOT NULL
+		WHERE COALESCE(m.id, rv.reviewer_id) IS NOT NULL%s
 		  AND rv.submitted_at >= ?
 		  AND rv.submitted_at <  ?
 		GROUP BY 1, 2
 		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
-		    prs_reviewed = excluded.prs_reviewed`, dialect.WeekStart("submitted_at")))
+		    prs_reviewed = excluded.prs_reviewed`, dialect.WeekStart("submitted_at"), a.allowFragment("COALESCE(m.id, rv.reviewer_id)")))
 
-	if _, err := db.ExecContext(ctx, reviewSQL, from, to); err != nil {
+	rvArgs := append([]any{}, allowArgs...)
+	rvArgs = append(rvArgs, from, to)
+	if _, err := db.ExecContext(ctx, reviewSQL, rvArgs...); err != nil {
 		return fmt.Errorf("aggregate reviews: %w", err)
 	}
 
@@ -233,13 +259,15 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		      AND s.resolved_at <  ?
 		) ranked
 		WHERE rn = 1
-		  AND assignee_id IS NOT NULL
+		  AND assignee_id IS NOT NULL%s
 		GROUP BY 1, 2
 		ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
 		    jira_issues_done = excluded.jira_issues_done,
-		    jira_points_done = excluded.jira_points_done`, dialect.WeekStart("resolved_at")))
+		    jira_points_done = excluded.jira_points_done`, dialect.WeekStart("resolved_at"), a.allowFragment("assignee_id")))
 
-	if _, err := db.ExecContext(ctx, jiraSQL, from, to); err != nil {
+	jiraArgs := []any{from, to}
+	jiraArgs = append(jiraArgs, allowArgs...)
+	if _, err := db.ExecContext(ctx, jiraSQL, jiraArgs...); err != nil {
 		return fmt.Errorf("aggregate jira: %w", err)
 	}
 
@@ -247,7 +275,64 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 	// pull_requests.first_review_at - pull_requests.created_at, p50 by
 	// (reviewer_id, week). p50 across reviews per author per week.
 
+	// W1 cleanup: every rebuild leaves the four INSERTs above blocked
+	// on the allowlist, but historical rollup rows for now-denied
+	// members linger outside the rebuild window. A simple sweep keeps
+	// the table consistent with the configured set on every rebuild.
+	// No-op when the allowlist is disabled (rebinds away to a no-arg
+	// query that matches nothing).
+	if a.allowlist.Enabled() {
+		ids := a.allowlist.IDs()
+		placeholders := make([]string, len(ids))
+		args := make([]any, len(ids))
+		for i, id := range ids {
+			placeholders[i] = "?"
+			args[i] = id
+		}
+		cleanup := rebind(fmt.Sprintf(
+			`DELETE FROM member_week_metrics WHERE member_id NOT IN (%s)`,
+			strings.Join(placeholders, ", "),
+		))
+		if _, err := db.ExecContext(ctx, cleanup, args...); err != nil {
+			return fmt.Errorf("cleanup non-allowlisted rollups: %w", err)
+		}
+	}
+
 	return nil
+}
+
+// allowArgs returns the parameter slice for the IN clause emitted by
+// allowFragment. It's separated so callers can append it onto each
+// INSERT's existing param slice (the order of bound args has to match
+// the order of '?' placeholders in the final, rebound SQL).
+func (a *Aggregator) allowArgs() []any {
+	if !a.allowlist.Enabled() {
+		return nil
+	}
+	ids := a.allowlist.IDs()
+	out := make([]any, len(ids))
+	for i, id := range ids {
+		out[i] = id
+	}
+	return out
+}
+
+// allowFragment returns the SQL fragment that filters by the W1
+// allowlist on the given member-id expression. The fragment is the
+// empty string when the allowlist is disabled, so the surrounding
+// query keeps its pre-W1 shape. When enabled, the fragment starts
+// with " AND " so it can be appended straight after an existing
+// `WHERE x IS NOT NULL` predicate.
+//
+// Bound args for the '?' placeholders come from allowArgs and are
+// appended to the INSERT's existing param slice in source order.
+func (a *Aggregator) allowFragment(memberExpr string) string {
+	if !a.allowlist.Enabled() {
+		return ""
+	}
+	placeholders := strings.Repeat("?, ", a.allowlist.Size())
+	placeholders = strings.TrimSuffix(placeholders, ", ")
+	return fmt.Sprintf("\n\t\t  AND %s IN (%s)", memberExpr, placeholders)
 }
 
 // RebuildRecent is a convenience wrapper for the auto-trigger after a

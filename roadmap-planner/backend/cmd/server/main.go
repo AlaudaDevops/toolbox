@@ -210,9 +210,13 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 	service.SetPillarMap(pillarMap)
 	service.SetStatusClassifier(contributions.NewStatusClassifier(cfg.TeamAnalytics.Statuses))
 	aggregator := contributions.NewAggregator(store)
-	api.AddContributionsRoutes(router, store, service, aggregator)
+	allowlist := contributions.BuildAllowlist(cfg.TeamAnalytics)
+	aggregator.SetAllowlist(allowlist)
+	api.AddContributionsRoutes(router, store, service, aggregator, allowlist)
 	logger.Info("Contributions API routes added",
-		zap.Int("pillars_configured", len(pillarMap.Order())))
+		zap.Int("pillars_configured", len(pillarMap.Order())),
+		zap.Bool("allowlist_enabled", allowlist.Enabled()),
+		zap.Int("allowlist_size", allowlist.Size()))
 
 	// Optional Jira sync goroutine.
 	//
@@ -259,7 +263,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 
 	// Optional GitLab sync goroutine.
 	if cfg.GitLab.Enabled {
-		startGitLabSync(ctx, cfg, store, aggregator)
+		startGitLabSync(ctx, cfg, store, aggregator, allowlist)
 	}
 
 	go func() {
@@ -344,7 +348,7 @@ func buildGitHubClient(cfg *config.GitHub) (*ghclient.Client, string, error) {
 //
 // Same fail-soft contract as startGitHubSync — bad config logs and
 // continues without a GitLab sync rather than refusing to start.
-func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator) {
+func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator, allowlist contributions.Allowlist) {
 	specs := parseGroupSpecs(cfg.GitLab.Groups)
 	if len(specs) == 0 {
 		logger.Warn("gitlab.enabled but gitlab.groups is empty; skipping sync")
@@ -372,6 +376,15 @@ func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Stor
 	syncer := glclient.NewSyncer(client, store, specs, glclient.DefaultLinker(projectKey), backfill)
 	syncer.HydrateDiff = cfg.GitLab.HydrateDiff
 	syncer.IncludeArchived = cfg.GitLab.IncludeArchived
+	syncer.MemberInstanceSweep = cfg.GitLab.MemberInstanceSweep
+	if allowlist.Enabled() {
+		ids := allowlist.IDs()
+		allowed := make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			allowed[id] = struct{}{}
+		}
+		syncer.AllowedMemberIDs = allowed
+	}
 
 	interval, err := time.ParseDuration(cfg.GitLab.SyncInterval)
 	if err != nil {
@@ -381,7 +394,9 @@ func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Stor
 	logger.Info("GitLab sync started",
 		zap.Duration("interval", interval),
 		zap.Int("specs", len(specs)),
-		zap.Int("backfill_days", backfill))
+		zap.Int("backfill_days", backfill),
+		zap.Bool("pass_b_sweep", syncer.MemberInstanceSweep && len(syncer.AllowedMemberIDs) > 0),
+		zap.Int("allowlisted_members", len(syncer.AllowedMemberIDs)))
 }
 
 func parseGroupSpecs(specs []string) []glclient.GroupSpec {

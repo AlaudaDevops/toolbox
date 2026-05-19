@@ -69,6 +69,7 @@ type Project struct {
 // MergeRequest mirrors what we persist into the shared pull_requests table.
 type MergeRequest struct {
 	IID          int        `json:"iid"`
+	ProjectID    int64      `json:"project_id"`
 	Title        string     `json:"title"`
 	State        string     `json:"state"` // "opened" | "closed" | "merged" | "locked"
 	WebURL       string     `json:"web_url"`
@@ -84,6 +85,12 @@ type MergeRequest struct {
 		ID       int64  `json:"id"`
 		Username string `json:"username"`
 	} `json:"author"`
+	// References.Full is the GitLab-canonical "<group>/<sub>/<proj>!<iid>"
+	// pointer. We rely on it in the instance-wide MR sweep to recover
+	// the project path-with-namespace without a per-MR show call.
+	References struct {
+		Full string `json:"full"`
+	} `json:"references"`
 	// Diff stats are only populated when we explicitly request them on
 	// the show endpoint; the list endpoint omits them. We hydrate a
 	// follow-up call only for merged MRs (the few that drive the
@@ -93,6 +100,35 @@ type MergeRequest struct {
 		Deletions    int `json:"deletions"`
 		ChangedFiles int `json:"changes_count_int"`
 	} `json:"-"`
+}
+
+// ProjectPath returns the path-with-namespace ("group/sub/proj") for an
+// MR returned by the instance-wide endpoint. It first tries the
+// References.Full pointer ("group/sub/proj!iid"), then falls back to
+// parsing the web_url. Returns the empty string if neither path works.
+func (m MergeRequest) ProjectPath() string {
+	if full := m.References.Full; full != "" {
+		if idx := strings.Index(full, "!"); idx > 0 {
+			return full[:idx]
+		}
+	}
+	// web_url is of the form
+	// "https://gitlab.example.com/<group>/<sub>/<proj>/-/merge_requests/<iid>".
+	// Strip the scheme+host, then trim "/-/merge_requests/...".
+	if u := m.WebURL; u != "" {
+		// Skip past "scheme://host/".
+		const sep = "://"
+		if i := strings.Index(u, sep); i >= 0 {
+			rest := u[i+len(sep):]
+			if j := strings.Index(rest, "/"); j >= 0 {
+				rest = rest[j+1:]
+				if k := strings.Index(rest, "/-/merge_requests/"); k > 0 {
+					return rest[:k]
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // Note is one MR comment. We only persist non-system non-author notes;
@@ -130,6 +166,14 @@ type ListGroupProjectsOptions struct {
 //
 // The group identifier is URL-path-escaped — `devops/edge` works as the
 // path lookup. For very large groups bump PerPage to 100 (default).
+//
+// `with_shared=false` is enforced server-side: GitLab's default is
+// `true`, which makes the endpoint return every shared project the
+// group has access to. That was the root cause of the W1/B1 audit
+// finding — prod's gitlab.groups=["devops/**"] pulled in
+// `container-platform/*`, `ops/*` etc. and credited their authors as
+// devops members. We never want that fan-out for ingest; per-member
+// instance-wide coverage now lives in ListInstanceMergeRequests.
 func (c *Client) ListGroupProjects(ctx context.Context, group string, opts ListGroupProjectsOptions) ([]Project, error) {
 	if opts.PerPage == 0 {
 		opts.PerPage = 100
@@ -140,6 +184,7 @@ func (c *Client) ListGroupProjects(ctx context.Context, group string, opts ListG
 		q.Set("per_page", strconv.Itoa(opts.PerPage))
 		q.Set("page", strconv.Itoa(page))
 		q.Set("include_subgroups", strconv.FormatBool(opts.IncludeSubgroups))
+		q.Set("with_shared", "false")
 		if !opts.IncludeArchived {
 			q.Set("archived", "false")
 		}
@@ -209,6 +254,75 @@ func (c *Client) ListMergeRequests(ctx context.Context, projectID int64, opts Li
 		var batch []MergeRequest
 		if err := c.do(ctx, "GET", path, nil, &batch); err != nil {
 			return nil, fmt.Errorf("list MRs project %d page %d: %w", projectID, page, err)
+		}
+		out = append(out, batch...)
+		if len(batch) < opts.PerPage {
+			break
+		}
+	}
+	return out, nil
+}
+
+// ListInstanceMergeRequestsOptions controls the instance-wide MR sweep
+// (the per-member Pass B in W1). The endpoint backing this is
+// `GET /api/v4/merge_requests?scope=all&author_username=<u>`.
+//
+// `with_shared` doesn't apply at this endpoint — GitLab always scopes
+// the result by what the auth token can see. For our bot user with
+// `read_api` over the alauda devops members, that's the full instance
+// up to project visibility limits.
+type ListInstanceMergeRequestsOptions struct {
+	AuthorUsername string
+	State          string // "opened" | "closed" | "merged" | "all" (default "all")
+	UpdatedAfter   time.Time
+	OrderBy        string // "updated_at" (default)
+	Sort           string // "asc" | "desc" (default "desc")
+	PerPage        int
+	MaxPages       int // 0 = unlimited
+}
+
+// ListInstanceMergeRequests returns every MR the token can see that
+// matches the supplied filter. We page until either MaxPages or a
+// short page is hit. Pagination semantics mirror ListMergeRequests; the
+// endpoint accepts the same `updated_after`/`order_by`/`sort`/`state`
+// query knobs server-side.
+//
+// Author scoping is required — the unscoped endpoint returns the
+// caller's MRs only, which isn't what Pass B needs. Pass the configured
+// member's gitlab username here.
+func (c *Client) ListInstanceMergeRequests(ctx context.Context, opts ListInstanceMergeRequestsOptions) ([]MergeRequest, error) {
+	if opts.AuthorUsername == "" {
+		return nil, fmt.Errorf("ListInstanceMergeRequests: AuthorUsername required")
+	}
+	if opts.State == "" {
+		opts.State = "all"
+	}
+	if opts.OrderBy == "" {
+		opts.OrderBy = "updated_at"
+	}
+	if opts.Sort == "" {
+		opts.Sort = "desc"
+	}
+	if opts.PerPage == 0 {
+		opts.PerPage = 100
+	}
+	var out []MergeRequest
+	for page := 1; opts.MaxPages == 0 || page <= opts.MaxPages; page++ {
+		q := url.Values{}
+		q.Set("scope", "all")
+		q.Set("author_username", opts.AuthorUsername)
+		q.Set("state", opts.State)
+		q.Set("order_by", opts.OrderBy)
+		q.Set("sort", opts.Sort)
+		q.Set("per_page", strconv.Itoa(opts.PerPage))
+		q.Set("page", strconv.Itoa(page))
+		if !opts.UpdatedAfter.IsZero() {
+			q.Set("updated_after", opts.UpdatedAfter.UTC().Format(time.RFC3339))
+		}
+		path := "/api/v4/merge_requests?" + q.Encode()
+		var batch []MergeRequest
+		if err := c.do(ctx, "GET", path, nil, &batch); err != nil {
+			return nil, fmt.Errorf("list instance MRs author=%s page %d: %w", opts.AuthorUsername, page, err)
 		}
 		out = append(out, batch...)
 		if len(batch) < opts.PerPage {
