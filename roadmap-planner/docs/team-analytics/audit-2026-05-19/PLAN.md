@@ -193,15 +193,16 @@ team_analytics:
     done:
       - "Done"
       - "Resolved"
-      - "Cancelled"
       - "using"
       - "已完成"
+    cancelled:
+      - "Cancelled"
       - "已取消"
 ```
 
-Open mapping calls:
-- **"Cancelled"** put under `done` because the work no longer takes capacity, even though it wasn't delivered. **Q2-follow-up A:** should we add a fourth bucket `cancelled` so velocity charts can exclude it? Default is `done`.
-- **"Ready for Delivery"** put under `in_progress` because it's still QA / release work in flight. **Q2-follow-up B:** confirm.
+Mapping calls:
+- **"Cancelled" / "已取消"** in their own bucket (per Q2-A revision 2026-05-19) — kept separate from `done` so velocity / throughput charts can either include them ("count anything that left the board") or exclude them ("only completed deliverables") without losing the count.
+- **"Ready for Delivery"** put under `in_progress` because it's still QA / release work in flight.
 
 ```go
 type SprintStats struct {
@@ -209,6 +210,7 @@ type SprintStats struct {
     Todo        int    `json:"todo"`
     InProgress  int    `json:"in_progress"`
     Done        int    `json:"done"`
+    Cancelled   int    `json:"cancelled"`
     PRsOpen     int    `json:"prs_open"`
     PRsMerged   int    `json:"prs_merged"`
     PRsTotal    int    `json:"prs_total,omitempty"`
@@ -494,7 +496,7 @@ Suggested rollout, two-week cadence, one PR per workstream unless noted:
 |---|---|---|
 | Q1 | scope of "instance-wide" | members can contribute everywhere → ingest instance-wide, filter by author at calc time (W1 rewritten) |
 | Q2 | sprint status lists | pulled live from Jira; full mapping in W4 |
-| Q2-A | Cancelled bucket | stays in `done` (per maintainer) |
+| Q2-A | Cancelled bucket | own bucket (4 lanes: `todo` / `in_progress` / `done` / `cancelled`) — revised 2026-05-19 |
 | Q2-B | Ready for Delivery | `in_progress` (no objection raised) |
 | Q3 | frontend track | one PR per workstream, backend + frontend together (no objection raised) |
 | Q4 | `epic_key` rename | confirmed hard-rename DB + Go + JSON in one migration |
