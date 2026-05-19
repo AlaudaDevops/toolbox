@@ -125,6 +125,7 @@ github:
     private_key_path: ""       # path to the PEM file (mount via Secret)
     private_key_pem: ""        # raw PEM contents (use env GITHUB_APP_PRIVATE_KEY_PEM in K8s)
 
+<<<<<<< HEAD
 # GitLab ingestion — mirrors `github` for self-hosted GitLab installs.
 # Requires storage.enabled = true.
 gitlab:
@@ -165,4 +166,29 @@ team_analytics:
   member_denylist: []
     # - gxjiao
     # - lmhe
+=======
+# Team analytics — pillar attribution + identity prefills + W1/W2 knobs.
+# All keys here are optional and additive; the dashboard works without
+# them (it just shows the un-curated raw data).
+team_analytics:
+  # github_login_prefills shortcuts the first-time Jira → GitHub
+  # identity link for members the operator already knows. Manual UI
+  # edits always win on subsequent syncs.
+  github_login_prefills: {}
+    # daniel: danielfbm
+    # jtcheng: chengjingtao
+  gitlab_username_prefills: {}
+    # daniel: daniel
+    # jtcheng: chengjingtao
+  # W2 (2026-05-19): explicit list of bot logins that get folded into
+  # the synthetic `bot` member. Match is exact + case-folded; no
+  # suffix magic. Adding a new bot here + restarting picks it up.
+  bot_logins: []
+    # - alaudabot
+    # - alaudaa-renovate
+    # - edge-katanomi-app2[bot]
+    # - copilot-pull-request-reviewer[bot]
+    # - kilo-code-bot[bot]
+    # - copilot
+>>>>>>> ee78c5b (feat(roadmap-planner): W2 — fold bot contributions into synthetic bot member)
   # pillars: { … }            # see docs/team-analytics/PROPOSAL.md

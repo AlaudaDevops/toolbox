@@ -84,6 +84,15 @@ type Syncer struct {
 	IncludeArchived bool          // default false (archived repos skipped)
 	IncludeForks    bool          // default false (forks skipped)
 
+	// IsBotLogin is the W2 predicate that reclassifies a raw login as
+	// the synthetic `bot` member. When non-nil and the predicate returns
+	// true, PR `author_id` / review `reviewer_id` are set to `"bot"`
+	// (so the dashboard credits the volume to one row) and
+	// `pr_reviews.is_bot` is set to 1 (so NetworkDensity excludes the
+	// row from human review-latency stats). Nil predicate disables
+	// the feature.
+	IsBotLogin func(login string) bool
+
 	wildcardCache *wildcardCache
 	nowFn         func() time.Time // injectable for cache-TTL tests
 }
@@ -202,6 +211,9 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			}
 			authorLogin := strings.ToLower(pr.User.Login)
 			authorID := byLogin[authorLogin]
+			if s.IsBotLogin != nil && s.IsBotLogin(authorLogin) {
+				authorID = "bot"
+			}
 			epicKey := ""
 			if s.linker != nil {
 				epicKey = s.linker.Link(pr)
@@ -247,24 +259,34 @@ func (s *Syncer) Sync(ctx context.Context) error {
 					s.logger.Warn("ListReviews failed",
 						zap.String("repo", full), zap.Int("pr", pr.Number), zap.Error(err))
 				} else {
-					var first *time.Time
+					var first, firstHuman *time.Time
 					for _, rev := range reviews {
 						st := strings.ToLower(rev.State)
 						reviewerLogin := strings.ToLower(rev.User.Login)
+						reviewerID := byLogin[reviewerLogin]
+						isBot := s.IsBotLogin != nil && s.IsBotLogin(reviewerLogin)
+						if isBot {
+							reviewerID = "bot"
+						}
 						reviewBatch = append(reviewBatch, storage.PRReview{
 							ID:            fmt.Sprintf("%s#%d/r%d", full, pr.Number, rev.ID),
 							PRID:          rec.ID,
 							Source:        "github",
-							ReviewerID:    byLogin[reviewerLogin],
+							ReviewerID:    reviewerID,
 							ReviewerLogin: reviewerLogin,
 							State:         st,
 							SubmittedAt:   rev.SubmittedAt,
+							IsBot:         isBot,
 						})
 						if first == nil || rev.SubmittedAt.Before(*first) {
 							first = &rev.SubmittedAt
 						}
+						if !isBot && (firstHuman == nil || rev.SubmittedAt.Before(*firstHuman)) {
+							firstHuman = &rev.SubmittedAt
+						}
 					}
 					rec.FirstReviewAt = first
+					rec.FirstHumanReviewAt = firstHuman
 				}
 			}
 			toStore = append(toStore, rec)

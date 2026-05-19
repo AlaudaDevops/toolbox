@@ -88,23 +88,21 @@ type TeamAnalytics struct {
 	//	    daniel: daniel
 	//	    jtcheng: chengjingtao
 	GitLabUsernamePrefills map[string]string `mapstructure:"gitlab_username_prefills" yaml:"gitlab_username_prefills"`
-	// MemberDenylist is the operator-curated list of Jira member ids
-	// (slugified email — the same key shape used in the prefill maps)
+	// MemberDenylist (W1) — operator-curated list of Jira member ids
 	// that should be excluded from the team-analytics rollups and from
-	// every contributions API response, regardless of whether they have
-	// an entry in the prefill maps.
-	//
-	// This is the W1 escape hatch for people who appear in Jira (so the
-	// auto-discovery picks them up) but should not count toward the
-	// dashboard — bots that aren't on the bot allowlist, people who
-	// left the team, contractors loaned out to another pillar, etc.
+	// every contributions API response. Subtracted from the prefill-
+	// derived allowlist.
 	MemberDenylist []string `mapstructure:"member_denylist" yaml:"member_denylist"`
-	// Statuses is the W4 (2026-05-19) configurable status → lane map
-	// used by the sprint card. Status names match Jira's `status.name`
-	// case-folded; an unknown status falls back to `in_progress` and
-	// triggers a warning so the operator can extend the lists. The
-	// built-in defaults cover DEVOPS's 37 statuses across 17 issue
-	// types — see PLAN.md W4 for the full mapping.
+	// BotLogins (W2) — explicit list of GitHub / GitLab logins that
+	// should be reassigned to the synthetic `bot` member instead of
+	// landing under their raw login. Match is exact + case-folded; no
+	// suffix magic. The synthetic `bot` member is auto-created by the
+	// Jira sync.
+	BotLogins []string `mapstructure:"bot_logins" yaml:"bot_logins"`
+	// Statuses (W4) — configurable status → lane map for the sprint
+	// card. Each lane (todo/in_progress/done/cancelled) is optional;
+	// empty lanes inherit DefaultStatusLanes() which covers the live
+	// DEVOPS Jira workflow (37 statuses, English + Chinese).
 	Statuses StatusLanes `mapstructure:"statuses" yaml:"statuses"`
 }
 

@@ -111,6 +111,11 @@ type Syncer struct {
 	// disables Pass B entirely.
 	AllowedMemberIDs map[string]struct{}
 
+	// IsBotLogin is the W2 predicate that reclassifies a raw GitLab
+	// username as the synthetic `bot` member. Mirrors the github
+	// syncer's field; see that doc for behavior. Nil disables.
+	IsBotLogin func(login string) bool
+
 	wildcardCache *wildcardCache
 	nowFn         func() time.Time
 }
@@ -259,6 +264,9 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			}
 			authorLogin := strings.ToLower(mr.Author.Username)
 			authorID := byUsername[authorLogin]
+			if s.IsBotLogin != nil && s.IsBotLogin(authorLogin) {
+				authorID = "bot"
+			}
 			epicKey := ""
 			if s.linker != nil {
 				epicKey = s.linker.Link(mr)
@@ -305,7 +313,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 						zap.String("project", p.PathWithNamespace),
 						zap.Int("iid", mr.IID), zap.Error(err))
 				} else {
-					var first *time.Time
+					var first, firstHuman *time.Time
 					for _, n := range notes {
 						if n.System {
 							continue
@@ -318,20 +326,30 @@ func (s *Syncer) Sync(ctx context.Context) error {
 						if !ok {
 							continue
 						}
+						reviewerID := byUsername[reviewerLogin]
+						isBot := s.IsBotLogin != nil && s.IsBotLogin(reviewerLogin)
+						if isBot {
+							reviewerID = "bot"
+						}
 						reviewBatch = append(reviewBatch, storage.PRReview{
 							ID:            fmt.Sprintf("%s!%d/n%d", p.PathWithNamespace, mr.IID, n.ID),
 							PRID:          rec.ID,
 							Source:        "gitlab",
-							ReviewerID:    byUsername[reviewerLogin],
+							ReviewerID:    reviewerID,
 							ReviewerLogin: reviewerLogin,
 							State:         st,
 							SubmittedAt:   n.CreatedAt,
+							IsBot:         isBot,
 						})
 						if first == nil || n.CreatedAt.Before(*first) {
 							first = &n.CreatedAt
 						}
+						if !isBot && (firstHuman == nil || n.CreatedAt.Before(*firstHuman)) {
+							firstHuman = &n.CreatedAt
+						}
 					}
 					rec.FirstReviewAt = first
+					rec.FirstHumanReviewAt = firstHuman
 				}
 			}
 			toStore = append(toStore, rec)
