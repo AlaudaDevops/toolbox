@@ -69,16 +69,17 @@ func (s *Service) PillarMap() *PillarMap {
 // to its pillar via the Phase 1 fixVersion-prefix fallback rather than
 // a Jira component match.
 type MemberSummary struct {
-	MemberID         string   `json:"member_id"`
-	WeekTotals       []Bucket `json:"week_totals"`
-	JiraIssuesDone   int      `json:"jira_issues_done"`
-	JiraPointsDone   float64  `json:"jira_points_done"`
-	PRsMerged        int      `json:"prs_merged"`
-	PRsOpened        int      `json:"prs_opened"`
-	PRsReviewed      int      `json:"prs_reviewed"`
-	ReviewLatencyP50 float64  `json:"review_latency_p50_hours,omitempty"`
-	Components       []string `json:"components,omitempty"`
-	Pillars          []string `json:"pillars,omitempty"`
+	MemberID         string         `json:"member_id"`
+	WeekTotals       []Bucket       `json:"week_totals"`
+	PeriodTotals     []PeriodBucket `json:"period_totals,omitempty"` // W7: populated when ?period=release_quarter
+	JiraIssuesDone   int            `json:"jira_issues_done"`
+	JiraPointsDone   float64        `json:"jira_points_done"`
+	PRsMerged        int            `json:"prs_merged"`
+	PRsOpened        int            `json:"prs_opened"`
+	PRsReviewed      int            `json:"prs_reviewed"`
+	ReviewLatencyP50 float64        `json:"review_latency_p50_hours,omitempty"`
+	Components       []string       `json:"components,omitempty"`
+	Pillars          []string       `json:"pillars,omitempty"`
 }
 
 // Bucket is one weekly aggregation point.
@@ -89,6 +90,53 @@ type Bucket struct {
 	PRsMerged int       `json:"prs_merged"`
 	PRsOpened int       `json:"prs_opened"`
 	Reviews   int       `json:"reviews"`
+}
+
+// PeriodBucket mirrors Bucket but is keyed by a release-cadence
+// quarter label instead of a week_start timestamp. Returned by the
+// W7 (2026-05-19) `?period=release_quarter` API mode.
+//
+// The current resolver derives the label from `CalendarQuarter(weekStart)`
+// for every week underneath; an upcoming Jira sync pass populates
+// `quarter_assignments` from the Milestone-prefix chain so the bucket
+// matches the release cadence rather than calendar quarters.
+type PeriodBucket struct {
+	Period    string `json:"period"`
+	JiraDone  int    `json:"jira_done"`
+	Points    float64 `json:"points"`
+	PRsMerged int    `json:"prs_merged"`
+	PRsOpened int    `json:"prs_opened"`
+	Reviews   int    `json:"reviews"`
+}
+
+// FoldWeeksByCalendarQuarter sums weekly buckets into PeriodBuckets
+// keyed by `CalendarQuarter(weekStart)`. Output is sorted by period
+// ascending (string sort works because labels are `<YYYY>Q<n>`).
+func FoldWeeksByCalendarQuarter(weeks []Bucket) []PeriodBucket {
+	by := map[string]*PeriodBucket{}
+	for _, w := range weeks {
+		label := CalendarQuarter(w.WeekStart)
+		b, ok := by[label]
+		if !ok {
+			b = &PeriodBucket{Period: label}
+			by[label] = b
+		}
+		b.JiraDone += w.JiraDone
+		b.Points += w.Points
+		b.PRsMerged += w.PRsMerged
+		b.PRsOpened += w.PRsOpened
+		b.Reviews += w.Reviews
+	}
+	labels := make([]string, 0, len(by))
+	for l := range by {
+		labels = append(labels, l)
+	}
+	sort.Strings(labels)
+	out := make([]PeriodBucket, 0, len(labels))
+	for _, l := range labels {
+		out = append(out, *by[l])
+	}
+	return out
 }
 
 // TeamOverview returns one MemberSummary per member, summed across the

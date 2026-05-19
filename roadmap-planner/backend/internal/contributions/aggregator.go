@@ -255,14 +255,16 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 // large enough to cover both the backfill default and any out-of-band
 // updates we may have absorbed (e.g., a back-dated `resolved` change).
 //
-// Default window is the last (storageBackfillDays + 7) days, capped at
-// 365. Pass days=0 to use the default.
+// Default window is the last 400 days (W7 2026-05-19, was 187), capped
+// at 730. Pass days=0 to use the default. The bump matches the
+// 365-day Storage.BackfillDays so the first rebuild after a fresh
+// deploy fully populates the year of rollup rows.
 func (a *Aggregator) RebuildRecent(ctx context.Context, days int) error {
 	if days <= 0 {
-		days = 187
+		days = 400
 	}
-	if days > 365 {
-		days = 365
+	if days > 730 {
+		days = 730
 	}
 	now := time.Now().UTC()
 	return a.Rebuild(ctx, MondayOf(now.AddDate(0, 0, -days)), MondayOf(now.AddDate(0, 0, 7)))

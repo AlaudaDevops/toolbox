@@ -52,10 +52,15 @@ func (h *ContributionsHandler) ListMembers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"members": members})
 }
 
-// TeamOverview — GET /api/contributions/team?from=&to=&pillar=&component=&include_inactive=
+// TeamOverview — GET /api/contributions/team?from=&to=&pillar=&component=&include_inactive=&period=
 //
 // Inactive members are dropped from the rollup table by default for the
 // same reason as ListMembers.
+//
+// W7 2026-05-19: `?period=release_quarter` folds the per-week buckets
+// into `<YYYY>Q<n>` labels via the calendar-quarter resolver (until
+// the Milestone-prefix Jira sync pass populates the
+// `quarter_assignments` table with authoritative labels).
 func (h *ContributionsHandler) TeamOverview(c *gin.Context) {
 	q, err := h.parseQuery(c)
 	if err != nil {
@@ -67,6 +72,11 @@ func (h *ContributionsHandler) TeamOverview(c *gin.Context) {
 		logger.Error("team overview failed", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if c.Query("period") == contributions.PeriodReleaseQuarter {
+		for i := range out {
+			out[i].PeriodTotals = contributions.FoldWeeksByCalendarQuarter(out[i].WeekTotals)
+		}
 	}
 	if !truthy(c.Query("include_inactive")) {
 		members, mErr := h.store.ListMembers(c.Request.Context())
@@ -110,6 +120,9 @@ func (h *ContributionsHandler) MemberDetail(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	if c.Query("period") == contributions.PeriodReleaseQuarter && summary != nil {
+		summary.PeriodTotals = contributions.FoldWeeksByCalendarQuarter(summary.WeekTotals)
+	}
 	// Enrich with the directory entry so the profile page has the
 	// identity fields (display name, email, github_login, …) without a
 	// second round-trip.
@@ -125,6 +138,7 @@ func (h *ContributionsHandler) MemberDetail(c *gin.Context) {
 	resp := gin.H{
 		"member_id":                summary.MemberID,
 		"week_totals":              summary.WeekTotals,
+		"period_totals":            summary.PeriodTotals,
 		"jira_issues_done":         summary.JiraIssuesDone,
 		"jira_points_done":         summary.JiraPointsDone,
 		"prs_merged":               summary.PRsMerged,
@@ -316,14 +330,21 @@ func (h *ContributionsHandler) CollectorStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, out)
 }
 
-// parseQuery normalises ?from=&to=&pillar=&component=&member=.
+// parseQuery normalises ?from=&to=&pillar=&component=&member=&period=.
 //
-// Default window is the last 12 weeks (84 days), which matches the
-// prototype and is the most common dashboard view.
+// Default window: the last 12 weeks (84 days) when the caller stays on
+// week-period; the last ~12 months (364 days, four full quarters)
+// when the caller asks for `?period=release_quarter`. W7 (2026-05-19):
+// dashboards that flip to the quarter view get a full year of buckets
+// without having to pass an explicit `from`.
 func (h *ContributionsHandler) parseQuery(c *gin.Context) (storage.MemberWeekQuery, error) {
 	now := time.Now().UTC()
+	defaultBack := 84
+	if c.Query("period") == contributions.PeriodReleaseQuarter {
+		defaultBack = 364
+	}
 	q := storage.MemberWeekQuery{
-		From: contributions.MondayOf(now.AddDate(0, 0, -84)),
+		From: contributions.MondayOf(now.AddDate(0, 0, -defaultBack)),
 		To:   contributions.MondayOf(now.AddDate(0, 0, 7)),
 	}
 	if v := c.Query("from"); v != "" {
