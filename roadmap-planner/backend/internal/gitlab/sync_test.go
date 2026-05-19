@@ -99,3 +99,14 @@ func TestDefaultLinkerExtractsEpic(t *testing.T) {
 func mr(_ *testing.T, branch, title string) MergeRequest {
 	return MergeRequest{SourceBranch: branch, Title: title}
 }
+
+// TestSyncerHydrateDiffDefault pins the W6 (2026-05-19) decision that
+// NewSyncer ships with diff hydration on. Operators who hit GitLab
+// rate-limit budget can still disable via `gitlab.hydrate_diff: false`;
+// this test guards the default so it doesn't silently flip back.
+func TestSyncerHydrateDiffDefault(t *testing.T) {
+	s := NewSyncer(nil, nil, nil, nil, 0)
+	if !s.HydrateDiff {
+		t.Fatalf("NewSyncer.HydrateDiff = false, want true (W6 default)")
+	}
+}
