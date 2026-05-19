@@ -264,7 +264,6 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 		DisplayName    *string `json:"display_name"`
 		GitHubLogin    *string `json:"github_login"`
 		GitLabUsername *string `json:"gitlab_username"`
-		PillarID       *string `json:"pillar_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -297,9 +296,6 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 	if req.GitLabUsername != nil {
 		existing.GitLabUsername = strings.ToLower(strings.TrimSpace(*req.GitLabUsername))
 	}
-	if req.PillarID != nil {
-		existing.PillarID = strings.TrimSpace(*req.PillarID)
-	}
 
 	// Literal-overwrite — UpsertMember's COALESCE semantics (which
 	// protect operator edits from being clobbered by the Jira sync)
@@ -309,7 +305,6 @@ func (h *ContributionsHandler) UpdateMember(c *gin.Context) {
 		DisplayName:    existing.DisplayName,
 		GitHubLogin:    existing.GitHubLogin,
 		GitLabUsername: existing.GitLabUsername,
-		PillarID:       existing.PillarID,
 	}); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

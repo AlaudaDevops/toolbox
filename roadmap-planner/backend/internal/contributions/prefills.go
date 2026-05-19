@@ -72,7 +72,6 @@ func ApplyGitHubLoginPrefills(ctx context.Context, store storage.Store, prefills
 			DisplayName:    m.DisplayName,
 			GitHubLogin:    gh,
 			GitLabUsername: m.GitLabUsername,
-			PillarID:       m.PillarID,
 		}
 		if sErr := store.SetMemberIdentity(ctx, m.ID, ident); sErr != nil {
 			failures = append(failures, fmt.Sprintf("%s→%s: %v", jid, gh, sErr))
@@ -122,7 +121,6 @@ func ApplyGitLabUsernamePrefills(ctx context.Context, store storage.Store, prefi
 			DisplayName:    m.DisplayName,
 			GitHubLogin:    m.GitHubLogin,
 			GitLabUsername: gl,
-			PillarID:       m.PillarID,
 		}
 		if sErr := store.SetMemberIdentity(ctx, m.ID, ident); sErr != nil {
 			failures = append(failures, fmt.Sprintf("%s→%s: %v", jid, gl, sErr))

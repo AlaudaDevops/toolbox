@@ -143,30 +143,119 @@ func (s *Service) NetworkDensity(ctx context.Context, q storage.MemberWeekQuery)
 
 	// 3. Cross-pillar review %.
 	//
-	// A review is "cross-pillar" when the reviewer's pillar differs
-	// from the author's pillar AND both pillars are populated. Reviews
-	// where either side has no pillar are excluded from the
-	// denominator — we cannot answer the question without the data.
+	// W9 (2026-05-19) rewrite: `members.pillar_id` is gone. Both
+	// "sides" come from PillarMap:
+	//   - PR pillar set: PillarsForRepo(pr.repo_id).
+	//   - Reviewer pillar set: union of pillars across PRs the
+	//     reviewer authored in [from, to).
+	// A review is cross-pillar when the two sets are disjoint AND
+	// both are non-empty. Empty either side → excluded from the
+	// denominator.
+	pm := s.PillarMap()
+	if !pm.Configured() {
+		return out, nil
+	}
+	revPillarSet, err := s.pillarsByAuthor(ctx, db, dialect, q, pm)
+	if err != nil {
+		return nil, fmt.Errorf("network cross-pillar reviewer-pillars: %w", err)
+	}
 	xSQL := rebindSimple(dialect, `
-		SELECT
-		  COUNT(*) AS total,
-		  SUM(CASE WHEN ma.pillar_id <> mr.pillar_id THEN 1 ELSE 0 END) AS xpillar
+		SELECT rv.reviewer_id, pr.repo_id
 		FROM pr_reviews rv
 		JOIN pull_requests pr ON pr.id = rv.pr_id
-		JOIN members ma ON ma.id = COALESCE(NULLIF(pr.author_id, ''), '')
-		JOIN members mr ON mr.id = COALESCE(NULLIF(rv.reviewer_id, ''), '')
 		WHERE rv.submitted_at >= ? AND rv.submitted_at < ?
 		  AND rv.is_bot = 0
-		  AND ma.pillar_id IS NOT NULL AND ma.pillar_id <> ''
-		  AND mr.pillar_id IS NOT NULL AND mr.pillar_id <> ''`)
-	var xTotal, xCross sql.NullInt64
-	if err := db.QueryRowContext(ctx, xSQL, q.From, q.To).Scan(&xTotal, &xCross); err != nil {
-		return nil, fmt.Errorf("network cross-pillar: %w", err)
+		  AND rv.reviewer_id IS NOT NULL AND rv.reviewer_id <> ''`)
+	rows2, err := db.QueryContext(ctx, xSQL, q.From, q.To)
+	if err != nil {
+		return nil, fmt.Errorf("network cross-pillar reviews: %w", err)
 	}
-	if xTotal.Int64 > 0 {
-		out.CrossPillarReviewPct = float64(xCross.Int64) / float64(xTotal.Int64) * 100
+	defer rows2.Close()
+	var xTotal, xCross int64
+	for rows2.Next() {
+		var reviewerID, repoID string
+		if err := rows2.Scan(&reviewerID, &repoID); err != nil {
+			return nil, err
+		}
+		prPillars := setOfStrings(pm.PillarsForRepo(repoID))
+		revPillars := revPillarSet[reviewerID]
+		if len(prPillars) == 0 || len(revPillars) == 0 {
+			continue
+		}
+		xTotal++
+		if disjointSet(prPillars, revPillars) {
+			xCross++
+		}
+	}
+	if err := rows2.Err(); err != nil {
+		return nil, err
+	}
+	if xTotal > 0 {
+		out.CrossPillarReviewPct = float64(xCross) / float64(xTotal) * 100
 	}
 	return out, nil
+}
+
+// pillarsByAuthor walks every PR authored in [q.From, q.To) and
+// returns author_id → set-of-pillars derived from
+// PillarMap.PillarsForRepo.
+func (s *Service) pillarsByAuthor(
+	ctx context.Context,
+	db *sql.DB,
+	dialect storage.Dialect,
+	q storage.MemberWeekQuery,
+	pm *PillarMap,
+) (map[string]map[string]struct{}, error) {
+	rows, err := db.QueryContext(ctx, rebindSimple(dialect, `
+		SELECT author_id, repo_id
+		FROM pull_requests
+		WHERE created_at >= ? AND created_at < ?
+		  AND author_id IS NOT NULL AND author_id <> ''`),
+		q.From, q.To)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]map[string]struct{}{}
+	for rows.Next() {
+		var authorID, repoID string
+		if err := rows.Scan(&authorID, &repoID); err != nil {
+			return nil, err
+		}
+		pillars := pm.PillarsForRepo(repoID)
+		if len(pillars) == 0 {
+			continue
+		}
+		set, ok := out[authorID]
+		if !ok {
+			set = map[string]struct{}{}
+			out[authorID] = set
+		}
+		for _, p := range pillars {
+			set[p] = struct{}{}
+		}
+	}
+	return out, rows.Err()
+}
+
+func setOfStrings(xs []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(xs))
+	for _, x := range xs {
+		out[x] = struct{}{}
+	}
+	return out
+}
+
+func disjointSet(a, b map[string]struct{}) bool {
+	if len(a) > len(b) {
+		a, b = b, a
+	}
+	for x := range a {
+		if _, ok := b[x]; ok {
+			return false
+		}
+	}
+	return true
 }
 
 // ----------------------------------------------------------------------
