@@ -208,6 +208,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 	service := contributions.NewService(store)
 	pillarMap := contributions.NewPillarMap(cfg.TeamAnalytics)
 	service.SetPillarMap(pillarMap)
+	service.SetStatusClassifier(contributions.NewStatusClassifier(cfg.TeamAnalytics.Statuses))
 	aggregator := contributions.NewAggregator(store)
 	api.AddContributionsRoutes(router, store, service, aggregator)
 	logger.Info("Contributions API routes added",

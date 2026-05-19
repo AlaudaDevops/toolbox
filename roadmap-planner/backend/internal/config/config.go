@@ -88,6 +88,21 @@ type TeamAnalytics struct {
 	//	    daniel: daniel
 	//	    jtcheng: chengjingtao
 	GitLabUsernamePrefills map[string]string `mapstructure:"gitlab_username_prefills" yaml:"gitlab_username_prefills"`
+	// Statuses is the W4 (2026-05-19) configurable status → lane map
+	// used by the sprint card. Status names match Jira's `status.name`
+	// case-folded; an unknown status falls back to `in_progress` and
+	// triggers a warning so the operator can extend the lists. The
+	// built-in defaults cover DEVOPS's 37 statuses across 17 issue
+	// types — see PLAN.md W4 for the full mapping.
+	Statuses StatusLanes `mapstructure:"statuses" yaml:"statuses"`
+}
+
+// StatusLanes is the configurable four-lane sprint classifier.
+type StatusLanes struct {
+	Todo       []string `mapstructure:"todo" yaml:"todo"`
+	InProgress []string `mapstructure:"in_progress" yaml:"in_progress"`
+	Done       []string `mapstructure:"done" yaml:"done"`
+	Cancelled  []string `mapstructure:"cancelled" yaml:"cancelled"`
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
