@@ -480,7 +480,7 @@ func (s *Syncer) sweepInstanceByMember(
 				AuthorLogin: authorLogin,
 				HeadBranch:  mr.SourceBranch,
 				BaseBranch:  mr.TargetBranch,
-				EpicKey:     epicKey,
+				JiraKey:     epicKey,
 				CreatedAt:   mr.CreatedAt,
 				MergedAt:    mr.MergedAt,
 				ClosedAt:    mr.ClosedAt,

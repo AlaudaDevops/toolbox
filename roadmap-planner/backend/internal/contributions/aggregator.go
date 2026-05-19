@@ -293,9 +293,17 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 			`DELETE FROM member_week_metrics WHERE member_id NOT IN (%s)`,
 			strings.Join(placeholders, ", "),
 		))
-		if _, err := db.ExecContext(ctx, cleanup, args...); err != nil {
+		res, err := db.ExecContext(ctx, cleanup, args...)
+		if err != nil {
 			return fmt.Errorf("cleanup non-allowlisted rollups: %w", err)
 		}
+		var removed int64
+		if res != nil {
+			removed, _ = res.RowsAffected()
+		}
+		a.logger.Info("allowlist cleanup",
+			zap.Int("allowlist_size", len(ids)),
+			zap.Int64("rows_removed", removed))
 	}
 
 	return nil

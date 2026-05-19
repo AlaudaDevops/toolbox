@@ -88,7 +88,17 @@ type TeamAnalytics struct {
 	//	    daniel: daniel
 	//	    jtcheng: chengjingtao
 	GitLabUsernamePrefills map[string]string `mapstructure:"gitlab_username_prefills" yaml:"gitlab_username_prefills"`
-<<<<<<< HEAD
+	// MemberDenylist is the operator-curated list of Jira member ids
+	// (slugified email — the same key shape used in the prefill maps)
+	// that should be excluded from the team-analytics rollups and from
+	// every contributions API response, regardless of whether they have
+	// an entry in the prefill maps.
+	//
+	// This is the W1 escape hatch for people who appear in Jira (so the
+	// auto-discovery picks them up) but should not count toward the
+	// dashboard — bots that aren't on the bot allowlist, people who
+	// left the team, contractors loaned out to another pillar, etc.
+	MemberDenylist []string `mapstructure:"member_denylist" yaml:"member_denylist"`
 	// Statuses is the W4 (2026-05-19) configurable status → lane map
 	// used by the sprint card. Status names match Jira's `status.name`
 	// case-folded; an unknown status falls back to `in_progress` and
@@ -104,28 +114,6 @@ type StatusLanes struct {
 	InProgress []string `mapstructure:"in_progress" yaml:"in_progress"`
 	Done       []string `mapstructure:"done" yaml:"done"`
 	Cancelled  []string `mapstructure:"cancelled" yaml:"cancelled"`
-=======
-	// MemberDenylist is the operator-curated list of Jira member ids
-	// (slugified email — the same key shape used in the prefill maps)
-	// that should be excluded from the team-analytics rollups and from
-	// every contributions API response, regardless of whether they have
-	// an entry in the prefill maps.
-	//
-	// This is the W1 escape hatch for people who appear in Jira (so the
-	// auto-discovery picks them up) but should not count toward the
-	// dashboard — bots that aren't on the bot allowlist, people who
-	// left the team, contractors loaned out to another pillar, etc.
-	//
-	// Example:
-	//
-	//	team_analytics:
-	//	  member_denylist:
-	//	    - gxjiao
-	//	    - lmhe
-	//	    - zhwang
-	//	    - chaozhou
-	MemberDenylist []string `mapstructure:"member_denylist" yaml:"member_denylist"`
->>>>>>> 39ec53a (feat(roadmap-planner): W1 — member allowlist + GitLab instance-wide sweep)
 }
 
 // PillarMapping is one bucket inside TeamAnalytics.Pillars.
