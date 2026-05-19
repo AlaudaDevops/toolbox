@@ -118,7 +118,7 @@ func TestSQLiteRoundTrip(t *testing.T) {
 			Number: 173, Title: "ci: smoke test", State: "merged",
 			AuthorID: "alice", HeadBranch: "DEVOPS-1-smoke", BaseBranch: "main",
 			Additions: 42, Deletions: 8, ChangedFiles: 3,
-			EpicKey:       "DEVOPS-1",
+			JiraKey:       "DEVOPS-1",
 			CreatedAt:     now.Add(-12 * time.Hour),
 			FirstReviewAt: &first,
 			MergedAt:      &merged,

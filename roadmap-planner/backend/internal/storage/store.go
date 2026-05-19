@@ -93,9 +93,12 @@ type IssueSnapshot struct {
 	ResolvedAt  *time.Time
 }
 
-// PullRequest is a GitHub PR or GitLab MR record. Linked to an Epic via
-// EpicKey when the configured Linker can resolve one (branch regex,
-// title, etc.).
+// PullRequest is a GitHub PR or GitLab MR record. Linked to a Jira
+// issue via JiraKey when the configured Linker can resolve one
+// (branch regex, title, etc.). JiraKey is *not* restricted to Epics —
+// the regex matches any DEVOPS-NNN id, which in prod is mostly
+// Stories / Bugs (see migration 0006 for the audit data behind the
+// rename from `epic_key`).
 //
 // AuthorLogin is the raw login string returned by the source API (lower-
 // cased on write). It's stored alongside the resolved AuthorID so the
@@ -120,7 +123,7 @@ type PullRequest struct {
 	Additions     int
 	Deletions     int
 	ChangedFiles  int
-	EpicKey       string
+	JiraKey       string // any Jira key matched by the linker; was misnamed `EpicKey` pre-W5
 	CreatedAt     time.Time
 	FirstReviewAt *time.Time
 	MergedAt      *time.Time

@@ -124,7 +124,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 		INSERT INTO pull_requests (
 			id, source, repo_id, number, title, state, author_id, author_login,
 			head_branch, base_branch, additions, deletions, changed_files,
-			epic_key, created_at, first_review_at, merged_at, closed_at, fetched_at
+			jira_key, created_at, first_review_at, merged_at, closed_at, fetched_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			source = excluded.source,
@@ -135,7 +135,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 			additions = excluded.additions,
 			deletions = excluded.deletions,
 			changed_files = excluded.changed_files,
-			epic_key = excluded.epic_key,
+			jira_key = excluded.jira_key,
 			first_review_at = excluded.first_review_at,
 			merged_at = excluded.merged_at,
 			closed_at = excluded.closed_at,
@@ -153,7 +153,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 		_, err := stmt.ExecContext(ctx,
 			p.ID, source, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID), nullable(p.AuthorLogin),
 			nullable(p.HeadBranch), nullable(p.BaseBranch), p.Additions, p.Deletions, p.ChangedFiles,
-			nullable(p.EpicKey), p.CreatedAt, p.FirstReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
+			nullable(p.JiraKey), p.CreatedAt, p.FirstReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("upsert pr %s: %w", p.ID, err)
