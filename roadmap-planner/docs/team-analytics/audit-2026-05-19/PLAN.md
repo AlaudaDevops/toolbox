@@ -72,9 +72,18 @@ This document maps every finding in the audit to a concrete deliverable. It is s
 
 **Design.**
 
-1. **One bot predicate in one place.** Stacked filters:
-   - Suffix rule: `*[bot]`, `*-bot`, `*-app`, `*-renovate*`.
-   - Explicit deny set in config: `team_analytics.bot_reviewers: ["alaudabot","alaudaa-renovate","edge-katanomi-app2","copilot-pull-request-reviewer","kilo-code-bot","copilot",…]`. **Confirm seed Q10b.**
+1. **One bot predicate in one place.** Per Q10-B: **explicit list only, no suffix magic.**
+   ```yaml
+   team_analytics:
+     bot_logins:
+       - alaudabot
+       - alaudaa-renovate
+       - edge-katanomi-app2[bot]
+       - copilot-pull-request-reviewer[bot]
+       - kilo-code-bot[bot]
+       - copilot
+   ```
+   `IsBotLogin(login string) bool` is a flat lowercased-string-set lookup. New bot accounts get added to the ConfigMap and a hot reload picks them up.
 2. **Member resolution change.** In `github/sync.go::byLogin` and `gitlab/sync.go::byUsername`, after the existing lookup, fall back to `"bot"` (a member that already exists with `id="bot"` and empty logins) when `IsBotLogin(login)` returns true. That means:
    - `pull_requests.author_id` becomes `"bot"` for renovate / scan-bots / etc.
    - `pr_reviews.reviewer_id` becomes `"bot"` for automated comments.
@@ -320,33 +329,39 @@ Storage cost: prod DB is 16 MB after ~6 months → ~30-35 MB after a year. Negli
 
 API cost: one-shot backfill scheduled overnight per Q12 above. Incremental syncs from `collection_runs.captured_at` thereafter.
 
-### W7b — Quarter source — needs one more clarification
+### W7b — Quarter source: Milestone-prefix chain (confirmed 2026-05-19)
 
-**Maintainer-cited example "2026Q1 2026Q2 2026Q4"** doesn't show up in Jira as I expected. I checked three places:
+**Maintainer answer (Q7):** "They are not labels, they are written inside a Milestone Jira issue (automatically added as a prefix in the milestone name) and the epics are linked with a blocking link to each of the milestones. Only issue will be dangling issues or epics that are not inside a milestone, from that we can use resolution_date or other date fields to infer."
 
-| place | result |
-|---|---|
-| `/rest/api/2/project/DEVOPS/versions` (320 versions; sample names: `v3.0.3-1, v3.4, v4.3.0, v4.4.0, …`) | **0 versions matching `\d{4}Q[1-4]`** |
-| `/rest/agile/1.0/sprint/1767` (most recent active sprint) | name `DevOps-4.4-s2`, no quarter label |
-| `/rest/api/2/search?jql=fixVersion in ("2026Q1","2026Q4")` | JQL error: those fixVersions don't exist |
+**Verified on live Jira (2026-05-19).**
 
-So the "2026Q1/Q2/Q4" labels probably aren't stored in Jira directly. **Q7-follow-up A:** where exactly are these quarter labels defined?
+- Milestones in DEVOPS look like:
+  - `DEVOPS-43598 — 2026Q2：Tekton Pipelines - Restricted 安全策略适配/Tekton Hub下线`
+  - `DEVOPS-42014 — 2026Q1：Security patches in 2026Q1`
+  - `DEVOPS-43568 — 2026Q4：Connectors final adjustments`
 
-Most plausible candidates:
-- **A1.** A manual mapping `releaseSeries → quarterLabel` we maintain in this repo (e.g. `v4.2 → 2026Q1`, `v4.3 → 2026Q2`, `v4.4 → 2026Q3`, `v4.5 → 2026Q4`).
-- **A2.** Inferred from each released fixVersion's `releaseDate` (calendar-quarter the version shipped in), with the team defining "quarter = the release wave that landed in those three months".
-- **A3.** A Jira custom field (e.g., `customfield_QuarterTag`) — but I didn't find one named obviously.
+  Note the **full-width Chinese colon `：` (U+FF1A)** — not the regular ASCII `:`. The regex has to accept both.
+- Each Milestone has `issuelinks` of `type.name = "Blocks"`; the inward issue is an Epic. So the chain is **Epic ←Blocks— Milestone**, and the quarter prefix lives on the Milestone summary.
+- Dangling cases:
+  - Issue has no Epic Link → fall back to its own `resolution_date` (or `merged_at` for the PR side) and bucket into the calendar quarter the event landed in.
+  - Epic has no Milestone blocker → same fallback using Epic's `resolution_date`.
 
-**Recommendation pending the answer:**
-- **If A1:** add `team_analytics.release_quarters: [{"label":"2026Q1","versions":["v4.2","v4.2.1",…]}, …]` to config. The aggregator's quarter-fold helper consults this table to bucket a fixVersion to a quarter.
-- **If A2:** infer at read time from `releaseDate` of each released version. Cheap, no config, but quarters drift if a release slips.
-- **If A3:** read the custom field through the existing Jira sync, store on `issue_snapshots`.
+**Resolver design.**
 
-Either A1 or A2 lets us start without a schema change. **Q7-follow-up B:** which one matches our reality?
+1. **Jira sync extension.**
+   - Existing pass already fetches Epics and Stories/Bugs/etc.
+   - New pass: fetch every issue with `issuetype = Milestone` updated in the window. Parse the prefix `^(\d{4}Q[1-4])[：:]` from `summary` → `milestone.quarter_label`. Walk `issuelinks` for `type=Blocks, inwardIssue.type=Epic` → record `(epic_key, quarter_label)` pairs.
+   - Store in a new table `quarter_assignments(issue_key TEXT PRIMARY KEY, quarter_label TEXT, source TEXT)`. `source ∈ {"milestone","fallback"}`. Migration `0008_quarter_assignments.sql`.
+   - On each Jira sync, refresh the rows touched in the window.
+2. **Epic → Quarter** lookup is O(1) once `quarter_assignments` is populated.
+3. **Story/Bug/Task → Quarter** lookup walks the issue's Epic Link (`customfield_10005`) → consult `quarter_assignments[epic_key]`. If missing, fall back to `2026Q<calendar-quarter-of-resolved_at>`.
+4. **PR → Quarter** lookup walks `pull_requests.jira_key` (W5) → issue → quarter (as above). PRs without a Jira key fall back to `2026Q<calendar-quarter-of-merged_at>`.
+
+Quarter labels are returned literally from the milestone summaries — no need to invent a calendar mapping. Calendar-quarter fallbacks use the obvious Jan-Mar=Q1 etc. mapping so dangling items still land somewhere.
 
 ### W7c — API + frontend shape
 
-Add `?period=week|release_quarter` (default `week`). On `period=release_quarter`, fold weekly rows by mapping each MR `merged_at` / Jira `resolved_at` → fixVersion (latest fixVersion released after the event) → quarter label.
+Add `?period=week|release_quarter` (default `week`). On `period=release_quarter`, fold weekly rows: each row's PR set → resolve quarter via the chain above → sum into the per-quarter bucket. The output still includes a `dangling: int` count per period so the UI can show "and N items without a quarter assignment".
 
 ```json
 {
@@ -368,14 +383,16 @@ Add `?period=week|release_quarter` (default `week`). On `period=release_quarter`
 ```
 
 **Files**
-- `backend/internal/storage/config.go`
-- `backend/internal/contributions/aggregator.go` — RebuildRecent default
-- `backend/internal/contributions/period.go` — new package-local helper that maps `(time.Time) → release-quarter label` per Q7-follow-up answer
-- `backend/internal/contributions/service.go` — add `bucketByPeriod` that swaps `WeekTotals` for `PeriodTotals` on the `release_quarter` path
-- `backend/internal/api/handlers/contributions.go` — parse `?period=`
-- Frontend — new tab "Quarter" inside each chart; coordinate inside the same PR.
+- `backend/internal/storage/config.go` — `BackfillDays = 365`.
+- `backend/internal/storage/migrations/0008_quarter_assignments.sql` — new table `(issue_key, quarter_label, source)`.
+- `backend/internal/jirasync/sync.go` — milestone pass + `quarter_assignments` upserts. Regex `^(\d{4}Q[1-4])[：:]\s*` for the prefix.
+- `backend/internal/contributions/aggregator.go` — `RebuildRecent` default 400 days; quarter folding helper.
+- `backend/internal/contributions/period.go` — `QuarterFor(jiraKey, fallbackTime) (string, source)` looking up `quarter_assignments` with the dangling fallback.
+- `backend/internal/contributions/service.go` — `bucketByPeriod` that swaps `WeekTotals` for `PeriodTotals`.
+- `backend/internal/api/handlers/contributions.go` — parse `?period=`.
+- Frontend — new tab "Quarter" inside each chart; same PR.
 
-**Risk.** Medium. Mainly the Q7 ambiguity — until we know which path, the helper is half-designed.
+**Risk.** Medium. New table + new Jira sync pass; quarter fallback path needs unit-test coverage so dangling items don't silently land in the wrong bucket.
 
 ---
 
@@ -471,28 +488,24 @@ Suggested rollout, two-week cadence, one PR per workstream unless noted:
 
 ---
 
-## Open questions — answers and remaining follow-ups (updated 2026-05-19)
+## Open questions — all resolved (final 2026-05-19)
 
-| | original Q | maintainer answer | follow-up I still need |
-|---|---|---|---|
-| Q1 | scope of "instance-wide" | members can contribute everywhere → ingest instance-wide, filter by author at calc time | **none** — design rewritten in W1 |
-| Q2 | sprint status lists | pulled from Jira; mapped above | **Q2-A**: should "Cancelled / 已取消" go in `done` or a fourth `cancelled` bucket?; **Q2-B**: confirm "Ready for Delivery" → `in_progress` |
-| Q3 | frontend track | "what is the best?" → my decision: **one PR per workstream, backend+frontend together**, so reviewers see complete behaviour changes | **none** — confirm if you disagree |
-| Q4 | `epic_key` rename | "elaborate" → see W5 detailed; no current API consumer reads the tag, hard-rename is safe | **confirm hard-rename OK** |
-| Q5 | GL `changes_requested` | defer | **none** |
-| Q6 | quarter aggregation | read-time fold | **none** |
-| Q7 | quarter boundary | release-cadence quarters, not calendar | **Q7-A**: where exactly do `2026Q1` / `2026Q2` / `2026Q4` live? Not in fixVersions / sprints / JQL. (See W7b — three candidate sources.); **Q7-B**: confirm A1 (config-driven `release_quarters` map) vs A2 (infer from fixVersion `releaseDate`) vs A3 (Jira custom field) |
-| Q8 | review_latency_p50_hours | implement | **none** |
-| Q9 | pillar attribution | option (i) — drop `members.pillar_id`, redefine cross-pillar % | **none** |
-| Q10 | bot deny set | merge bot contributions into a synthetic `bot` member (better than my draft) → W2 rewritten | **Q10-B**: confirm seed list `alaudabot, alaudaa-renovate, edge-katanomi-app2[bot], copilot-pull-request-reviewer[bot], kilo-code-bot[bot], copilot`; anything else? |
-| Q11 | member denylist seed | confirmed: `gxjiao, lmhe, zhwang, chaozhou` | **none** |
-| Q12 | backfill timing | overnight | **none** |
+| | original Q | resolution |
+|---|---|---|
+| Q1 | scope of "instance-wide" | members can contribute everywhere → ingest instance-wide, filter by author at calc time (W1 rewritten) |
+| Q2 | sprint status lists | pulled live from Jira; full mapping in W4 |
+| Q2-A | Cancelled bucket | stays in `done` (per maintainer) |
+| Q2-B | Ready for Delivery | `in_progress` (no objection raised) |
+| Q3 | frontend track | one PR per workstream, backend + frontend together (no objection raised) |
+| Q4 | `epic_key` rename | confirmed hard-rename DB + Go + JSON in one migration |
+| Q5 | GL `changes_requested` | deferred |
+| Q6 | quarter aggregation | read-time fold |
+| Q7 | quarter source | Milestone-prefix chain, verified live (W7b) |
+| Q8 | review_latency_p50_hours | implement after W2 |
+| Q9 | pillar attribution | option (i) — drop `members.pillar_id`, redefine cross-pillar % from PR-repo + Jira-component |
+| Q10 | bot handling | reassign to synthetic `bot` member |
+| Q10-B | bot seed | `alaudabot, alaudaa-renovate, edge-katanomi-app2[bot], copilot-pull-request-reviewer[bot], kilo-code-bot[bot], copilot` — **explicit list only, no suffix magic** (per maintainer) |
+| Q11 | member denylist | `gxjiao, lmhe, zhwang, chaozhou` |
+| Q12 | backfill timing | overnight |
 
-### Remaining clarifications (4 items)
-
-- **Q2-A.** "Cancelled" / "已取消" — put under `done` (treats it as "no longer takes capacity") or add a fourth `cancelled` bucket so velocity charts can exclude it?
-- **Q4.** Confirm: hard-rename `epic_key` → `jira_key` (DB column + Go field + JSON tag) in one migration. No alias for backward compat.
-- **Q7-A / Q7-B.** Where do the `2026Q1 2026Q2 2026Q4` quarter labels live? I can't find them in Jira. Pick one: **A1** config-driven mapping `versions[] → quarter_label`, **A2** infer from fixVersion `releaseDate` (calendar-quarter the version shipped), or **A3** a Jira custom field I should look up.
-- **Q10-B.** Confirm the bot-login seed list above. Any others I haven't met yet?
-
-*Once those four answers land, every W block is fully specified and I can convert each into a tracked task and start.*
+**Plan is fully specified.** Next step: convert each W block into a Jira task and start with W1.
