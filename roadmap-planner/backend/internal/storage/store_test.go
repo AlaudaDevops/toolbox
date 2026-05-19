@@ -41,7 +41,6 @@ func TestSQLiteRoundTrip(t *testing.T) {
 		Email:         "alice@alauda.io",
 		JiraAccountID: "abc-123",
 		GitHubLogin:   "alicetan",
-		PillarID:      "ci-cd",
 		Active:        true,
 	}
 	if err := store.UpsertMember(ctx, mem); err != nil {
@@ -55,13 +54,13 @@ func TestSQLiteRoundTrip(t *testing.T) {
 		t.Fatalf("members round-trip failed: %+v", mems)
 	}
 
-	// upsert again with new pillar — should update, not insert
-	mem.PillarID = "essentials"
+	// Upsert again with a new display name — should update, not insert.
+	mem.DisplayName = "Alice Tan (updated)"
 	if err := store.UpsertMember(ctx, mem); err != nil {
 		t.Fatalf("re-upsert member: %v", err)
 	}
 	mems, _ = store.ListMembers(ctx)
-	if len(mems) != 1 || mems[0].PillarID != "essentials" {
+	if len(mems) != 1 || mems[0].DisplayName != "Alice Tan (updated)" {
 		t.Fatalf("upsert did not update: %+v", mems)
 	}
 

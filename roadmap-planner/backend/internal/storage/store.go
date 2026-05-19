@@ -159,7 +159,6 @@ type MemberIdentity struct {
 	DisplayName    string
 	GitHubLogin    string
 	GitLabUsername string
-	PillarID       string
 }
 
 // Member is the join entity across Jira, GitHub, and GitLab.
@@ -175,7 +174,6 @@ type Member struct {
 	JiraAccountID  string    `json:"jira_account_id,omitempty"`
 	GitHubLogin    string    `json:"github_login,omitempty"`
 	GitLabUsername string    `json:"gitlab_username,omitempty"`
-	PillarID       string    `json:"pillar_id,omitempty"`
 	Active         bool      `json:"active"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`

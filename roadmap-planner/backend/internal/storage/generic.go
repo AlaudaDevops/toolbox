@@ -231,21 +231,20 @@ func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 		active = 1
 	}
 	q := rebind(s.d, `
-		INSERT INTO members (id, display_name, email, jira_account_id, github_login, gitlab_username, pillar_id, active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO members (id, display_name, email, jira_account_id, github_login, gitlab_username, active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			display_name = excluded.display_name,
 			email = excluded.email,
 			jira_account_id = excluded.jira_account_id,
 			github_login = COALESCE(NULLIF(excluded.github_login, ''), members.github_login),
 			gitlab_username = COALESCE(NULLIF(excluded.gitlab_username, ''), members.gitlab_username),
-			pillar_id = COALESCE(NULLIF(excluded.pillar_id, ''), members.pillar_id),
 			active = excluded.active,
 			updated_at = excluded.updated_at`)
 	_, err := s.db.ExecContext(ctx, q,
 		m.ID, m.DisplayName, nullable(m.Email),
 		nullable(m.JiraAccountID), nullable(m.GitHubLogin), nullable(m.GitLabUsername),
-		nullable(m.PillarID), active, m.CreatedAt, m.UpdatedAt)
+		active, m.CreatedAt, m.UpdatedAt)
 	return err
 }
 
@@ -256,11 +255,11 @@ func (s *genericStore) UpsertMember(ctx context.Context, m Member) error {
 func (s *genericStore) SetMemberIdentity(ctx context.Context, id string, ident MemberIdentity) error {
 	q := rebind(s.d, `
 		UPDATE members
-		   SET display_name = ?, github_login = ?, gitlab_username = ?, pillar_id = ?, updated_at = ?
+		   SET display_name = ?, github_login = ?, gitlab_username = ?, updated_at = ?
 		 WHERE id = ?`)
 	res, err := s.db.ExecContext(ctx, q,
 		ident.DisplayName, nullable(ident.GitHubLogin), nullable(ident.GitLabUsername),
-		nullable(ident.PillarID), time.Now().UTC(), id)
+		time.Now().UTC(), id)
 	if err != nil {
 		return err
 	}
@@ -275,7 +274,7 @@ func (s *genericStore) ListMembers(ctx context.Context) ([]Member, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, display_name, COALESCE(email, ''), COALESCE(jira_account_id, ''),
 		       COALESCE(github_login, ''), COALESCE(gitlab_username, ''),
-		       COALESCE(pillar_id, ''), active, created_at, updated_at
+		       active, created_at, updated_at
 		FROM members
 		ORDER BY display_name`)
 	if err != nil {
@@ -287,7 +286,7 @@ func (s *genericStore) ListMembers(ctx context.Context) ([]Member, error) {
 		var m Member
 		var active int
 		if err := rows.Scan(&m.ID, &m.DisplayName, &m.Email, &m.JiraAccountID,
-			&m.GitHubLogin, &m.GitLabUsername, &m.PillarID, &active, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			&m.GitHubLogin, &m.GitLabUsername, &active, &m.CreatedAt, &m.UpdatedAt); err != nil {
 			return nil, err
 		}
 		m.Active = active != 0

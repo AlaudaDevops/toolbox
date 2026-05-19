@@ -125,7 +125,6 @@ github:
     private_key_path: ""       # path to the PEM file (mount via Secret)
     private_key_pem: ""        # raw PEM contents (use env GITHUB_APP_PRIVATE_KEY_PEM in K8s)
 
-<<<<<<< HEAD
 # GitLab ingestion — mirrors `github` for self-hosted GitLab installs.
 # Requires storage.enabled = true.
 gitlab:
@@ -137,52 +136,31 @@ gitlab:
   backfill_days: 0             # 0 = inherit storage.backfill_days
   groups:
     - "devops/**"              # "**" = whole subtree; "group/*" = direct children only
-  hydrate_diff: false          # fetch additions/deletions/changed_files per merged MR
-  include_archived: false      # include archived projects in the sweep
-  # W1 Pass B (2026-05-19). When true, every cycle also sweeps
-  # `/merge_requests?scope=all&author_username=<u>` for every member in
-  # the derived allowlist (`team_analytics.{github,gitlab}_username_prefills`
-  # minus `team_analytics.member_denylist`). Captures MRs your team
-  # filed in projects outside `groups`. No-op when no prefills are
-  # configured — adopt gradually.
+  hydrate_diff: true           # W6: fetch additions/deletions/changed_files per merged MR
+  include_archived: false
+  # W1 Pass B (2026-05-19): per-allowlisted-member instance-wide MR sweep.
   member_instance_sweep: false
 
-# Team analytics — pillar attribution + identity prefills + W1 filters.
+# Team analytics — pillar attribution + identity prefills + W1/W2/W4 knobs.
 # All keys here are optional and additive; the dashboard works without
 # them (it just shows the un-curated raw data).
 team_analytics:
   # Identity prefills — one-shot github_login / gitlab_username
   # assignment to Jira members on the first sync. Manual UI edits always
   # win on subsequent syncs.
-  github_login_prefills:
-    # daniel: danielfbm
-    # jtcheng: chengjingtao
-  gitlab_username_prefills:
-    # daniel: daniel
-    # jtcheng: chengjingtao
-  # W1 allowlist denylist. The effective allowlist is the union of the
-  # two prefill maps above minus the entries here. Use this to suppress
-  # ex-team-members or contractors who shouldn't count.
-  member_denylist: []
-    # - gxjiao
-    # - lmhe
-=======
-# Team analytics — pillar attribution + identity prefills + W1/W2 knobs.
-# All keys here are optional and additive; the dashboard works without
-# them (it just shows the un-curated raw data).
-team_analytics:
-  # github_login_prefills shortcuts the first-time Jira → GitHub
-  # identity link for members the operator already knows. Manual UI
-  # edits always win on subsequent syncs.
   github_login_prefills: {}
     # daniel: danielfbm
     # jtcheng: chengjingtao
   gitlab_username_prefills: {}
     # daniel: daniel
     # jtcheng: chengjingtao
+  # W1 allowlist denylist. The effective allowlist is the union of the
+  # two prefill maps above minus the entries here.
+  member_denylist: []
+    # - gxjiao
+    # - lmhe
   # W2 (2026-05-19): explicit list of bot logins that get folded into
-  # the synthetic `bot` member. Match is exact + case-folded; no
-  # suffix magic. Adding a new bot here + restarting picks it up.
+  # the synthetic `bot` member. Match is exact + case-folded.
   bot_logins: []
     # - alaudabot
     # - alaudaa-renovate
@@ -190,5 +168,4 @@ team_analytics:
     # - copilot-pull-request-reviewer[bot]
     # - kilo-code-bot[bot]
     # - copilot
->>>>>>> ee78c5b (feat(roadmap-planner): W2 — fold bot contributions into synthetic bot member)
   # pillars: { … }            # see docs/team-analytics/PROPOSAL.md
