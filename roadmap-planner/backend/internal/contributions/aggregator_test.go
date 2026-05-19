@@ -211,3 +211,109 @@ func TestAggregatorAllowlist(t *testing.T) {
 		}
 	}
 }
+
+// TestAggregatorReviewLatency exercises the W8 (2026-05-19) per-reviewer
+// p50 of `first_human_review_at - created_at`.
+//
+// Seeds three PRs created in the same week, all reviewed by `alice` as
+// the first human reviewer. Latencies (in hours): 1, 4, 9 — p50 = 4.
+// One bot review is also seeded to confirm it's ignored (is_bot = 1).
+func TestAggregatorReviewLatency(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	store, err := storage.OpenSQLite(filepath.Join(dir, "lat.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+	for _, m := range []storage.Member{
+		{ID: "alice", DisplayName: "Alice", GitHubLogin: "alice", Active: true},
+		{ID: "bot", DisplayName: "Bot", Active: true},
+	} {
+		if err := store.UpsertMember(ctx, m); err != nil {
+			t.Fatalf("upsert %s: %v", m.ID, err)
+		}
+	}
+
+	now := time.Now().UTC().Truncate(time.Hour)
+	created := MondayOf(now).Add(36 * time.Hour)
+	week := MondayOf(created)
+	prs := []storage.PullRequest{}
+	reviews := []storage.PRReview{}
+	for i, latHours := range []int{1, 4, 9} {
+		prID := "alaudadevops/x#" + itoa(i+1)
+		first := created.Add(time.Duration(latHours) * time.Hour)
+		prs = append(prs, storage.PullRequest{
+			ID: prID, Source: "github", RepoID: "alaudadevops/x", Number: i + 1,
+			Title: "PR", State: "merged",
+			AuthorLogin:        "danielfbm",
+			CreatedAt:          created,
+			FirstReviewAt:      &first,
+			FirstHumanReviewAt: &first,
+			FetchedAt:          created,
+		})
+		reviews = append(reviews, storage.PRReview{
+			ID: prID + "/r1", PRID: prID, Source: "github",
+			ReviewerID: "alice", ReviewerLogin: "alice", State: "approved",
+			SubmittedAt: first,
+		})
+	}
+	// Bot review on the first PR — should be ignored.
+	reviews = append(reviews, storage.PRReview{
+		ID: "alaudadevops/x#1/r-bot", PRID: "alaudadevops/x#1", Source: "github",
+		ReviewerID: "bot", ReviewerLogin: "renovate", State: "commented",
+		SubmittedAt: created.Add(30 * time.Minute), IsBot: true,
+	})
+	if err := store.UpsertPullRequests(ctx, prs); err != nil {
+		t.Fatalf("upsert prs: %v", err)
+	}
+	if err := store.UpsertPRReviews(ctx, reviews); err != nil {
+		t.Fatalf("upsert reviews: %v", err)
+	}
+
+	agg := NewAggregator(store)
+	if err := agg.Rebuild(ctx, week.Add(-7*24*time.Hour), week.Add(14*24*time.Hour)); err != nil {
+		t.Fatalf("rebuild: %v", err)
+	}
+
+	rows, err := store.MemberWeekMetrics(ctx, storage.MemberWeekQuery{
+		From:      week.Add(-7 * 24 * time.Hour),
+		To:        week.Add(14 * 24 * time.Hour),
+		MemberIDs: []string{"alice"},
+	})
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row, got %d: %+v", len(rows), rows)
+	}
+	r := rows[0]
+	if r.ReviewLatencyP50Hours == nil {
+		t.Fatalf("review_latency_p50_hours nil; want 4.0")
+	}
+	if *r.ReviewLatencyP50Hours != 4.0 {
+		t.Errorf("review_latency_p50_hours = %v, want 4.0", *r.ReviewLatencyP50Hours)
+	}
+}
+
+func itoa(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	out := []byte{}
+	for n > 0 {
+		out = append([]byte{'0' + byte(n%10)}, out...)
+		n /= 10
+	}
+	if neg {
+		out = append([]byte{'-'}, out...)
+	}
+	return string(out)
+}
