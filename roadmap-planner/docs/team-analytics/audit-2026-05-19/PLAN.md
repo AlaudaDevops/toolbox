@@ -22,74 +22,81 @@ This document maps every finding in the audit to a concrete deliverable. It is s
 
 ---
 
-## W1 — Restrict member metrics to DEVOPS team contributions (covers B1, B10, B11)
+## W1 — Member-author-driven ingest, with denylist (covers B1, B10, B11) — **REVISED 2026-05-19**
 
-**Problem.** Today the GitLab sync over-ingests because `with_shared=true` is the GitLab default, and the aggregator credits MRs solely on `LOWER(m.gitlab_username) = pr.author_login`. Result: zhwang's whole rollup is from `container-platform/*` / `ops/*` / `alauda/artifacts`.
+**Problem recap.** Today the GitLab sync over-ingests because `with_shared=true` is the GitLab default; the aggregator credits MRs solely on `LOWER(m.gitlab_username) = pr.author_login`, so zhwang's whole rollup is from `container-platform/*` / `ops/*` / `alauda/artifacts`.
 
-**Direction agreed with maintainer.** Keep the GitLab scan instance-wide (it's a feature, not a bug — we want to capture our members' contributions to other teams' repos), but restrict **calculation** to members of the DEVOPS team. Add an explicit deny list for members we no longer want represented at all (Zonghang, Chaozhou, others).
+**Maintainer answer (Q1).** "Our members can contribute in very different groups and repos, their contributions should be counted as well." → we do NOT want to restrict the ingest scope to `devops/**`; on the contrary, we want **wider** coverage so that, say, daniel's MRs in `alaudadevops/*` already work and qingliu's MRs in `container-platform/*` would also count if they ever happen.
 
-**Design.**
+**Revised design — member-driven ingest, not group-driven.**
 
-1. **`team_analytics.members` becomes the source of truth for "who is a tracked member".** Move the today-implicit set (anyone the Jira sync ingested under DEVOPS) onto an explicit allowlist driven by config. Three possible knobs:
-   - `team_analytics.member_allowlist: ["daniel","qingliu",…]` — opt-in.
-   - `team_analytics.member_denylist: ["zhwang","chaozhou","gxjiao","lmhe"]` — opt-out.
-   - **Recommended:** allowlist by default (derived from `github_login_prefills`/`gitlab_username_prefills` union, since those are already curated) **plus** an explicit `member_denylist` field for one-off removals.
-2. **Aggregator** gains a single `WHERE member_id IN (…allowlist…)` predicate after the JOIN. Everything outside the allowlist drops from `member_week_metrics` and from every downstream API.
-3. **`/api/contributions/members`** filters to the allowlist. The existing `include_inactive` flag stays for the `members.active` Jira-truth dimension, but the allowlist is the harder gate.
-4. **`PillarThroughput`** keeps counting every in-scope MR / Jira issue (it's a team-level chart, not a per-member chart), but with the GitLab scope tightened it will naturally drop the noise from `alauda/artifacts` etc. — see W1b.
-
-**W1b. GitLab fetch — keep instance-wide, drop shared.** Set `with_shared=false` on the `/groups/:id/projects` call. Rationale: "scan the whole instance" should mean "scan the `devops/**` subtree we control", not "scan every group that has ever shared a project with us." Maintainer agreed B1 should be re-framed as "instance-wide" but in the GitLab sense this means *traverse subgroups recursively*, not *follow shared-project links*. **OPEN QUESTION (Q1) below.**
+1. **Two ingest passes, both honouring the allowlist** below:
+   - **Pass A (existing).** Per-project sync of `devops/**` (subgroups recursive) — captures team review participation and PRs by non-members reviewing our members' work. **Set `with_shared=false`** so we don't pull in the shared-project graph (this was the root cause of B1, and we still don't want it). The `devops/**` scope here is just "the projects our team owns"; it's not a member-filter, it's a team-context capture.
+   - **Pass B (new).** Per-member sweep of MRs across the entire GitLab instance. For each member in the allowlist:
+     - `GET /api/v4/merge_requests?scope=all&author_username=<u>&updated_after=<since>&per_page=100` (page through). With the bot's PAT scope (`read_api`) this returns every MR they can see — for our members, that's the entire instance up to private-project visibility. Reviews on those MRs come from the same notes-as-reviews mechanism. The same `with_shared` flag does not apply at this endpoint.
+   - **De-duplication** is automatic because `pull_requests.id = "<group/proj>!<iid>"` is unique across passes.
+2. **`team_analytics.members` becomes the source of truth for "who counts".**
+   - **Recommended:** *derive* the allowlist from the union of `github_login_prefills` ∪ `gitlab_username_prefills` keys (already curated, already declared once in the ConfigMap, no new config to maintain).
+   - **Explicit knob:** `team_analytics.member_denylist: ["zhwang","chaozhou","gxjiao","lmhe"]` — confirmed by maintainer.
+3. **Aggregator** gains a single `WHERE COALESCE(m.id, pr.author_id) IN (…allowlist…)` after the existing JOIN. Everything outside the allowlist drops from `member_week_metrics` and from every downstream API.
+4. **`/api/contributions/members`** filters to the same set; `include_inactive` stays for the (less reliable) `members.active` dimension.
+5. **`PillarThroughput`** keeps counting every ingested MR / issue (team-level chart), but the bot work goes into the synthetic `bot` member from W2 instead of staying anonymous; out-of-scope-author noise drops because the dominant contaminator (`alauda/artifacts`, `container-platform/*`) had no allowlisted human authors in our window.
 
 **Files**
-- `backend/internal/gitlab/client.go` — add `with_shared=false`.
-- `backend/internal/config/config.go` — add `TeamAnalytics.MemberAllowlist []string`, `TeamAnalytics.MemberDenylist []string`.
-- `backend/internal/contributions/allowlist.go` — new helper that resolves the effective set (allowlist − denylist).
-- `backend/internal/contributions/aggregator.go` — wire allowlist into the four INSERT SELECT statements.
+- `backend/internal/gitlab/client.go` — add `q.Set("with_shared", "false")` to `ListGroupProjects`. Add a new `ListInstanceMergeRequests(ctx, opts)` calling `/api/v4/merge_requests?scope=all&…`.
+- `backend/internal/gitlab/sync.go` — second sweep loop after `resolveProjects`; reuse the same upsert path so the storage shape is identical.
+- `backend/internal/config/config.go` — `TeamAnalytics.MemberDenylist []string` (allowlist is derived, no field).
+- `backend/internal/contributions/allowlist.go` — new helper computing the effective set from the prefill maps minus the denylist; cached at startup, refreshed on config reload.
+- `backend/internal/contributions/aggregator.go` — wire the allowlist into the four INSERT SELECT statements (one extra IN clause + a parameter slice).
 - `backend/internal/api/handlers/contributions.go::ListMembers/TeamOverview` — also filter on the same set.
 
 **Migration**
-- No schema change. On rollout, run `aggregator.RebuildRecent(0)` once so the rollup discards non-allowlisted members.
-- Optionally: `DELETE FROM member_week_metrics WHERE member_id NOT IN (…allowlist…)` for cleanliness.
+- No schema change.
+- One-shot post-deploy: `DELETE FROM member_week_metrics WHERE member_id NOT IN (…allowlist…)` for cleanliness, then `aggregator.RebuildRecent(400)` (note the bumped window from W7).
+- Out-of-scope `pull_requests` rows stay in the table — they're useful for repo-level metrics and they cost nothing.
 
-**Rollback.** Empty allowlist == "trust the data, no filter" — same behaviour as today. Safe to revert by clearing the config.
+**Rollback.** Empty denylist + skip Pass B = today's behaviour. Two boolean flags can gate the new sweep if we need to revert under live traffic.
 
 **Tests**
-- Aggregator: write 3 PRs by 3 logins, only one in the allowlist; rebuild; assert 1 row in rollup.
-- Handler: with denylist, the team overview hides the denylisted member even if they have rollup rows.
+- Aggregator unit test: 3 PRs by 3 logins, only one allowlisted; rebuild; assert 1 row in rollup.
+- Aggregator unit test: denylist removes an allowlisted user.
+- GitLab sync test (mock client): two members each have 2 MRs in different namespaces; sweep returns 4 rows; second sync run de-dups against the existing PR set.
 
-**Risk.** Low. The blast radius is "previously-shown members get hidden". Visible to operators on next reload.
+**Risk.** Medium. New API surface (`/merge_requests?scope=all`) has different pagination semantics — verify the page-size + `X-Total-Pages` behaviour in a smoke test before relying on it in prod.
 
 ---
 
-## W2 — Bot classification (covers B4)
+## W2 — Bot contributions consolidated under one synthetic `bot` member (covers B4) — **REVISED 2026-05-19**
 
-**Problem.** 1450 of 3079 PRs in the 12-week window have `first_review_at` inside 6 minutes; 1659 of those first reviews are by `alaudabot`. `pr_reviews` is 56 % bot rows. The "first-review latency" KPI is unusable.
+**Maintainer answer (Q10).** "I lean towards merging bot contribution in one fictional Bot user." → instead of *hiding* bot rows, we **reassign** every bot author / reviewer to a single member id (`bot`, which already exists in the directory) and let the dashboard show "Bot did N reviews" as one row. Humans see honest first-review latency; the team still sees the volume of automated work.
 
 **Design.**
 
-1. Introduce a single bot predicate in one place. Two stacked filters:
-   - **Suffix rule.** Anyone matching `*[bot]` or `*-bot` or `*-app` is a bot.
-   - **Explicit deny set** in config: `team_analytics.bot_reviewers: ["alaudabot","alaudaa-renovate","edge-katanomi-app2","copilot-pull-request-reviewer","kilo-code-bot",…]`.
-2. **`first_review_at` computation** skips bot reviewers when picking `min(submitted_at)`.
-3. **`pr_reviews` row write** still happens — we want the audit trail — but they're tagged with a new `is_bot` column (migration `0005_pr_reviews_is_bot.sql`) and the aggregator filters on it for `prs_reviewed` and any future latency metric.
-4. **`NetworkDensity`** queries already key off `first_review_at` and `pr_reviews`; once both sides are bot-aware, p50 / orphan / under-24h all start measuring **humans only**.
+1. **One bot predicate in one place.** Stacked filters:
+   - Suffix rule: `*[bot]`, `*-bot`, `*-app`, `*-renovate*`.
+   - Explicit deny set in config: `team_analytics.bot_reviewers: ["alaudabot","alaudaa-renovate","edge-katanomi-app2","copilot-pull-request-reviewer","kilo-code-bot","copilot",…]`. **Confirm seed Q10b.**
+2. **Member resolution change.** In `github/sync.go::byLogin` and `gitlab/sync.go::byUsername`, after the existing lookup, fall back to `"bot"` (a member that already exists with `id="bot"` and empty logins) when `IsBotLogin(login)` returns true. That means:
+   - `pull_requests.author_id` becomes `"bot"` for renovate / scan-bots / etc.
+   - `pr_reviews.reviewer_id` becomes `"bot"` for automated comments.
+3. **`first_review_at` calculation** still selects `min(submitted_at)` across *all* reviews including bot ones — but the **NetworkDensity panel** computes its p50 from `pull_requests` where the first reviewer is not a bot. New helper column `pull_requests.first_human_review_at` (migration `0005_first_human_review.sql`) keeps the SQL straightforward.
+4. **`pr_reviews.is_bot`** column joins the schema for analytical convenience even though resolver maps to `"bot"` member — this lets us answer "how much bot noise are we generating per pillar" without an extra lookup table.
+5. **Allowlist (W1)** must **always** include `"bot"` so its rollup row stays visible in the team overview. The dashboard treats it as just another member.
 
 **Files**
-- `backend/internal/contributions/bot.go` — new pure function `IsBotLogin(login string, cfg BotConfig) bool`.
-- `backend/internal/storage/migrations/0005_pr_reviews_is_bot.sql` — add `is_bot INTEGER NOT NULL DEFAULT 0`.
-- `backend/internal/github/sync.go`, `backend/internal/gitlab/sync.go` — set `is_bot` when writing reviews and when computing `FirstReviewAt`.
-- `backend/internal/contributions/aggregator.go` — `WHERE NOT rv.is_bot`.
-- `backend/internal/contributions/service_extras.go::NetworkDensity` — `WHERE NOT pr.first_review_by_bot` (or recompute on the fly).
+- `backend/internal/contributions/bot.go` — pure `IsBotLogin(login string, cfg BotConfig) bool`.
+- `backend/internal/storage/migrations/0005_first_human_review.sql` — add `is_bot INTEGER NOT NULL DEFAULT 0` on `pr_reviews`; add `first_human_review_at TIMESTAMP` on `pull_requests`.
+- `backend/internal/github/sync.go`, `backend/internal/gitlab/sync.go` — set `is_bot`; compute `first_human_review_at`; reassign `author_id` / `reviewer_id` to `"bot"` when the login matches.
+- `backend/internal/contributions/service_extras.go::NetworkDensity` — bind on `first_human_review_at`; `JOIN ... AND rv.is_bot = 0` for cross-pillar.
 - `backend/internal/config/config.go` — `TeamAnalytics.BotReviewers []string`.
 
 **Migration**
-- Add column with default `0`.
-- On startup: one-time backfill task `UPDATE pr_reviews SET is_bot=1 WHERE …`.
-- Re-derive `pull_requests.first_review_at` for affected PRs (one CTE: pick the earliest non-bot review per PR).
+- Two columns added with sensible defaults.
+- One-shot backfill (Go, not raw SQL — needs the bot list): walk `pr_reviews`, set `is_bot` where `IsBotLogin(reviewer_login)`. Walk `pull_requests`, set `first_human_review_at = MIN(submitted_at) WHERE NOT is_bot`. Reassign `author_id` / `reviewer_id` to `"bot"` for the matching rows.
+- `aggregator.RebuildRecent(400)` after.
 
-**Rollback.** Drop the column; revert config.
+**Rollback.** Two new columns are additive. Reverting the resolver shift requires re-running the backfill in reverse — easier said than done, so the safe rollback is "revert the resolver code but leave the bot rows assigned to `bot`" — the dashboard tolerates that.
 
-**Risk.** Headline numbers change visibly — first-review p50 will jump from 0.1 h to "real value, probably 4–10 h". Surface this in the release notes.
+**Risk.** Numbers will move visibly: first-human-review p50 jumps from 0.1 h to whatever the real number is, and the `bot` member will likely top the team table for `prs_merged` (renovate alone has hundreds in the window). Headline this in the release notes.
 
 ---
 
@@ -120,140 +127,237 @@ In addition, optionally:
 
 ---
 
-## W4 — Sprint WIP / In-Progress / Done split (covers B7)
+## W4 — Sprint TODO / In-Progress / Done split (covers B7) — **REVISED 2026-05-19**
 
-**Problem.** `SprintStats.WIP` lumps Backlog / Selected for Development / Blocked / In Progress together because the classifier only checks `resolved_at IS NULL`.
+**Problem.** `SprintStats.WIP` lumps Backlog / Blocked / In Progress together because the classifier only checks `resolved_at IS NULL`.
 
-**Design.** Split into three buckets using the existing `status` column:
+**Maintainer answer (Q2).** "Can you query Jira directly and cross-check?" → done. DEVOPS uses **different status sets per issue type**:
 
-```go
-type SprintStats struct {
-    Name        string `json:"name,omitempty"`
-    Todo        int    `json:"todo"`         // Backlog, Selected, Blocked, To Do, …
-    InProgress  int    `json:"in_progress"`  // matches in_progress_statuses
-    Done        int    `json:"done"`         // matches done_statuses OR resolved_at not null
-    PRsOpen     int    `json:"prs_open"`
-    PRsMerged   int    `json:"prs_merged"`
-    PRsTotal    int    `json:"prs_total,omitempty"` // convenience
-}
-```
+| issue type | statuses |
+|---|---|
+| Bug, Story, Technical Debt | Open, Designing, Developing, Testing, Acceptance Testing, Ready for Delivery, Done, Cancelled |
+| Improvement, Vulnerability, Task, Sub-task, Pillar, Milestone, Document | Backlog, Blocked, In Progress, In Testing, Ready for QA, Resolved, Signed Off, Test Failed, Cancelled |
+| Epic | 待处理, 调研中, 调研完成, 设计完成, 开发完成, 测试完成, 验收完成, 阻塞中, 已完成, 已取消 |
+| Job | Open, In Progress, Under Review, Ready for Delivery, Done, Cancelled |
+| Customer Reported Incident | Open, In Progress, Under Review, Verify, Wait for Verify, Mitigated, Resolved |
+| Platform application | Open, In Progress, Under Review, CONFIRM RELEASE, DEPLOY, using, Done, Cancelled |
+| Components / Components-sub-task | In Progress, Components-test, Ready for QA, Test Failed, Done, Cancelled |
 
-Status lists land under `team_analytics.statuses` so they can grow independently of the metrics-block config (which is DORA-focused):
+**Proposed 3-bucket mapping** (status order matches what the Jira API returns — all checked names below are real statuses I pulled live on 2026-05-19):
 
 ```yaml
 team_analytics:
   statuses:
-    todo:        ["Backlog", "Selected for Development", "Blocked", "To Do", "Open", "待办", "已阻塞"]
-    in_progress: ["In Progress", "In Development", "调研中", "调研完成", "设计完成", "开发完成", "测试完成", "验收完成"]
-    done:        ["Done", "Closed", "Released", "已完成"]
+    todo:
+      - "Backlog"
+      - "Blocked"
+      - "Open"
+      - "待处理"
+      - "阻塞中"
+    in_progress:
+      - "Acceptance Testing"
+      - "CONFIRM RELEASE"
+      - "Components-test"
+      - "DEPLOY"
+      - "Designing"
+      - "Developing"
+      - "Doc Reviewing"
+      - "In Progress"
+      - "In Testing"
+      - "Mitigated"
+      - "Ready for Delivery"
+      - "Ready for Doc Review"
+      - "Ready for QA"
+      - "Review/Test Failed"
+      - "Signed Off"
+      - "Test Failed"
+      - "Testing"
+      - "Under Review"
+      - "Verify"
+      - "Wait for Verify"
+      - "调研中"
+      - "调研完成"
+      - "设计完成"
+      - "开发完成"
+      - "测试完成"
+      - "验收完成"
+    done:
+      - "Done"
+      - "Resolved"
+      - "Cancelled"
+      - "using"
+      - "已完成"
+      - "已取消"
 ```
 
-Anything unmatched falls under `in_progress` (least-bad default — operator gets pinged to extend the lists). **OPEN QUESTION (Q2) on exact status names.**
+Open mapping calls:
+- **"Cancelled"** put under `done` because the work no longer takes capacity, even though it wasn't delivered. **Q2-follow-up A:** should we add a fourth bucket `cancelled` so velocity charts can exclude it? Default is `done`.
+- **"Ready for Delivery"** put under `in_progress` because it's still QA / release work in flight. **Q2-follow-up B:** confirm.
+
+```go
+type SprintStats struct {
+    Name        string `json:"name,omitempty"`
+    Todo        int    `json:"todo"`
+    InProgress  int    `json:"in_progress"`
+    Done        int    `json:"done"`
+    PRsOpen     int    `json:"prs_open"`
+    PRsMerged   int    `json:"prs_merged"`
+    PRsTotal    int    `json:"prs_total,omitempty"`
+}
+```
+
+Anything that doesn't match any list falls back to `in_progress` and the operator gets a warning log so they can extend the config.
 
 **Files**
-- `backend/internal/contributions/service_extras.go::sprintCounts` — use the new helper.
-- `backend/internal/config/config.go` — add `TeamAnalytics.Statuses` struct.
-- `frontend/...` — Member-profile sprint card needs a three-row layout; coordinate with whoever owns the React component (see Q3 — do we extend `prototype.html` first, or jump straight to JSX?).
+- `backend/internal/contributions/service_extras.go::sprintCounts` — use a status-classification helper.
+- `backend/internal/config/config.go` — add `TeamAnalytics.Statuses` struct + defaults (the lists above, so the config can stay empty in most installs).
+- `frontend/...` — Member-profile sprint card needs a three-row layout. Per Q3 below — coordinate inside the same PR.
 
-**Risk.** Frontend coupling. If the frontend reads `wip` today, ship a graceful alias (`wip = todo + in_progress`) for one release.
+**Risk.** Backward compat: if any caller reads `wip`, we keep it as a derived alias (`wip = todo + in_progress`) for one release tagged for removal.
 
 ---
 
-## W5 — `pull_requests.epic_key` → `jira_key` rename (covers B8)
+## W5 — `pull_requests.epic_key` → `jira_key` rename (covers B8) — **CLARIFICATION 2026-05-19**
 
-**Problem.** The column stores any `DEVOPS-\d+` mentioned in the source branch or title, not just epic keys. 0 of 4411 linked Jira issues in prod are actual Epics; the rest are Stories, Bugs, Jobs, Technical Debt.
+**Maintainer asked (Q4):** "don't understand the issue here, elaborate."
 
-**Proposed change.**
+**The issue, in detail.**
 
-1. **Schema rename** — `0006_rename_epic_key_to_jira_key.sql`:
+1. The schema column is named **`epic_key`** (migration `0001_init.sql`):
    ```sql
-   ALTER TABLE pull_requests RENAME COLUMN epic_key TO jira_key;
-   CREATE INDEX IF NOT EXISTS idx_pull_requests_jira_key ON pull_requests(jira_key);
+   CREATE TABLE pull_requests (
+       ...
+       epic_key TEXT,
+       ...
+   );
    ```
-   (SQLite's `ALTER TABLE RENAME COLUMN` is 3.25+ — fine.)
-2. **Code rename** — `storage.PullRequest.EpicKey` → `JiraKey`; `Linker.Link` keeps its signature, just stores into the new field.
-3. **API/JSON** — current JSON shape only exposes `jira_key` in member-profile sprint queries; existing callers read top-level summary fields, so we don't break wire format. **OPEN QUESTION (Q4)** — do we keep the JSON tag as `epic_key` for backward compat for one release?
+2. The Go struct field is named **`EpicKey`** with JSON tag `epic_key` (`backend/internal/storage/store.go`):
+   ```go
+   type PullRequest struct {
+       ...
+       EpicKey string `json:"epic_key,omitempty"`
+       ...
+   }
+   ```
+3. The PR-linker in `backend/internal/gitlab/sync.go:48` (and the github one) sets this column via a regex that matches **any** Jira key in the source branch or title:
+   ```go
+   regexp.MustCompile(`(?i)\b(` + regexp.QuoteMeta(projectKey) + `-\d+)\b`)
+   ```
+4. In prod (4411 PRs with a linked key), the issue types of the matched Jira issues are:
 
-**Why this matters.** Anyone reading the code today reasonably assumes `epic_key` filters to Epics. The sprint-PR query (`service_extras.go:535-546`) is correct by accident — it relies on the *misnamed* column matching *story* issue keys.
+   | issue type | count |
+   |---|---|
+   | Story | 2817 |
+   | Bug | 996 |
+   | Job | 199 |
+   | Technical Debt | 195 |
+   | Document | 118 |
+   | Sub-task | 57 |
+   | Task | 25 |
+   | Improvement | 4 |
+   | **Epic** | **0** |
 
-**Files**
+   Zero of the rows ever point at an actual Epic.
+
+**Why this is a bug worth a rename.**
+
+- A maintainer reading `pull_requests.epic_key` reasonably assumes "filter PRs to only those that landed in an Epic". The query `WHERE epic_key IS NOT NULL` does NOT mean that.
+- The sprint stats query (`service_extras.go:535-546`) joins `pr.epic_key = issue_snapshots.issue_key WHERE sprint_id = ?` — this happens to be **correct on accident** because most sprint members are Stories, and `epic_key` happens to store Stories. If anyone later writes a similar query expecting actual-Epic semantics, they'll silently get wrong numbers.
+- Future readers grepping for the right column name will look for `jira_key` first; the misnomer wastes their time.
+
+**Why I asked Q4 specifically.**
+
+The rename is internal — DB column + Go field + SQL queries — but the **JSON tag** is visible to any API client that reads PR metadata. If something outside the repo (a script, the frontend) consumes `"epic_key"` from a response, renaming the tag breaks it.
+
+Audit: the JSON tag `epic_key` is **not** in the response of any currently shipped endpoint. The PR list is not exposed; only counts are. So the JSON-tag rename is safe.
+
+**Decision: hard-rename both DB column and JSON tag in the same migration.** No alias.
+
+**Files** (unchanged from the draft above):
 - `backend/internal/storage/migrations/0006_rename_epic_key_to_jira_key.sql`
-- `backend/internal/storage/store.go` — struct field rename + struct tag.
+- `backend/internal/storage/store.go` — struct field + tag rename.
 - `backend/internal/github/sync.go`, `backend/internal/gitlab/sync.go` — field rename.
 - `backend/internal/contributions/service_extras.go` — SQL rename.
-- `frontend/...` — if it reads `epic_key` anywhere.
+- Frontend grep — currently no hits for `epic_key`; safe.
 
-**Risk.** Medium — touches every PR-row read site. Cover with `make test` and a sample profile query.
+**Risk.** Medium — many compile sites, but the failure mode is loud (build error or missing column). Covered by `make test`.
 
 ---
 
-## W6 — GitHub / GitLab parity (covers B12)
+## W6 — GitHub / GitLab parity (covers B12) — **REVISED 2026-05-19**
 
-**Maintainer asked: what can we do here?**
+**Maintainer answers.**
+- **Q5 (changes_requested marker):** "defer, we generally don't do that in gitlab." → dropped from this workstream.
+- **Q12 (extra API cost):** "backfill can be schedule overnight." → fine to flip `HydrateDiff` on without worrying about the one-shot spike.
 
-Three asymmetries, each with a choice:
+**Final scope of W6:**
 
-1. **MR additions / deletions / changed_files.** Today only filled when `HydrateDiff=true` (off by default). Recommendation: **flip the default to `true`** and add a `team_analytics.gitlab_hydrate_diff: false` opt-out. Cost is ~1 extra API call per merged MR — at the current sync size (42 records/cycle) this is negligible. The benefit is that PR-size charts (planned for Phase 3) work for GitLab on day one.
-2. **`changes_requested` review state.** GitLab has no first-class API for this. Closest analogues:
-   - `/needs-rework`, `/changes-requested`, `/not-lgtm` magic comments in alauda's prow conventions. **OPEN QUESTION (Q5)** — do we agree on a marker?
-   - GitLab approval rules — but those are project-config-dependent.
-   - **Recommendation:** add a regex pattern in config (`team_analytics.review_classifiers.changes_requested: '^\s*/(needs-rework|not-lgtm)\s*$'`) and let teams adopt it; default empty. Until then we accept the asymmetry.
-3. **Draft MR exclusion from review fetch.** GitHub has `pr.Draft`, GitLab has `mr.Draft` (also called WIP). The GitHub branch skips reviews for drafts; the GitLab branch doesn't. Trivial — mirror the github skip in `gitlab/sync.go:Sync`.
+1. **MR additions / deletions / changed_files** — flip `gitlab/sync.go:110` default `HydrateDiff: false` → `true`. Add config opt-out `team_analytics.gitlab_hydrate_diff: false` for installs that hit rate limits. Cost is ~1 extra API call per merged MR; the current sync ingests ~50 MRs per cycle, so this is roughly +2 % of GL API budget per cycle and ~30 min one-shot extra during the W7 backfill (runs overnight per Q12).
+2. **Draft MR review-fetch skip** — `gitlab/sync.go:Sync` mirrors the github branch's `if pr.Draft { skipReviews = true }` pattern. Saves a per-draft API call and prevents drafts polluting `first_review_at`.
+3. ~~`changes_requested` marker~~ — **deferred per Q5.**
 
 **Files**
-- `backend/internal/gitlab/sync.go` — `s.HydrateDiff = true` default; draft skip.
-- `backend/internal/gitlab/sync.go::classifyNote` — extend with optional regex.
-- `backend/internal/config/config.go` — new fields.
+- `backend/internal/gitlab/sync.go` — default flip; draft skip.
+- `backend/internal/config/config.go` — `TeamAnalytics.GitLabHydrateDiff *bool` (pointer so absent ≠ false).
 
-**Risk.** GitLab API budget. Monitor `record_count` in the next sync cycle.
+**Risk.** Negligible after Q12 confirmation.
 
 ---
 
-## W7 — Window: 12 months, bucketed by quarter (covers B13)
+## W7 — 12-month window, release-cadence "quarter" buckets (covers B13) — **REVISED 2026-05-19**
 
-**Maintainer ask:** "I want to change the whole collection to span last 12 months, but split by quarter — feasible?"
-
-**Yes. Two pieces:**
+**Maintainer answers.**
+- **Q6 (aggregation strategy):** "start with read time fold, we can split if necessary later" → keep `member_week_metrics` weekly; fold in handler.
+- **Q7 (quarter boundary):** "actually our quarters are not real quarters it is a version cadence, it can be split by the current quarters split already in jira (2026Q1 2026Q2 2026Q4) which directly relates to our release dates (quite weird, I know)" → quarters track release cadence, not calendar.
+- **Q12 (timing):** "backfill can be schedule overnight." → fine.
 
 ### W7a — Collection (ingest) — extend to 365 days
+- `Storage.BackfillDays = 365` (today 180).
+- `github.backfill_days`, `gitlab.backfill_days`, `jira.backfill_days` already inherit `storage.backfill_days` when set to `0`, leave as-is.
+- `aggregator.RebuildRecent` default window: bump from 187 to **400** so the first rebuild after deploy fully populates the year.
 
-- `backend/internal/storage/config.go::Storage.BackfillDays = 365` (today 180).
-- `github.backfill_days`, `gitlab.backfill_days`, `jira.backfill_days` either inherit `storage.backfill_days` (today's behaviour when set to `0`) or get overridden — recommend leaving the inherits in place and bumping `storage.backfill_days` only.
-- `aggregator.RebuildRecent` default window — bump from 187 to **400** so the first rebuild after deploy fully populates the year.
+Storage cost: prod DB is 16 MB after ~6 months → ~30-35 MB after a year. Negligible.
 
-Storage cost: prod DB is 16 MB after ~6 months. Doubling the window → roughly 30-35 MB. Negligible.
+API cost: one-shot backfill scheduled overnight per Q12 above. Incremental syncs from `collection_runs.captured_at` thereafter.
 
-API cost: backfill is a one-shot. Subsequent syncs remain incremental from the last `collection_run`.
+### W7b — Quarter source — needs one more clarification
 
-### W7b — Aggregation (read) — quarter buckets
+**Maintainer-cited example "2026Q1 2026Q2 2026Q4"** doesn't show up in Jira as I expected. I checked three places:
 
-Two ways to do this; pick one (see Q6):
+| place | result |
+|---|---|
+| `/rest/api/2/project/DEVOPS/versions` (320 versions; sample names: `v3.0.3-1, v3.4, v4.3.0, v4.4.0, …`) | **0 versions matching `\d{4}Q[1-4]`** |
+| `/rest/agile/1.0/sprint/1767` (most recent active sprint) | name `DevOps-4.4-s2`, no quarter label |
+| `/rest/api/2/search?jql=fixVersion in ("2026Q1","2026Q4")` | JQL error: those fixVersions don't exist |
 
-**Option A — Aggregate at read time.** Keep `member_week_metrics` weekly; the API endpoint accepts `?bucket=quarter` (default `week`). The handler folds weekly rows into quarters in Go before returning. Trivial code, no new schema, but every query does the fold.
+So the "2026Q1/Q2/Q4" labels probably aren't stored in Jira directly. **Q7-follow-up A:** where exactly are these quarter labels defined?
 
-**Option B — Add `member_quarter_metrics`.** A second rollup, written by the aggregator in parallel with the weekly one. Faster reads, but two writers to keep in sync.
+Most plausible candidates:
+- **A1.** A manual mapping `releaseSeries → quarterLabel` we maintain in this repo (e.g. `v4.2 → 2026Q1`, `v4.3 → 2026Q2`, `v4.4 → 2026Q3`, `v4.5 → 2026Q4`).
+- **A2.** Inferred from each released fixVersion's `releaseDate` (calendar-quarter the version shipped in), with the team defining "quarter = the release wave that landed in those three months".
+- **A3.** A Jira custom field (e.g., `customfield_QuarterTag`) — but I didn't find one named obviously.
 
-**Recommendation: Option A** for now, promote to Option B if a quarter-level query is ever slow enough to matter. Profile after rollout.
+**Recommendation pending the answer:**
+- **If A1:** add `team_analytics.release_quarters: [{"label":"2026Q1","versions":["v4.2","v4.2.1",…]}, …]` to config. The aggregator's quarter-fold helper consults this table to bucket a fixVersion to a quarter.
+- **If A2:** infer at read time from `releaseDate` of each released version. Cheap, no config, but quarters drift if a release slips.
+- **If A3:** read the custom field through the existing Jira sync, store on `issue_snapshots`.
 
-**Quarter boundary.**
+Either A1 or A2 lets us start without a schema change. **Q7-follow-up B:** which one matches our reality?
 
-- Calendar quarters: Q1 = Jan-Mar, etc.
-- Alauda fiscal year? **OPEN QUESTION (Q7)** — confirm calendar vs. fiscal.
-- Default to calendar quarters unless we hear otherwise.
+### W7c — API + frontend shape
 
-**API shape.** Extend `MemberWeekQuery` → `MemberPeriodQuery` (or add a `Bucket` field) and let the handler decide. The frontend gets:
+Add `?period=week|release_quarter` (default `week`). On `period=release_quarter`, fold weekly rows by mapping each MR `merged_at` / Jira `resolved_at` → fixVersion (latest fixVersion released after the event) → quarter label.
 
 ```json
 {
   "members": [
     {
       "member_id": "daniel",
-      "quarter_totals": [
-        {"quarter": "2025-Q2", "jira_done": 32, "points": 27, "prs_merged": 180, ...},
-        {"quarter": "2025-Q3", ...},
-        {"quarter": "2025-Q4", ...},
-        {"quarter": "2026-Q1", ...},
-        {"quarter": "2026-Q2", ...}
+      "period_totals": [
+        {"period": "2026Q1", "from": "...", "to": "...", "jira_done": 32, "points": 27, "prs_merged": 180, ...},
+        {"period": "2026Q2", ...},
+        {"period": "2026Q3", ...},
+        {"period": "2026Q4", ...}
       ],
       ...
     }
@@ -263,47 +367,72 @@ Two ways to do this; pick one (see Q6):
 }
 ```
 
-(week_totals stays the default; quarter_totals only on `?bucket=quarter`.)
-
 **Files**
 - `backend/internal/storage/config.go`
 - `backend/internal/contributions/aggregator.go` — RebuildRecent default
-- `backend/internal/contributions/service.go` — add `bucketByQuarter` helper
-- `backend/internal/api/handlers/contributions.go` — parse `?bucket=`
-- Frontend — new view tab for quarter; coordinate.
+- `backend/internal/contributions/period.go` — new package-local helper that maps `(time.Time) → release-quarter label` per Q7-follow-up answer
+- `backend/internal/contributions/service.go` — add `bucketByPeriod` that swaps `WeekTotals` for `PeriodTotals` on the `release_quarter` path
+- `backend/internal/api/handlers/contributions.go` — parse `?period=`
+- Frontend — new tab "Quarter" inside each chart; coordinate inside the same PR.
 
-**Risk.** Medium — first deploy will re-run a full 365-day backfill. Run during off-hours. Watch `collection_runs.duration_ms`.
-
----
-
-## W8 — `review_latency_p50_hours` (covers B3)
-
-**Maintainer didn't comment on this finding.** Two options:
-
-- **A.** Implement it (the TODO at `aggregator.go:246-248`). Once W2 lands, the underlying data is honest enough to be useful.
-- **B.** Hide the field until A lands — the API and Member Profile drop the row so users don't think "0 h" is real.
-
-**Recommendation:** **A**, after W2 ships, because W4-W7 don't unblock it and the field is already plumbed end-to-end. Cost is one calculator implementation, mirroring the `cycle_time` shape. **OPEN QUESTION (Q8) — confirm.**
+**Risk.** Medium. Mainly the Q7 ambiguity — until we know which path, the helper is half-designed.
 
 ---
 
-## W9 — B2 / B5 pillar plumbing (HIGH severity in the audit, but design-dependent)
+## W8 — `review_latency_p50_hours` (covers B3) — **CONFIRMED 2026-05-19**
 
-**Problem.** `member_week_metrics.pillar_id` and `.component` are always `''`. `cross_pillar_review_pct` is always `0`. `members.pillar_id` is `null` for everyone.
+**Maintainer answer (Q8):** "implement."
 
-**Maintainer comment on B9:** "pillars[] derived from member work is by design — member work can traverse different pillars."
+**Design.** Per-(reviewer, week) p50 of `(first_human_review_at - created_at)` — depends on W2 having shipped `first_human_review_at` so the metric measures human review time. Aggregator query mirrors the existing `prs_reviewed` insert, but uses Go-side sort+percentile (same trick `NetworkDensity` uses, see `service_extras.go:104-137`).
 
-That makes the `pillars[]` field (B9) fine as-is. **But** the `members.pillar_id` column is then completely vestigial — nothing writes it, nothing reads it usefully, and the cross-pillar review % relies on it being populated.
+**Files**
+- `backend/internal/contributions/aggregator.go` — new `reviewLatency` step, INSERT into the existing `review_latency_p50_hours` column.
+- `backend/internal/contributions/aggregator_test.go` — table-driven test for known input.
 
-**Recommendation, in order of preference:**
+**Risk.** Low. Schema and API already accept the field.
 
-1. **Drop `members.pillar_id` from the schema and the PATCH endpoint.** Replace `cross_pillar_review_pct` with a different metric — say "cross-component review %" — derived from the same per-issue / per-repo pillar attribution that `PillarThroughput` already uses. The author of a PR is mapped to a pillar via the PR's repo; the reviewer is mapped via *their own* most-recent PR's repo (or via the same Jira-issue mapping if available). Subtle, but doesn't depend on a hand-curated `members.pillar_id` field.
-2. **Keep `members.pillar_id` but populate it from a new `team_analytics.member_pillars` config block.** Operator declares each member's "home" pillar; PATCH overrides; cross-pillar review compares home pillars.
-3. **Drop the cross-pillar review % metric entirely.** It hasn't been useful to anyone since launch.
+**Depends on:** W2.
 
-**OPEN QUESTION (Q9) — which path?**
+---
 
-Once decided, the corresponding W9 lands in one PR.
+## W9 — Pillar plumbing redesign (covers B2, B5; B9 stays as-is) — **CONFIRMED 2026-05-19**
+
+**Maintainer answer (Q9): option (i)** — drop `members.pillar_id`; redefine cross-pillar review % using PR-repo + Jira-component attribution.
+
+**Design.**
+
+1. **Schema migration `0007_drop_members_pillar.sql`:**
+   ```sql
+   ALTER TABLE members DROP COLUMN pillar_id;
+   -- member_week_metrics.pillar_id column kept for now (always ''); the
+   -- aggregator-write change to make it useful is out of scope of this W9.
+   ```
+2. **API surface:**
+   - `PATCH /api/contributions/members/:id` drops `pillar_id` from the accepted body.
+   - The `Member` JSON shape drops `pillar_id` (or returns it always `null` for one release).
+3. **`cross_pillar_review_pct` redefined.** New helper `pillarsForPR(pr) []string`:
+   - Primary: `PillarMap.PillarsForRepo(pr.repo_id)`.
+   - Fallback: if the PR has a `jira_key` (W5), the Jira issue's `components` / `versions` map via `PillarMap.PillarsFor(comps, vers)`.
+   - Else: synthetic "Unassigned" — excluded from the denominator (same as today).
+   - For a review row, the reviewer's "side" is the union of pillars across the reviewer's *own* recent PRs in the same window (cheap to compute: one extra subquery per panel load). A review is "cross-pillar" when the PR's pillar set and the reviewer's pillar set are disjoint AND both are non-empty.
+4. The frontend's "this member's pillars" card already pulls from B9's per-member-attribution map; no change needed there.
+
+**Why this is non-trivial.** Today's metric (`service_extras.go:139-162`) compares `members.pillar_id` directly. The new metric needs:
+- A per-PR pillar resolver (cheap; reuses existing config).
+- A per-reviewer "what pillars are they active in" resolver (one extra SQL window per panel render).
+
+We can cache the reviewer→pillar resolution per-window inside the handler to avoid repeated SQL.
+
+**Files**
+- `backend/internal/storage/migrations/0007_drop_members_pillar.sql`.
+- `backend/internal/storage/store.go::Member`, `MemberIdentity` — drop `PillarID`.
+- `backend/internal/api/handlers/contributions.go::UpdateMember` — drop `pillar_id`.
+- `backend/internal/contributions/service_extras.go::NetworkDensity` — rewrite the cross-pillar query as described.
+- `backend/internal/contributions/prefills.go` — drop the (unused) write path.
+
+**Risk.** Medium. SQL change in a hot path. Cover with a unit test where 2 PRs land in distinct pillars, 1 review is by an author in the other pillar → 50 %.
+
+**Depends on:** W5 (uses `jira_key`).
 
 ---
 
@@ -318,59 +447,52 @@ Combine into the W7 PR.
 
 ---
 
-## Order & sequencing
+## Order & sequencing — **REVISED 2026-05-19**
 
 ```
-W1 ─────► W3 (denylist consumed by W1)
-W1 ─────► W7b (quarter aggregation depends on the allowlisted member set)
-W2 ─────► W8 (review latency wants the bot filter first)
-W5 (rename) — independent
-W6 (parity) — independent
-W9 (pillars) — independent, gated on Q9
+W1 (allowlist + instance-wide MR sweep) ───► W2 (bot consolidation)
+                                              │
+                                              ├──► W8 (review latency p50, needs first_human_review_at)
+                                              └──► W9 (cross-pillar % rewrite, needs W5 for jira_key)
+W5 (epic_key→jira_key) ───────────────────────┘
+W4 (sprint TODO/IP/Done) — independent of all
+W6 (gitlab parity) — independent
+W7 (12-month + release-quarter buckets) — gated on Q7-follow-up
+W10 (window bound + label tidy) — folded into W7
+W3 — folded into W1 (same denylist)
 ```
 
-Suggested rollout sprints (2-week cadence):
+Suggested rollout, two-week cadence, one PR per workstream unless noted:
 
-1. **Sprint 1 (this sprint).** W1 + W3 — fix the "who counts" story. Single PR.
-2. **Sprint 2.** W2 + W8 — fix the review story. Two PRs, second after first lands.
-3. **Sprint 3.** W7 (12 months / quarter) + W10 — biggest visible change. One PR.
-4. **Sprint 4.** W5 (rename) + W6 (parity) — janitorial.
-5. **Sprint 5.** W9 — depends on Q9 answer.
+1. **Sprint 1 (this sprint, after answers below land):** W1 (single PR, includes W3) — "who counts" + GitLab `with_shared=false` + per-member sweep. **Visible effect:** zhwang/chaozhou/gxjiao/lmhe disappear from the dashboard; allowlisted members' counts may rise slightly if they had MRs in `container-platform/*` etc.
+2. **Sprint 2:** W2 (PR2) + W4 (PR3). **Visible effect:** team's first-review p50 jumps from 0.1 h to something realistic; a new `bot` row tops the team table; sprint card shows three columns.
+3. **Sprint 3:** W5 (PR4) + W6 (PR5). Janitorial.
+4. **Sprint 4:** W7 (PR6, big), W10 folded in; W8 (PR7); W9 (PR8) — these three can land in parallel once Sprint 3 ships.
 
 ---
 
-## Open questions (please answer before execution)
+## Open questions — answers and remaining follow-ups (updated 2026-05-19)
 
-**Q1 — B1 scope of "instance-wide".**
-You said "GitLab instance-wide scan, focus on devops member contributions." Two interpretations of what we should ingest:
-- **(a)** *Keep `with_shared=true` AND remove `devops/**` from the spec entirely → scan every project on `gitlab-ce.alauda.cn`.* Maximum coverage; expensive; lots of noise we filter at calculation time via the allowlist.
-- **(b)** *Keep `groups: ["devops/**"]` but switch `with_shared=false`.* Plus W1's allowlist drops non-DEVOPS authors. The instance-wide-ness is "DEVOPS team's own subgroups, recursively". My recommendation.
-- **(c)** *Open: scan a much wider but still-curated set, e.g. `devops/**`, plus members' personal namespaces (`mingfu/*`, `daniel/*`, …).*
+| | original Q | maintainer answer | follow-up I still need |
+|---|---|---|---|
+| Q1 | scope of "instance-wide" | members can contribute everywhere → ingest instance-wide, filter by author at calc time | **none** — design rewritten in W1 |
+| Q2 | sprint status lists | pulled from Jira; mapped above | **Q2-A**: should "Cancelled / 已取消" go in `done` or a fourth `cancelled` bucket?; **Q2-B**: confirm "Ready for Delivery" → `in_progress` |
+| Q3 | frontend track | "what is the best?" → my decision: **one PR per workstream, backend+frontend together**, so reviewers see complete behaviour changes | **none** — confirm if you disagree |
+| Q4 | `epic_key` rename | "elaborate" → see W5 detailed; no current API consumer reads the tag, hard-rename is safe | **confirm hard-rename OK** |
+| Q5 | GL `changes_requested` | defer | **none** |
+| Q6 | quarter aggregation | read-time fold | **none** |
+| Q7 | quarter boundary | release-cadence quarters, not calendar | **Q7-A**: where exactly do `2026Q1` / `2026Q2` / `2026Q4` live? Not in fixVersions / sprints / JQL. (See W7b — three candidate sources.); **Q7-B**: confirm A1 (config-driven `release_quarters` map) vs A2 (infer from fixVersion `releaseDate`) vs A3 (Jira custom field) |
+| Q8 | review_latency_p50_hours | implement | **none** |
+| Q9 | pillar attribution | option (i) — drop `members.pillar_id`, redefine cross-pillar % | **none** |
+| Q10 | bot deny set | merge bot contributions into a synthetic `bot` member (better than my draft) → W2 rewritten | **Q10-B**: confirm seed list `alaudabot, alaudaa-renovate, edge-katanomi-app2[bot], copilot-pull-request-reviewer[bot], kilo-code-bot[bot], copilot`; anything else? |
+| Q11 | member denylist seed | confirmed: `gxjiao, lmhe, zhwang, chaozhou` | **none** |
+| Q12 | backfill timing | overnight | **none** |
 
-Which?
+### Remaining clarifications (4 items)
 
-**Q2 — Status name lists.** I drafted three buckets in W4. Are those names exhaustive for our workflows, or are there others (custom DEVOPS statuses we don't see in the audit sample)?
+- **Q2-A.** "Cancelled" / "已取消" — put under `done` (treats it as "no longer takes capacity") or add a fourth `cancelled` bucket so velocity charts can exclude it?
+- **Q4.** Confirm: hard-rename `epic_key` → `jira_key` (DB column + Go field + JSON tag) in one migration. No alias for backward compat.
+- **Q7-A / Q7-B.** Where do the `2026Q1 2026Q2 2026Q4` quarter labels live? I can't find them in Jira. Pick one: **A1** config-driven mapping `versions[] → quarter_label`, **A2** infer from fixVersion `releaseDate` (calendar-quarter the version shipped), or **A3** a Jira custom field I should look up.
+- **Q10-B.** Confirm the bot-login seed list above. Any others I haven't met yet?
 
-**Q3 — Frontend track.** This whole plan touches member-profile / team-overview JSX. Should I open a sister branch in `frontend/` per PR, or batch the frontend changes into a single follow-up PR?
-
-**Q4 — `epic_key` rename.** Keep the JSON tag as `epic_key` for one release for backward compat, or hard-rename to `jira_key` immediately? (No external API consumers that I'm aware of, but worth confirming.)
-
-**Q5 — GitLab `changes_requested` marker.** Do we already have a convention (`/needs-rework`, `/not-lgtm`, something else) we want to honour? If not, defer.
-
-**Q6 — Quarter aggregation strategy.** Read-time fold (Option A, simpler) or a parallel rollup table (Option B, faster reads)? I lean A.
-
-**Q7 — Quarter boundary.** Calendar (Q1 = Jan-Mar) or Alauda fiscal year? If fiscal, where does FY start?
-
-**Q8 — `review_latency_p50_hours`.** Implement (after W2) or hide? I lean implement.
-
-**Q9 — Pillar attribution path.** Drop `members.pillar_id`, populate via config, or drop the cross-pillar review % metric? I lean "drop members.pillar_id + redefine cross-pillar review % from PR-repo and issue-component attribution."
-
-**Q10 — Bot deny set seed.** Confirm the initial list — `alaudabot`, `alaudaa-renovate`, `edge-katanomi-app2[bot]`, `copilot-pull-request-reviewer[bot]`, `kilo-code-bot[bot]`. Anything obvious I missed?
-
-**Q11 — Member denylist seed.** Confirm: `gxjiao`, `lmhe`, `zhwang`, `chaozhou`. Any others?
-
-**Q12 — Backfill cost.** W7's 365-day backfill will hammer GitHub + GitLab on first run. Acceptable to run during business hours, or do we want a manual gate / scheduled overnight kick?
-
----
-
-*If the answers to Q1–Q12 land in a single Discord reply, I can convert each W block into a tracked Jira task and start executing in order.*
+*Once those four answers land, every W block is fully specified and I can convert each into a tracked task and start.*
