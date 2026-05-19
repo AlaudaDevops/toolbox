@@ -393,7 +393,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("storage.type", "sqlite")
 	viper.SetDefault("storage.path", "./data/roadmap.db")
 	viper.SetDefault("storage.dsn", "")
-	viper.SetDefault("storage.backfill_days", 180)
+	viper.SetDefault("storage.backfill_days", 365)
 
 	// GitLab defaults
 	viper.SetDefault("gitlab.enabled", false)
