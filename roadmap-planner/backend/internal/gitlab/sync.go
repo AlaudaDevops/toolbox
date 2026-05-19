@@ -87,7 +87,13 @@ type Syncer struct {
 
 	WildcardTTL     time.Duration
 	IncludeArchived bool
-	HydrateDiff     bool // fetch additions/deletions/changed_files per merged MR
+	// HydrateDiff controls whether merged MRs get a follow-up show-MR
+	// call to populate additions/deletions/changed_files. Default true
+	// since W6 (2026-05-19) — the data is cheap (~1 extra call per
+	// merged MR, ~+2% of the per-cycle API budget) and the Dashboard
+	// tab consumes it. Operators on tight rate budgets can disable via
+	// `gitlab.hydrate_diff: false`.
+	HydrateDiff bool
 
 	wildcardCache *wildcardCache
 	nowFn         func() time.Time
@@ -107,7 +113,7 @@ func NewSyncer(client *Client, store storage.Store, specs []GroupSpec, linker Li
 		logger:        logger.WithComponent("gitlab-syncer"),
 		backfillDays:  backfillDays,
 		WildcardTTL:   DefaultWildcardTTL,
-		HydrateDiff:   false,
+		HydrateDiff:   true,
 		wildcardCache: newWildcardCache(),
 		nowFn:         time.Now,
 	}

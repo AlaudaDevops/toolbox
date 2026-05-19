@@ -401,7 +401,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("gitlab.sync_interval", "30m")
 	viper.SetDefault("gitlab.groups", []string{})
 	viper.SetDefault("gitlab.backfill_days", 0)
-	viper.SetDefault("gitlab.hydrate_diff", false)
+	viper.SetDefault("gitlab.hydrate_diff", true)
 	viper.SetDefault("gitlab.include_archived", false)
 
 	// GitHub defaults
