@@ -124,8 +124,9 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 		INSERT INTO pull_requests (
 			id, source, repo_id, number, title, state, author_id, author_login,
 			head_branch, base_branch, additions, deletions, changed_files,
-			jira_key, created_at, first_review_at, merged_at, closed_at, fetched_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			jira_key, created_at, first_review_at, first_human_review_at,
+			merged_at, closed_at, fetched_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			source = excluded.source,
 			title = excluded.title,
@@ -137,6 +138,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 			changed_files = excluded.changed_files,
 			jira_key = excluded.jira_key,
 			first_review_at = excluded.first_review_at,
+			first_human_review_at = excluded.first_human_review_at,
 			merged_at = excluded.merged_at,
 			closed_at = excluded.closed_at,
 			fetched_at = excluded.fetched_at`)
@@ -153,7 +155,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 		_, err := stmt.ExecContext(ctx,
 			p.ID, source, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID), nullable(p.AuthorLogin),
 			nullable(p.HeadBranch), nullable(p.BaseBranch), p.Additions, p.Deletions, p.ChangedFiles,
-			nullable(p.JiraKey), p.CreatedAt, p.FirstReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
+			nullable(p.JiraKey), p.CreatedAt, p.FirstReviewAt, p.FirstHumanReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("upsert pr %s: %w", p.ID, err)
@@ -172,14 +174,15 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 	}
 	defer func() { _ = tx.Rollback() }()
 	q := rebind(s.d, `
-		INSERT INTO pr_reviews (id, pr_id, source, reviewer_id, reviewer_login, state, submitted_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO pr_reviews (id, pr_id, source, reviewer_id, reviewer_login, state, submitted_at, is_bot)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			source = excluded.source,
 			reviewer_id = excluded.reviewer_id,
 			reviewer_login = excluded.reviewer_login,
 			state = excluded.state,
-			submitted_at = excluded.submitted_at`)
+			submitted_at = excluded.submitted_at,
+			is_bot = excluded.is_bot`)
 	stmt, err := tx.PrepareContext(ctx, q)
 	if err != nil {
 		return err
@@ -190,8 +193,12 @@ func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) 
 		if source == "" {
 			source = "github"
 		}
+		isBot := 0
+		if r.IsBot {
+			isBot = 1
+		}
 		_, err := stmt.ExecContext(ctx, r.ID, r.PRID, source, nullable(r.ReviewerID),
-			nullable(r.ReviewerLogin), r.State, r.SubmittedAt)
+			nullable(r.ReviewerLogin), r.State, r.SubmittedAt, isBot)
 		if err != nil {
 			return fmt.Errorf("upsert review %s: %w", r.ID, err)
 		}

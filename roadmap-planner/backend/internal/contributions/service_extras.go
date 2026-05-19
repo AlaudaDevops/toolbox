@@ -79,13 +79,18 @@ func (s *Service) NetworkDensity(ctx context.Context, q storage.MemberWeekQuery)
 	// which is anchored on creation. Drafts are excluded because they
 	// shouldn't count toward orphan rate; we approximate by skipping
 	// PRs that closed without a merge AND without a review.
-	hours := hoursBetween(dialect, "first_review_at", "created_at")
+	//
+	// W2: latency uses `first_human_review_at` so bot reviews (renovate,
+	// catalog-bot, etc.) don't dominate the p50. Orphan rate stays
+	// `first_review_at IS NULL` — a PR with only a bot review is still
+	// reviewed for orphan purposes, but it isn't reviewed for latency.
+	hours := hoursBetween(dialect, "first_human_review_at", "created_at")
 	prSQL := rebindSimple(dialect, fmt.Sprintf(`
 		SELECT
 		  COUNT(*) AS total,
 		  SUM(CASE WHEN merged_at IS NOT NULL THEN 1 ELSE 0 END) AS merged,
 		  SUM(CASE WHEN first_review_at IS NULL THEN 1 ELSE 0 END) AS orphans,
-		  SUM(CASE WHEN first_review_at IS NOT NULL AND %s <= 24.0
+		  SUM(CASE WHEN first_human_review_at IS NOT NULL AND %s <= 24.0
 		           THEN 1 ELSE 0 END) AS under24h
 		FROM pull_requests
 		WHERE created_at >= ? AND created_at < ?`, hours))
@@ -111,7 +116,7 @@ func (s *Service) NetworkDensity(ctx context.Context, q storage.MemberWeekQuery)
 		SELECT %s
 		FROM pull_requests
 		WHERE created_at >= ? AND created_at < ?
-		  AND first_review_at IS NOT NULL`, hours))
+		  AND first_human_review_at IS NOT NULL`, hours))
 	rows, err := db.QueryContext(ctx, latSQL, q.From, q.To)
 	if err != nil {
 		return nil, fmt.Errorf("network latencies: %w", err)
@@ -151,6 +156,7 @@ func (s *Service) NetworkDensity(ctx context.Context, q storage.MemberWeekQuery)
 		JOIN members ma ON ma.id = COALESCE(NULLIF(pr.author_id, ''), '')
 		JOIN members mr ON mr.id = COALESCE(NULLIF(rv.reviewer_id, ''), '')
 		WHERE rv.submitted_at >= ? AND rv.submitted_at < ?
+		  AND rv.is_bot = 0
 		  AND ma.pillar_id IS NOT NULL AND ma.pillar_id <> ''
 		  AND mr.pillar_id IS NOT NULL AND mr.pillar_id <> ''`)
 	var xTotal, xCross sql.NullInt64

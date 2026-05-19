@@ -110,25 +110,26 @@ type IssueSnapshot struct {
 // share the same table without losing provenance. Defaults to "github"
 // for rows ingested before the 0003 migration.
 type PullRequest struct {
-	ID            string // "owner/name#number" (github) or "group/sub/proj!iid" (gitlab)
-	Source        string // "github" | "gitlab"
-	RepoID        string
-	Number        int
-	Title         string
-	State         string // "open" | "merged" | "closed"
-	AuthorID      string // FK to members.id, empty if no match
-	AuthorLogin   string // raw login from the source API, lower-cased
-	HeadBranch    string
-	BaseBranch    string
-	Additions     int
-	Deletions     int
-	ChangedFiles  int
-	JiraKey       string // any Jira key matched by the linker; was misnamed `EpicKey` pre-W5
-	CreatedAt     time.Time
-	FirstReviewAt *time.Time
-	MergedAt      *time.Time
-	ClosedAt      *time.Time
-	FetchedAt     time.Time
+	ID                 string // "owner/name#number" (github) or "group/sub/proj!iid" (gitlab)
+	Source             string // "github" | "gitlab"
+	RepoID             string
+	Number             int
+	Title              string
+	State              string // "open" | "merged" | "closed"
+	AuthorID           string // FK to members.id, empty if no match
+	AuthorLogin        string // raw login from the source API, lower-cased
+	HeadBranch         string
+	BaseBranch         string
+	Additions          int
+	Deletions          int
+	ChangedFiles       int
+	JiraKey            string // any Jira key matched by the linker; was misnamed `EpicKey` pre-W5
+	CreatedAt          time.Time
+	FirstReviewAt      *time.Time
+	FirstHumanReviewAt *time.Time // W2: MIN(submitted_at) over non-bot reviews
+	MergedAt           *time.Time
+	ClosedAt           *time.Time
+	FetchedAt          time.Time
 }
 
 // PRReview is one review event on a PR or MR.
@@ -148,6 +149,7 @@ type PRReview struct {
 	ReviewerLogin string // raw login from the source API, lower-cased
 	State         string // approved | changes_requested | commented
 	SubmittedAt   time.Time
+	IsBot         bool // W2: reviewer_login matched the configured bot allowlist
 }
 
 // MemberIdentity is the operator-editable identity payload for the PATCH

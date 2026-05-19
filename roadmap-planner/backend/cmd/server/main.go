@@ -212,11 +212,30 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 	aggregator := contributions.NewAggregator(store)
 	allowlist := contributions.BuildAllowlist(cfg.TeamAnalytics)
 	aggregator.SetAllowlist(allowlist)
+	bots := contributions.NewBotSet(cfg.TeamAnalytics.BotLogins)
 	api.AddContributionsRoutes(router, store, service, aggregator, allowlist)
 	logger.Info("Contributions API routes added",
 		zap.Int("pillars_configured", len(pillarMap.Order())),
 		zap.Bool("allowlist_enabled", allowlist.Enabled()),
-		zap.Int("allowlist_size", allowlist.Size()))
+		zap.Int("allowlist_size", allowlist.Size()),
+		zap.Int("bot_logins_configured", bots.Size()))
+
+	// W2 one-shot bot consolidation: retroactively tag existing PR /
+	// review rows ingested before this feature shipped, reassign bot
+	// author/reviewer ids to the synthetic `bot` member, and compute
+	// first_human_review_at. Idempotent — safe to run on every boot.
+	if bots.Size() > 0 {
+		res, err := contributions.ConsolidateBots(ctx, store, bots)
+		if err != nil {
+			logger.Warn("bot consolidation backfill failed", zap.Error(err))
+		} else {
+			logger.Info("bot consolidation backfill applied",
+				zap.Int("reviews_marked_bot", res.ReviewsMarkedBot),
+				zap.Int("reviewer_id_rewritten", res.ReviewsAuthorRew),
+				zap.Int("pr_author_id_rewritten", res.PRsAuthorRewrite),
+				zap.Int("pr_first_human_review_rows", res.PRsFirstHumanSet))
+		}
+	}
 
 	// Optional Jira sync goroutine.
 	//
@@ -258,12 +277,12 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 
 	// Optional GitHub sync goroutine.
 	if cfg.GitHub.Enabled {
-		startGitHubSync(ctx, cfg, store, aggregator)
+		startGitHubSync(ctx, cfg, store, aggregator, bots)
 	}
 
 	// Optional GitLab sync goroutine.
 	if cfg.GitLab.Enabled {
-		startGitLabSync(ctx, cfg, store, aggregator, allowlist)
+		startGitLabSync(ctx, cfg, store, aggregator, allowlist, bots)
 	}
 
 	go func() {
@@ -279,7 +298,7 @@ func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Conf
 // All failures are non-fatal — if GitHub auth or repo parsing breaks,
 // we log and continue without a GitHub syncer rather than refusing to
 // start the whole server. The roadmap UI keeps working.
-func startGitHubSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator) {
+func startGitHubSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator, bots contributions.BotSet) {
 	repos := parseRepos(cfg.GitHub.Repos)
 	if len(repos) == 0 {
 		logger.Warn("github.enabled but github.repos is empty; skipping sync")
@@ -301,6 +320,9 @@ func startGitHubSync(ctx context.Context, cfg *config.Config, store storage.Stor
 		backfill = cfg.Storage.BackfillDays
 	}
 	syncer := ghclient.NewSyncer(client, store, repos, ghclient.DefaultLinker(projectKey), backfill)
+	if bots.Size() > 0 {
+		syncer.IsBotLogin = bots.Contains
+	}
 
 	interval, err := time.ParseDuration(cfg.GitHub.SyncInterval)
 	if err != nil {
@@ -348,7 +370,7 @@ func buildGitHubClient(cfg *config.GitHub) (*ghclient.Client, string, error) {
 //
 // Same fail-soft contract as startGitHubSync — bad config logs and
 // continues without a GitLab sync rather than refusing to start.
-func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator, allowlist contributions.Allowlist) {
+func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Store, aggregator *contributions.Aggregator, allowlist contributions.Allowlist, bots contributions.BotSet) {
 	specs := parseGroupSpecs(cfg.GitLab.Groups)
 	if len(specs) == 0 {
 		logger.Warn("gitlab.enabled but gitlab.groups is empty; skipping sync")
@@ -384,6 +406,9 @@ func startGitLabSync(ctx context.Context, cfg *config.Config, store storage.Stor
 			allowed[id] = struct{}{}
 		}
 		syncer.AllowedMemberIDs = allowed
+	}
+	if bots.Size() > 0 {
+		syncer.IsBotLogin = bots.Contains
 	}
 
 	interval, err := time.ParseDuration(cfg.GitLab.SyncInterval)
