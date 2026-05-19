@@ -147,11 +147,12 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 //	GET   /api/contributions/network         — review-network density panel
 //	GET   /api/contributions/pillars         — pillar throughput stack
 //	GET   /api/contributions/status          — last-sync timestamps
-func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service, aggregator *contributions.Aggregator) {
+func AddContributionsRoutes(router *gin.Engine, store storage.Store, service *contributions.Service, aggregator *contributions.Aggregator, allowlist contributions.Allowlist) {
 	if store == nil || service == nil {
 		return
 	}
 	h := handlers.NewContributionsHandler(store, service, aggregator)
+	h.SetAllowlist(allowlist)
 	api := router.Group("/api")
 	g := api.Group("/contributions")
 	g.Use(middleware.AuthMiddleware())

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/config"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/storage"
 )
 
@@ -110,5 +111,103 @@ func TestAggregatorJiraRollup(t *testing.T) {
 	}
 	if !r.WeekStart.Equal(weekStart) {
 		t.Fatalf("week_start=%s want %s", r.WeekStart, weekStart)
+	}
+}
+
+// TestAggregatorAllowlist seeds three GitHub PRs by three different
+// authors, configures an allowlist that names only one of them, and
+// verifies the rollup keeps just that author. The other two authors
+// have GitHub-login prefills (so they're real Jira members) but one
+// is in the denylist and the other isn't in either prefill map — both
+// have to disappear from `member_week_metrics`.
+//
+// Then it flips the allowlist off and re-runs Rebuild to confirm the
+// no-filter sentinel preserves the pre-W1 shape (all three return).
+func TestAggregatorAllowlist(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	store, err := storage.OpenSQLite(filepath.Join(dir, "agg-allow.db"))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+	if err := store.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// Three Jira members, each linked to a distinct GitHub login.
+	for _, m := range []storage.Member{
+		{ID: "daniel", DisplayName: "Daniel", GitHubLogin: "danielfbm", Active: true},
+		{ID: "zhwang", DisplayName: "ZH Wang", GitHubLogin: "zhwang", Active: true},
+		{ID: "stranger", DisplayName: "External Author", GitHubLogin: "stranger", Active: true},
+	} {
+		if err := store.UpsertMember(ctx, m); err != nil {
+			t.Fatalf("upsert %s: %v", m.ID, err)
+		}
+	}
+
+	// Three merged PRs in the same week, one per author.
+	now := time.Now().UTC().Truncate(time.Second)
+	week := MondayOf(now).Add(36 * time.Hour)
+	for i, login := range []string{"danielfbm", "zhwang", "stranger"} {
+		merged := week.Add(time.Duration(i) * time.Hour)
+		if err := store.UpsertPullRequests(ctx, []storage.PullRequest{{
+			ID:          "alaudadevops/repo#" + login,
+			Source:      "github",
+			RepoID:      "alaudadevops/repo",
+			Number:      i + 1,
+			Title:       "PR by " + login,
+			State:       "merged",
+			AuthorLogin: login,
+			CreatedAt:   merged.Add(-24 * time.Hour),
+			MergedAt:    &merged,
+			FetchedAt:   now,
+		}}); err != nil {
+			t.Fatalf("upsert PR %s: %v", login, err)
+		}
+	}
+
+	agg := NewAggregator(store)
+	// Allowlist via the prefill maps: daniel and zhwang are configured,
+	// stranger is not — and zhwang is explicitly denied. After the
+	// filter the only survivor is daniel (+ the bot synthetic, which
+	// has no PRs in this fixture so it contributes nothing).
+	agg.SetAllowlist(BuildAllowlist(config.TeamAnalytics{
+		GitHubLoginPrefills: map[string]string{
+			"daniel": "danielfbm",
+			"zhwang": "zhwang",
+		},
+		MemberDenylist: []string{"zhwang"},
+	}))
+	rebuildFrom := MondayOf(week).Add(-7 * 24 * time.Hour)
+	rebuildTo := MondayOf(week).Add(14 * 24 * time.Hour)
+	if err := agg.Rebuild(ctx, rebuildFrom, rebuildTo); err != nil {
+		t.Fatalf("rebuild filtered: %v", err)
+	}
+	rows, err := store.MemberWeekMetrics(ctx, storage.MemberWeekQuery{From: rebuildFrom, To: rebuildTo})
+	if err != nil {
+		t.Fatalf("read filtered: %v", err)
+	}
+	if len(rows) != 1 || rows[0].MemberID != "daniel" {
+		t.Fatalf("filtered rollup = %+v, want exactly daniel", rows)
+	}
+
+	// Flip filter off and confirm all three rows come back.
+	agg.SetAllowlist(Allowlist{})
+	if err := agg.Rebuild(ctx, rebuildFrom, rebuildTo); err != nil {
+		t.Fatalf("rebuild unfiltered: %v", err)
+	}
+	rows, err = store.MemberWeekMetrics(ctx, storage.MemberWeekQuery{From: rebuildFrom, To: rebuildTo})
+	if err != nil {
+		t.Fatalf("read unfiltered: %v", err)
+	}
+	got := map[string]bool{}
+	for _, r := range rows {
+		got[r.MemberID] = true
+	}
+	for _, id := range []string{"daniel", "zhwang", "stranger"} {
+		if !got[id] {
+			t.Fatalf("unfiltered rollup missing %s; got %+v", id, got)
+		}
 	}
 }

@@ -26,20 +26,33 @@ import (
 // contributions.Service, and returns JSON. All logic lives one layer
 // down. This makes it easy to keep the API stable while we evolve the
 // rollup pipeline (B2/B3).
+//
+// allowlist is the W1 "who counts" filter; when disabled (Enabled()
+// returns false) every endpoint reverts to the pre-W1 behaviour and
+// shows whoever is in the underlying tables.
 type ContributionsHandler struct {
 	store      storage.Store
 	service    *contributions.Service
 	aggregator *contributions.Aggregator
+	allowlist  contributions.Allowlist
 }
 
 func NewContributionsHandler(store storage.Store, service *contributions.Service, aggregator *contributions.Aggregator) *ContributionsHandler {
 	return &ContributionsHandler{store: store, service: service, aggregator: aggregator}
 }
 
+// SetAllowlist installs the W1 allowlist filter. Safe to call at
+// startup; not safe to swap at runtime (no synchronisation on reads).
+func (h *ContributionsHandler) SetAllowlist(al contributions.Allowlist) {
+	h.allowlist = al
+}
+
 // ListMembers — GET /api/contributions/members?include_inactive=1
 //
 // Inactive Jira users (deactivated accounts) are hidden by default — the
-// team-overview UI only shows people who can still receive work.
+// team-overview UI only shows people who can still receive work. When
+// the W1 allowlist is configured, members outside it are filtered out
+// regardless of their Active flag.
 func (h *ContributionsHandler) ListMembers(c *gin.Context) {
 	members, err := h.store.ListMembers(c.Request.Context())
 	if err != nil {
@@ -49,6 +62,7 @@ func (h *ContributionsHandler) ListMembers(c *gin.Context) {
 	if !truthy(c.Query("include_inactive")) {
 		members = filterActive(members)
 	}
+	members = filterAllowlist(members, h.allowlist)
 	c.JSON(http.StatusOK, gin.H{"members": members})
 }
 
@@ -95,6 +109,19 @@ func (h *ContributionsHandler) TeamOverview(c *gin.Context) {
 			}
 			out = filtered
 		}
+	}
+	// W1 allowlist: when enabled, drop summaries for members outside
+	// the configured set. The aggregator already filters them out of
+	// the rollup table, but a manual rebuild that uses a different
+	// allowlist may have left stragglers — defence in depth.
+	if h.allowlist.Enabled() {
+		filtered := out[:0]
+		for _, ms := range out {
+			if h.allowlist.Contains(ms.MemberID) {
+				filtered = append(filtered, ms)
+			}
+		}
+		out = filtered
 	}
 	c.JSON(http.StatusOK, gin.H{"members": out, "from": q.From, "to": q.To})
 }
@@ -398,6 +425,21 @@ func filterActive(in []storage.Member) []storage.Member {
 	out := in[:0]
 	for _, m := range in {
 		if m.Active {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// filterAllowlist returns only members whose ID is in the allowlist.
+// No-op when the allowlist is disabled.
+func filterAllowlist(in []storage.Member, al contributions.Allowlist) []storage.Member {
+	if !al.Enabled() {
+		return in
+	}
+	out := in[:0]
+	for _, m := range in {
+		if al.Contains(m.ID) {
 			out = append(out, m)
 		}
 	}

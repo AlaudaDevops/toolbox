@@ -95,6 +95,22 @@ type Syncer struct {
 	// `gitlab.hydrate_diff: false`.
 	HydrateDiff bool
 
+	// MemberInstanceSweep enables Pass B (W1): after the project-scoped
+	// fetch finishes, sweep `/merge_requests?scope=all&author_username=<u>`
+	// for each Jira member whose GitLab username we know. Captures MRs
+	// our members file in projects that aren't on the configured
+	// gitlab.groups list. Off by default; main.go flips it on when
+	// gitlab.member_instance_sweep is true. No-op when AllowedMemberIDs
+	// is empty.
+	MemberInstanceSweep bool
+
+	// AllowedMemberIDs is the W1 set that Pass B walks. Each id must be
+	// a `members.id` (slugified email). Pass B looks up the matching
+	// `members.gitlab_username` and calls
+	// `/merge_requests?scope=all&author_username=<u>`. Nil/empty
+	// disables Pass B entirely.
+	AllowedMemberIDs map[string]struct{}
+
 	wildcardCache *wildcardCache
 	nowFn         func() time.Time
 }
@@ -163,16 +179,21 @@ func classifyNote(body string) (string, bool) {
 // The shape mirrors github.Syncer.Sync — see those comments for first-
 // run vs. incremental behaviour.
 func (s *Syncer) Sync(ctx context.Context) error {
-	if len(s.specs) == 0 {
+	passBActive := s.MemberInstanceSweep && len(s.AllowedMemberIDs) > 0
+	if len(s.specs) == 0 && !passBActive {
 		return nil
 	}
 
 	now := s.nowFn()
-	resolved, resolveErr := s.resolveProjects(ctx, now)
-	if resolveErr != nil {
-		s.logger.Warn("group spec resolution failed (partial)", zap.Error(resolveErr))
+	var resolved []Project
+	var resolveErr error
+	if len(s.specs) > 0 {
+		resolved, resolveErr = s.resolveProjects(ctx, now)
+		if resolveErr != nil {
+			s.logger.Warn("group spec resolution failed (partial)", zap.Error(resolveErr))
+		}
 	}
-	if len(resolved) == 0 {
+	if len(resolved) == 0 && !passBActive {
 		if resolveErr != nil {
 			return resolveErr
 		}
@@ -206,6 +227,12 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			byUsername[strings.ToLower(m.GitLabUsername)] = m.ID
 		}
 	}
+
+	// Track every storage id we've already written this cycle so Pass B
+	// can skip MRs Pass A already covered. Cheaper than asking the
+	// store after each upsert; uses the same key shape as the storage
+	// PK ("<group/proj>!<iid>").
+	seenIDs := make(map[string]struct{}, 256)
 
 	for _, p := range resolved {
 		mrs, err := s.client.ListMergeRequests(ctx, p.ID, ListMergeRequestsOptions{
@@ -316,8 +343,23 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		if err := s.store.UpsertPRReviews(ctx, reviewBatch); err != nil {
 			return fmt.Errorf("upsert MR reviews for %s: %w", p.PathWithNamespace, err)
 		}
+		for _, r := range toStore {
+			seenIDs[r.ID] = struct{}{}
+		}
 		totalMRs += len(toStore)
 		totalReviews += len(reviewBatch)
+	}
+
+	// Pass B (W1): per-allowlisted-member instance-wide MR sweep.
+	// Captures MRs our team filed in projects outside the configured
+	// `gitlab.groups` list. De-dupes against Pass A via seenIDs.
+	if s.MemberInstanceSweep && len(s.AllowedMemberIDs) > 0 {
+		passBMRs, passBReviews, passBErr := s.sweepInstanceByMember(ctx, members, since, runStart, seenIDs)
+		if passBErr != nil && firstErr == nil {
+			firstErr = passBErr
+		}
+		totalMRs += passBMRs
+		totalReviews += passBReviews
 	}
 
 	run := storage.CollectionRun{
@@ -339,6 +381,177 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		zap.Int("reviews", totalReviews),
 		zap.Duration("duration", time.Since(runStart)))
 	return firstErr
+}
+
+// sweepInstanceByMember runs Pass B (W1): for each allowlisted member
+// whose `members.gitlab_username` is populated, sweep
+// `/merge_requests?scope=all&author_username=<u>` over the entire
+// instance and upsert every MR not already covered by Pass A.
+//
+// `seenIDs` is mutated as we accept new rows so back-to-back members
+// referencing the same MR (rare but possible — cross-author MRs are
+// surfaced as the author's row only) don't double-upsert.
+//
+// Errors from any single member are logged and skipped: we don't want
+// one bad ticker tick to abort the whole sweep. The first error is
+// returned for the caller to bubble up into the collection_run.
+func (s *Syncer) sweepInstanceByMember(
+	ctx context.Context,
+	members []storage.Member,
+	since time.Time,
+	runStart time.Time,
+	seenIDs map[string]struct{},
+) (int, int, error) {
+	byID := make(map[string]storage.Member, len(members))
+	byUsername := make(map[string]string, len(members))
+	for _, m := range members {
+		byID[m.ID] = m
+		if m.GitLabUsername != "" {
+			byUsername[strings.ToLower(m.GitLabUsername)] = m.ID
+		}
+	}
+
+	totalMRs, totalReviews := 0, 0
+	var firstErr error
+	for memberID := range s.AllowedMemberIDs {
+		m, ok := byID[memberID]
+		if !ok {
+			// Allowlisted member doesn't exist in the directory yet —
+			// either the Jira sync hasn't created the row yet, or the
+			// operator typo'd the denylist/prefill key. Either way Pass
+			// B has nothing to fetch for them; skip silently.
+			continue
+		}
+		if m.GitLabUsername == "" {
+			continue
+		}
+		mrs, err := s.client.ListInstanceMergeRequests(ctx, ListInstanceMergeRequestsOptions{
+			AuthorUsername: m.GitLabUsername,
+			State:          "all",
+			UpdatedAfter:   since,
+			MaxPages:       20,
+		})
+		if err != nil {
+			s.logger.Warn("Pass B: ListInstanceMergeRequests failed",
+				zap.String("member", memberID),
+				zap.String("gitlab_username", m.GitLabUsername),
+				zap.Error(err))
+			if firstErr == nil {
+				firstErr = err
+			}
+			continue
+		}
+		s.logger.Debug("Pass B: fetched member MRs",
+			zap.String("member", memberID), zap.Int("count", len(mrs)))
+
+		toStore := make([]storage.PullRequest, 0, len(mrs))
+		reviewBatch := make([]storage.PRReview, 0)
+		for _, mr := range mrs {
+			projectPath := mr.ProjectPath()
+			if projectPath == "" {
+				s.logger.Warn("Pass B: skipping MR with empty project path",
+					zap.String("member", memberID), zap.Int("iid", mr.IID), zap.String("web_url", mr.WebURL))
+				continue
+			}
+			id := fmt.Sprintf("%s!%d", projectPath, mr.IID)
+			if _, dup := seenIDs[id]; dup {
+				continue
+			}
+
+			state := "open"
+			if mr.MergedAt != nil {
+				state = "merged"
+			} else if mr.State == "closed" || mr.State == "locked" {
+				state = "closed"
+			}
+			authorLogin := strings.ToLower(mr.Author.Username)
+			epicKey := ""
+			if s.linker != nil {
+				epicKey = s.linker.Link(mr)
+			}
+			rec := storage.PullRequest{
+				ID:          id,
+				Source:      "gitlab",
+				RepoID:      projectPath,
+				Number:      mr.IID,
+				Title:       mr.Title,
+				State:       state,
+				AuthorID:    byUsername[authorLogin],
+				AuthorLogin: authorLogin,
+				HeadBranch:  mr.SourceBranch,
+				BaseBranch:  mr.TargetBranch,
+				JiraKey:     epicKey,
+				CreatedAt:   mr.CreatedAt,
+				MergedAt:    mr.MergedAt,
+				ClosedAt:    mr.ClosedAt,
+				FetchedAt:   runStart,
+			}
+			if s.HydrateDiff && mr.MergedAt != nil && mr.ProjectID > 0 {
+				if full, err := s.client.GetMergeRequest(ctx, mr.ProjectID, mr.IID); err == nil {
+					rec.Additions = full.Diff.Additions
+					rec.Deletions = full.Diff.Deletions
+					rec.ChangedFiles = full.Diff.ChangedFiles
+				}
+			}
+
+			skipNotes := mr.Draft || mr.WorkInProg
+			if !skipNotes && mr.MergedAt == nil && mr.ClosedAt != nil &&
+				time.Since(*mr.ClosedAt) > 7*24*time.Hour {
+				skipNotes = true
+			}
+			if !skipNotes && mr.ProjectID > 0 {
+				notes, err := s.client.ListMRNotes(ctx, mr.ProjectID, mr.IID)
+				if err != nil {
+					s.logger.Warn("Pass B: ListMRNotes failed",
+						zap.String("project", projectPath),
+						zap.Int("iid", mr.IID), zap.Error(err))
+				} else {
+					var first *time.Time
+					for _, n := range notes {
+						if n.System {
+							continue
+						}
+						reviewerLogin := strings.ToLower(n.Author.Username)
+						if reviewerLogin == authorLogin {
+							continue
+						}
+						st, ok := classifyNote(n.Body)
+						if !ok {
+							continue
+						}
+						reviewBatch = append(reviewBatch, storage.PRReview{
+							ID:            fmt.Sprintf("%s!%d/n%d", projectPath, mr.IID, n.ID),
+							PRID:          rec.ID,
+							Source:        "gitlab",
+							ReviewerID:    byUsername[reviewerLogin],
+							ReviewerLogin: reviewerLogin,
+							State:         st,
+							SubmittedAt:   n.CreatedAt,
+						})
+						if first == nil || n.CreatedAt.Before(*first) {
+							first = &n.CreatedAt
+						}
+					}
+					rec.FirstReviewAt = first
+				}
+			}
+			toStore = append(toStore, rec)
+			seenIDs[id] = struct{}{}
+		}
+
+		if len(toStore) == 0 {
+			continue
+		}
+		if err := s.store.UpsertPullRequests(ctx, toStore); err != nil {
+			return totalMRs, totalReviews, fmt.Errorf("Pass B upsert MRs for member %s: %w", memberID, err)
+		}
+		if err := s.store.UpsertPRReviews(ctx, reviewBatch); err != nil {
+			return totalMRs, totalReviews, fmt.Errorf("Pass B upsert MR reviews for member %s: %w", memberID, err)
+		}
+		totalMRs += len(toStore)
+		totalReviews += len(reviewBatch)
+	}
+	return totalMRs, totalReviews, firstErr
 }
 
 // resolveProjects expands every spec, dropping archived projects when
