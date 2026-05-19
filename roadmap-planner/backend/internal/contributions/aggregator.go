@@ -10,6 +10,7 @@ package contributions
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -271,9 +272,88 @@ func (a *Aggregator) Rebuild(ctx context.Context, from, to time.Time) error {
 		return fmt.Errorf("aggregate jira: %w", err)
 	}
 
-	// TODO(B3): review_latency_p50_hours — derive from
-	// pull_requests.first_review_at - pull_requests.created_at, p50 by
-	// (reviewer_id, week). p50 across reviews per author per week.
+	// Review latency p50, by reviewer × week (W8 2026-05-19).
+	//
+	// For each non-bot review row that matches `pr.first_human_review_at`
+	// (i.e., the first *human* touch on the PR), we record the latency
+	// in hours from the PR's `created_at`. The week is the week the PR
+	// was opened — the metric answers "when reviewer X picks up a PR,
+	// how long after creation does that first response take?" rather
+	// than "how long does the review process last", which keeps the
+	// number comparable across reviewers regardless of how long the PR
+	// sat before they happened to look at it.
+	//
+	// p50 is computed in Go (portable across SQLite + Postgres). The
+	// dataset per (reviewer, week) is small (single-digit reviews for
+	// most engineers per week), so the in-memory sort is cheap.
+	latSQL := rebind(fmt.Sprintf(`
+		SELECT
+		  rv.reviewer_id AS member_id,
+		  %s AS week_start,
+		  %s AS latency_hours
+		FROM pr_reviews rv
+		JOIN pull_requests pr ON pr.id = rv.pr_id
+		WHERE rv.is_bot = 0
+		  AND rv.reviewer_id IS NOT NULL
+		  AND rv.reviewer_id <> ''
+		  AND pr.first_human_review_at IS NOT NULL
+		  AND rv.submitted_at = pr.first_human_review_at
+		  AND pr.created_at >= ?
+		  AND pr.created_at <  ?`,
+		dialect.WeekStart("pr.created_at"),
+		hoursBetween(dialect, "pr.first_human_review_at", "pr.created_at"),
+	))
+	latArgs := []any{from, to}
+	latRows, err := db.QueryContext(ctx, latSQL, latArgs...)
+	if err != nil {
+		return fmt.Errorf("aggregate review latency: %w", err)
+	}
+	type latKey struct {
+		member string
+		week   time.Time
+	}
+	pools := map[latKey][]float64{}
+	for latRows.Next() {
+		var memberID string
+		var weekStartRaw any
+		var hours float64
+		if err := latRows.Scan(&memberID, &weekStartRaw, &hours); err != nil {
+			latRows.Close()
+			return fmt.Errorf("scan review latency: %w", err)
+		}
+		weekStart, err := scanTimeAny(weekStartRaw)
+		if err != nil {
+			latRows.Close()
+			return fmt.Errorf("parse review-latency week_start: %w", err)
+		}
+		if hours < 0 {
+			continue
+		}
+		pools[latKey{memberID, weekStart}] = append(pools[latKey{memberID, weekStart}], hours)
+	}
+	latRows.Close()
+	if err := latRows.Err(); err != nil {
+		return fmt.Errorf("iterate review latency: %w", err)
+	}
+	if len(pools) > 0 {
+		upsertSQL := rebind(`
+			INSERT INTO member_week_metrics (member_id, week_start, pillar_id, component, review_latency_p50_hours)
+			VALUES (?, ?, '', '', ?)
+			ON CONFLICT(member_id, week_start, pillar_id, component) DO UPDATE SET
+			    review_latency_p50_hours = excluded.review_latency_p50_hours`)
+		for k, vs := range pools {
+			sort.Float64s(vs)
+			p50 := round1(percentile(vs, 0.50))
+			// Bind week_start as the same `YYYY-MM-DD` string the other
+			// INSERTs in Rebuild emit via `dialect.WeekStart(...)`, so the
+			// composite primary key matches and the ON CONFLICT branch
+			// fires instead of creating a parallel row.
+			weekStr := k.week.UTC().Format("2006-01-02")
+			if _, err := db.ExecContext(ctx, upsertSQL, k.member, weekStr, p50); err != nil {
+				return fmt.Errorf("upsert review latency for %s/%s: %w", k.member, k.week, err)
+			}
+		}
+	}
 
 	// W1 cleanup: every rebuild leaves the four INSERTs above blocked
 	// on the allowlist, but historical rollup rows for now-denied
@@ -361,6 +441,33 @@ func (a *Aggregator) RebuildRecent(ctx context.Context, days int) error {
 	}
 	now := time.Now().UTC()
 	return a.Rebuild(ctx, MondayOf(now.AddDate(0, 0, -days)), MondayOf(now.AddDate(0, 0, 7)))
+}
+
+// scanTimeAny converts a driver value emitted by `dialect.WeekStart(...)`
+// to a time.Time. SQLite returns the strftime result as TEXT
+// ("YYYY-MM-DD"); Postgres returns date_trunc as time.Time directly.
+// Empty / nil inputs produce the zero time without erroring.
+func scanTimeAny(v any) (time.Time, error) {
+	switch t := v.(type) {
+	case nil:
+		return time.Time{}, nil
+	case time.Time:
+		return t.UTC(), nil
+	case string:
+		return parseDateString(t)
+	case []byte:
+		return parseDateString(string(t))
+	}
+	return time.Time{}, fmt.Errorf("unsupported time scan type %T", v)
+}
+
+func parseDateString(s string) (time.Time, error) {
+	for _, layout := range []string{"2006-01-02", "2006-01-02 15:04:05", time.RFC3339, time.RFC3339Nano} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.UTC(), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("week_start %q: no layout matched", s)
 }
 
 // MondayOf returns the Monday 00:00 UTC of t's week.
