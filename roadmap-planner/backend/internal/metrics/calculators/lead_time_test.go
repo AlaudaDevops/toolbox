@@ -147,37 +147,44 @@ func TestMatchReleasedVersion_PicksEarliestInWindow(t *testing.T) {
 	b := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC) // in window — later
 	c := time.Date(2026, 7, 1, 0, 0, 0, 0, time.UTC) // outside window
 	releases := map[string]models.EnrichedRelease{
-		"tektoncd-operator-v4.5.0": {Name: "tektoncd-operator-v4.5.0", Released: true, ReleaseDate: a},
-		"tektoncd-operator-v4.6.0": {Name: "tektoncd-operator-v4.6.0", Released: true, ReleaseDate: b},
-		"tektoncd-operator-v4.7.0": {Name: "tektoncd-operator-v4.7.0", Released: true, ReleaseDate: c},
+		"tektoncd-operator-v4.5.0": {Name: "tektoncd-operator-v4.5.0", Component: "tektoncd-operator", Released: true, ReleaseDate: a},
+		"tektoncd-operator-v4.6.0": {Name: "tektoncd-operator-v4.6.0", Component: "tektoncd-operator", Released: true, ReleaseDate: b},
+		"tektoncd-operator-v4.7.0": {Name: "tektoncd-operator-v4.7.0", Component: "tektoncd-operator", Released: true, ReleaseDate: c},
 	}
 	window := models.TimeRange{
 		Start: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
 		End:   time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
 	}
 	names := []string{"tektoncd-operator-v4.7.0", "tektoncd-operator-v4.6.0", "tektoncd-operator-v4.5.0"}
-	gotDate, gotName := matchReleasedVersion(names, releases, window)
+	gotDate, gotRelease := matchReleasedVersion(names, releases, window)
 	if !gotDate.Equal(a) {
 		t.Errorf("date = %v, want %v", gotDate, a)
 	}
-	if gotName != "tektoncd-operator-v4.5.0" {
-		t.Errorf("name = %q, want tektoncd-operator-v4.5.0", gotName)
+	if gotRelease.Name != "tektoncd-operator-v4.5.0" {
+		t.Errorf("name = %q, want tektoncd-operator-v4.5.0", gotRelease.Name)
+	}
+	if gotRelease.Component != "tektoncd-operator" {
+		t.Errorf("component = %q, want tektoncd-operator", gotRelease.Component)
 	}
 }
 
-func TestComponentFromVersionName(t *testing.T) {
-	cases := map[string]string{
-		"tektoncd-operator-v4.6.3":      "tektoncd-operator",
-		"tekton-operator-v3.20.0":       "tekton-operator",
-		"connectors-operator-v4.2.0":    "connectors-operator",
-		"v2.1":                          "v2.1",        // unconventional → as-is
-		"0.3":                           "0.3",         // ditto
-		"DEVOPS-2024-Q4":                "DEVOPS-2024-Q4",
+// TestMatchReleasedVersion_HandlesNoVPrefix verifies the calculator
+// reuses the collector-parsed Component field, so version names that
+// do not match a `{component}-vX.Y.Z` shape (e.g. `argo-cd-2.9.0`)
+// still bucket correctly under the configured component, matching
+// how release_frequency and other metrics group their results.
+func TestMatchReleasedVersion_HandlesNoVPrefix(t *testing.T) {
+	d := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	releases := map[string]models.EnrichedRelease{
+		"argo-cd-2.9.0": {Name: "argo-cd-2.9.0", Component: "argo-cd", Released: true, ReleaseDate: d},
 	}
-	for in, want := range cases {
-		if got := componentFromVersionName(in); got != want {
-			t.Errorf("componentFromVersionName(%q) = %q, want %q", in, got, want)
-		}
+	window := models.TimeRange{
+		Start: time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC),
+		End:   time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC),
+	}
+	_, got := matchReleasedVersion([]string{"argo-cd-2.9.0"}, releases, window)
+	if got.Component != "argo-cd" {
+		t.Errorf("component = %q, want argo-cd (collector-parsed, not regex-derived)", got.Component)
 	}
 }
 
@@ -335,7 +342,7 @@ func TestCalculate_EndToEnd(t *testing.T) {
 	}
 
 	releases := []models.EnrichedRelease{
-		{ID: "v1", Name: "tektoncd-operator-v4.6.3", Released: true, ReleaseDate: relDate, Component: "tektoncd-operator"},
+		{ID: "v1", Name: "tektoncd-operator-v4.6.3", Component: "tektoncd-operator", Released: true, ReleaseDate: relDate},
 	}
 	issues := []models.EnrichedIssue{
 		{Key: "DEVOPS-1", Name: "thing one", IssueType: "Story",

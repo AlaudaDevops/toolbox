@@ -555,7 +555,7 @@ GET /api/metrics/lead_time?component=tektoncd-operator&window_months=9&include_b
 | E2 | 1 个 PR 引用多 issue | 该 PR 计入每个 issue 的 linked_prs 各一次（重复但正确）；**worst_issues 展示侧按 jira_key 去重**——同一 PR 让多个 issue 同时进 top-N 时仅显示第一个并标 `cross_referenced: true` |
 | E3 | PR.merged_at > fix_version.releaseDate | 该 PR 不算入当前 issue（视为 hotfix，归下一 release）|
 | E4 | PR.first_commit_at < issue.created（提前编码）| 仍以 PR.first_commit_at 为 T0（commit-centric 严守 D3）|
-| E5 | issue.fix_version 名称不匹配 `{component}-v{semver}` | 不影响计算（只影响 component filter），R1 监控 |
+| E5 | issue.fix_version 名称不匹配 `{component}-v{semver}`（如 `argo-cd-2.9.0` 无 `v` 前缀） | calculator 直接复用 `EnrichedRelease.Component`（collector 已 parsed，跟 release_frequency 同源），不重新解析；component filter 仍可命中 |
 | E6 | 窗口边界：first_commit 在窗口外但 release 在窗口内 | 计入（窗口判定按 release 日期，对齐 DORA 惯例）|
 | E7 | issue 跨 release（早 fix_version → 又重新 fix_version）| 用最新 released=true 的 fix_version；如有多个，记录 `multiple_releases=true` |
 | E8 | 任一 stage duration < 0（dev/review/release 中任一为负，常见于时区错乱 / squash 重写 / draft PR 占位早于 first commit）| 该 issue 完全排除，记入 `coverage.data_anomaly`（与详细设计 §4 C6 一致）|

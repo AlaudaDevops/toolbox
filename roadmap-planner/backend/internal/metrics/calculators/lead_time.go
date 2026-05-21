@@ -41,7 +41,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"time"
 
@@ -64,11 +63,6 @@ const (
 // the issue is dropped (plan §9 E9). Keeps long-tail outliers from
 // dragging Dev/Total p50.
 const excludedLongDevThreshold = 180 * 24 * time.Hour
-
-// componentVersionRE extracts `tektoncd-operator` from
-// `tektoncd-operator-v4.6.3`. Names that do not match are bucketed
-// under the version name as-is so they remain visible in the breakdown.
-var componentVersionRE = regexp.MustCompile(`^([a-z][a-z0-9-]+)-v\d+(?:\.\d+)*$`)
 
 // stagedIssue is the per-issue computation result.
 type stagedIssue struct {
@@ -203,12 +197,15 @@ func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.Calcula
 	for _, iss := range mergeIssueLists(data.Epics, data.Issues) {
 		// Window check is by release date, not issue.created (DORA
 		// convention; plan §9 E6).
-		relDate, relName := matchReleasedVersion(iss.Versions, versionByName, data.TimeRange)
+		relDate, release := matchReleasedVersion(iss.Versions, versionByName, data.TimeRange)
 		if relDate.IsZero() {
 			recordCoverage(componentCoverage, "", "C5")
 			continue
 		}
-		component := componentFromVersionName(relName)
+		component := release.Component
+		if component == "" {
+			component = release.Name // fallback when collector did not parse one
+		}
 		if len(data.Filters.Components) > 0 && !containsString(data.Filters.Components, component) {
 			continue
 		}
@@ -341,11 +338,13 @@ func mergeIssueLists(epics, issues []models.EnrichedIssue) []models.EnrichedIssu
 }
 
 // matchReleasedVersion picks the earliest released version on this
-// issue whose releaseDate falls inside `window`. Returns (zero, "") when
-// no such version exists — that maps to C5.
-func matchReleasedVersion(versionNames []string, byName map[string]models.EnrichedRelease, window models.TimeRange) (time.Time, string) {
+// issue whose releaseDate falls inside `window`. Returns the matching
+// EnrichedRelease so callers can reuse its parsed Component field
+// (set by collector via ConvertJiraVersionToVersion); zero values map
+// to C5.
+func matchReleasedVersion(versionNames []string, byName map[string]models.EnrichedRelease, window models.TimeRange) (time.Time, models.EnrichedRelease) {
 	var bestDate time.Time
-	var bestName string
+	var best models.EnrichedRelease
 	for _, name := range versionNames {
 		r, ok := byName[name]
 		if !ok || !r.Released || r.ReleaseDate.IsZero() {
@@ -356,22 +355,10 @@ func matchReleasedVersion(versionNames []string, byName map[string]models.Enrich
 		}
 		if bestDate.IsZero() || r.ReleaseDate.Before(bestDate) {
 			bestDate = r.ReleaseDate
-			bestName = name
+			best = r
 		}
 	}
-	return bestDate, bestName
-}
-
-// componentFromVersionName extracts the component prefix from a Jira
-// version name like `tektoncd-operator-v4.6.3`. Falls back to the raw
-// name when it does not match the expected `{component}-v{semver}`
-// shape — that keeps unconventional version names visible instead of
-// merging them into a single bucket.
-func componentFromVersionName(name string) string {
-	if m := componentVersionRE.FindStringSubmatch(name); len(m) == 2 {
-		return m[1]
-	}
-	return name
+	return bestDate, best
 }
 
 // filterPreReleasePRs drops PRs whose merged_at is *after* the release
