@@ -170,7 +170,12 @@ func NewLeadTimeCalculator(options map[string]interface{}) *LeadTimeCalculator {
 		BaseCalculator: NewBaseCalculator(
 			"lead_time_to_release",
 			"Time from first commit on a linked PR to release",
-			"hours",
+			// Unit stays "days" for backward compatibility with the
+			// existing MetricCard / MetricBreakdown / Prometheus
+			// consumers (DORA day thresholds, lead_time_days). The
+			// hour-precision values live in MetricResult.Metadata
+			// (total.p50_hours, stages[].p50_hours, trend.points[]).
+			"days",
 			[]string{"component"},
 			options,
 		),
@@ -252,8 +257,10 @@ func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.Calcula
 		}
 
 		results = append(results, models.MetricResult{
-			Name:  c.Name(),
-			Value: totalStats.P50Hours,
+			Name: c.Name(),
+			// Value is in days for the existing consumers (P1-1); the
+			// hour-precision values are in Metadata.
+			Value: totalStats.P50Hours / 24,
 			Unit:  c.Unit(),
 			Labels: map[string]string{
 				"component": component,

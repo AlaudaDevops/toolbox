@@ -412,8 +412,16 @@ func TestCalculate_EndToEnd(t *testing.T) {
 	if r.Labels["component"] != "tektoncd-operator" {
 		t.Errorf("component label = %q, want tektoncd-operator", r.Labels["component"])
 	}
+	if r.Unit != "days" {
+		t.Errorf("Unit = %q, want days (backward-compat with MetricCard / Prometheus)", r.Unit)
+	}
 	if r.Value <= 0 {
 		t.Errorf("Value = %v, want > 0", r.Value)
+	}
+	// Sanity check that Value is days, not hours: a 30-day window
+	// here can never produce > 60 days of Lead Time.
+	if r.Value > 60 {
+		t.Errorf("Value = %v days, suspiciously high — is Value still hours?", r.Value)
 	}
 
 	cov, ok := r.Metadata["coverage"].(*coverageStats)

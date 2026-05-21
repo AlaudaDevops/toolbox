@@ -488,11 +488,15 @@ worst_issues = [worst_per_stage["dev"], worst_per_stage["review"], worst_per_sta
 
 ### 8 · API 返回结构
 
+`MetricResult.Value` 字段为 **days**（向后兼容现有 `MetricCard` / `MetricBreakdown` / Prometheus exporter `lead_time_days` 的 day 阈值消费）。Metadata 内部全部用 **hours**（精度需要）；前端 Phase 1 渲染时按需转换到合适单位。
+
 ```json
 GET /api/metrics/lead_time?component=tektoncd-operator&window_months=9&include_bots=false
 
 {
   "metric": "lead_time",
+  "value": 18,        // ← p50 in days, backward-compat with MetricCard
+  "unit": "days",
   "window": { "start": "2025-09-01", "end": "2026-05-21" },
   "filters": { "component": "tektoncd-operator", "include_bots": false },
   "total": {
