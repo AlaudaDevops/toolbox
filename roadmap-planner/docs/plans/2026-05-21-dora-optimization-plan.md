@@ -488,7 +488,9 @@ worst_issues = [worst_per_stage["dev"], worst_per_stage["review"], worst_per_sta
 
 ### 8 · API 返回结构
 
-`MetricResult.Value` 字段为 **days**（向后兼容现有 `MetricCard` / `MetricBreakdown` / Prometheus exporter `lead_time_days` 的 day 阈值消费）。Metadata 内部全部用 **hours**（精度需要）；前端 Phase 1 渲染时按需转换到合适单位。
+`MetricResult.Value` 字段为 **days**（向后兼容现有 `MetricCard` / `MetricBreakdown` / Prometheus exporter `lead_time_days` 的 day 阈值消费）。Metadata 含两层：
+- **新的 hour-precision payload**：`total` / `stages` / `worst_issues` / `coverage` / `trend` 等（Phase 1 frontend 用）
+- **legacy days 兼容字段**：`min` / `max` / `average` / `count` / `sample_size` / `percentile`，供 `MetricBreakdown.jsx` 直接读旧路径
 
 ```json
 GET /api/metrics/lead_time?component=tektoncd-operator&window_months=9&include_bots=false

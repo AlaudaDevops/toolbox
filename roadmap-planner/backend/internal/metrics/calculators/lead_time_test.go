@@ -431,4 +431,20 @@ func TestCalculate_EndToEnd(t *testing.T) {
 	if cov.IssuesFull != 1 || cov.IssuesDevMissing != 1 {
 		t.Errorf("coverage = %+v, want IssuesFull=1 IssuesDevMissing=1", cov)
 	}
+
+	// MetricBreakdown.jsx reads legacy days fields directly off the
+	// Metadata map. P2 review fix — make sure they are populated so
+	// the UI does not show Min=0 / Max=0 / Count=0.
+	for _, key := range []string{"min", "max", "average"} {
+		v, ok := r.Metadata[key].(float64)
+		if !ok || v <= 0 {
+			t.Errorf("metadata[%q] = %v (%T), want positive days value", key, r.Metadata[key], r.Metadata[key])
+		}
+	}
+	for _, key := range []string{"count", "sample_size"} {
+		v, ok := r.Metadata[key].(int)
+		if !ok || v <= 0 {
+			t.Errorf("metadata[%q] = %v (%T), want positive int sample count", key, r.Metadata[key], r.Metadata[key])
+		}
+	}
 }

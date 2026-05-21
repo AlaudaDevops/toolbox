@@ -256,6 +256,12 @@ func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.Calcula
 			trend = buildTrend(issues, data.TimeRange)
 		}
 
+		// Legacy metadata keys (days) consumed by MetricBreakdown.jsx
+		// and any other day-based reader. Sourced from `totals` (hours)
+		// and converted; structured hour-precision data stays in
+		// metadata.total / metadata.stages.
+		minDays, maxDays, avgDays := legacyDaySummary(totals)
+
 		results = append(results, models.MetricResult{
 			Name: c.Name(),
 			// Value is in days for the existing consumers (P1-1); the
@@ -267,6 +273,7 @@ func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.Calcula
 			},
 			Timestamp: time.Now(),
 			Metadata: map[string]interface{}{
+				// New (hours-precision) structured payload.
 				"total":               totalStats,
 				"stages":              stages,
 				"worst_issues":        worst,
@@ -274,11 +281,37 @@ func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.Calcula
 				"trend":               trend,
 				"consistency_warning": stringPtrOrNil(consistencyWarning),
 				"include_bots":        includeBots,
+				// Legacy backward-compat (days) for MetricBreakdown.jsx
+				// `min`/`max`/`count` reads. See P2 review fix.
+				"min":         minDays,
+				"max":         maxDays,
+				"average":     avgDays,
+				"count":       totalStats.SampleCount,
+				"sample_size": totalStats.SampleCount,
+				"percentile":  50,
 			},
 		})
 	}
 
 	return results, nil
+}
+
+// legacyDaySummary returns min/max/average of the totals slice
+// (which is in hours) converted to days. Empty slice yields zeros.
+func legacyDaySummary(totals []float64) (minDays, maxDays, avgDays float64) {
+	if len(totals) == 0 {
+		return 0, 0, 0
+	}
+	sorted := append([]float64(nil), totals...)
+	sort.Float64s(sorted)
+	minDays = sorted[0] / 24
+	maxDays = sorted[len(sorted)-1] / 24
+	var sum float64
+	for _, h := range sorted {
+		sum += h
+	}
+	avgDays = (sum / float64(len(sorted))) / 24
+	return
 }
 
 // PrometheusMetrics returns the Prometheus metric descriptors.
