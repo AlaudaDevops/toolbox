@@ -124,9 +124,9 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 		INSERT INTO pull_requests (
 			id, source, repo_id, number, title, state, author_id, author_login,
 			head_branch, base_branch, additions, deletions, changed_files,
-			jira_key, created_at, first_review_at, first_human_review_at,
+			jira_key, created_at, first_commit_at, first_review_at, first_human_review_at,
 			merged_at, closed_at, fetched_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			source = excluded.source,
 			title = excluded.title,
@@ -137,6 +137,7 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 			deletions = excluded.deletions,
 			changed_files = excluded.changed_files,
 			jira_key = excluded.jira_key,
+			first_commit_at = COALESCE(excluded.first_commit_at, pull_requests.first_commit_at),
 			first_review_at = excluded.first_review_at,
 			first_human_review_at = excluded.first_human_review_at,
 			merged_at = excluded.merged_at,
@@ -155,13 +156,51 @@ func (s *genericStore) UpsertPullRequests(ctx context.Context, prs []PullRequest
 		_, err := stmt.ExecContext(ctx,
 			p.ID, source, p.RepoID, p.Number, p.Title, p.State, nullable(p.AuthorID), nullable(p.AuthorLogin),
 			nullable(p.HeadBranch), nullable(p.BaseBranch), p.Additions, p.Deletions, p.ChangedFiles,
-			nullable(p.JiraKey), p.CreatedAt, p.FirstReviewAt, p.FirstHumanReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
+			nullable(p.JiraKey), p.CreatedAt, p.FirstCommitAt, p.FirstReviewAt, p.FirstHumanReviewAt, p.MergedAt, p.ClosedAt, p.FetchedAt,
 		)
 		if err != nil {
 			return fmt.Errorf("upsert pr %s: %w", p.ID, err)
 		}
 	}
 	return tx.Commit()
+}
+
+func (s *genericStore) ListPullRequestsSince(ctx context.Context, since time.Time) ([]PullRequest, error) {
+	q := rebind(s.d, `
+		SELECT id, source, repo_id, number, title, state,
+		       COALESCE(author_id, '') AS author_id,
+		       COALESCE(author_login, '') AS author_login,
+		       COALESCE(head_branch, '') AS head_branch,
+		       COALESCE(base_branch, '') AS base_branch,
+		       COALESCE(additions, 0) AS additions,
+		       COALESCE(deletions, 0) AS deletions,
+		       COALESCE(changed_files, 0) AS changed_files,
+		       COALESCE(jira_key, '') AS jira_key,
+		       created_at, first_commit_at, first_review_at, first_human_review_at,
+		       merged_at, closed_at, fetched_at
+		FROM pull_requests
+		WHERE merged_at IS NOT NULL AND merged_at >= ?
+		ORDER BY merged_at ASC`)
+	rows, err := s.db.QueryContext(ctx, q, since)
+	if err != nil {
+		return nil, fmt.Errorf("list PRs since %s: %w", since.Format(time.RFC3339), err)
+	}
+	defer rows.Close()
+	out := make([]PullRequest, 0, 256)
+	for rows.Next() {
+		var p PullRequest
+		if err := rows.Scan(
+			&p.ID, &p.Source, &p.RepoID, &p.Number, &p.Title, &p.State,
+			&p.AuthorID, &p.AuthorLogin, &p.HeadBranch, &p.BaseBranch,
+			&p.Additions, &p.Deletions, &p.ChangedFiles, &p.JiraKey,
+			&p.CreatedAt, &p.FirstCommitAt, &p.FirstReviewAt, &p.FirstHumanReviewAt,
+			&p.MergedAt, &p.ClosedAt, &p.FetchedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan PR: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 func (s *genericStore) UpsertPRReviews(ctx context.Context, reviews []PRReview) error {

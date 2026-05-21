@@ -377,6 +377,29 @@ func (c *Client) ListMRNotes(ctx context.Context, projectID int64, iid int) ([]N
 	return out, nil
 }
 
+// MRCommit is the slice of the MR-commits resource we use for Lead Time.
+// We only need the earliest commit's authored_date (see Lead Time
+// calculator), so the struct stays narrow on purpose.
+type MRCommit struct {
+	SHA          string    `json:"id"`
+	AuthoredDate time.Time `json:"authored_date"`
+}
+
+// ListMRCommits returns the commits associated with one MR. Mirrors the
+// GitHub client's ListPRCommits: we read one page (up to 100 commits)
+// and let the caller pick min(authored_date) for
+// `pull_requests.first_commit_at` in the DORA Lead Time calculator.
+//
+// GitLab's default per_page is 20 — override matters.
+func (c *Client) ListMRCommits(ctx context.Context, projectID int64, iid int) ([]MRCommit, error) {
+	path := fmt.Sprintf("/api/v4/projects/%d/merge_requests/%d/commits?per_page=100", projectID, iid)
+	var out []MRCommit
+	if err := c.do(ctx, "GET", path, nil, &out); err != nil {
+		return nil, fmt.Errorf("list MR commits %d!%d: %w", projectID, iid, err)
+	}
+	return out, nil
+}
+
 // SearchUsers does a /users?search=<email> lookup. GitLab returns an
 // array even for an exact-email match, so callers should pick the entry
 // whose email matches case-insensitively (when their token has the

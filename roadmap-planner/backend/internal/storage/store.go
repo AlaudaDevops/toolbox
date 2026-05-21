@@ -49,6 +49,10 @@ type Store interface {
 	// GitHub.
 	UpsertPullRequests(ctx context.Context, prs []PullRequest) error
 	UpsertPRReviews(ctx context.Context, reviews []PRReview) error
+	// ListPullRequestsSince returns all PRs (github + gitlab) that merged
+	// on or after `since`. Open / closed-without-merge rows are excluded —
+	// the DORA Lead Time calculator only attributes shipped work.
+	ListPullRequestsSince(ctx context.Context, since time.Time) ([]PullRequest, error)
 
 	// Members.
 	UpsertMember(ctx context.Context, m Member) error
@@ -125,6 +129,7 @@ type PullRequest struct {
 	ChangedFiles       int
 	JiraKey            string // any Jira key matched by the linker; was misnamed `EpicKey` pre-W5
 	CreatedAt          time.Time
+	FirstCommitAt      *time.Time // DORA Phase 2: MIN(commit.author.date) from PR/MR commits API
 	FirstReviewAt      *time.Time
 	FirstHumanReviewAt *time.Time // W2: MIN(submitted_at) over non-bot reviews
 	MergedAt           *time.Time

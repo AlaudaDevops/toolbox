@@ -80,8 +80,10 @@ func (s *Service) ListAvailableMetrics() []models.MetricInfo {
 	return s.registry.ListMetricInfo()
 }
 
-// CalculateMetric calculates a specific metric with the given filters
-func (s *Service) CalculateMetric(ctx context.Context, name string, filters models.MetricFilters, timeRange models.TimeRange) ([]models.MetricResult, error) {
+// CalculateMetric calculates a specific metric with the given filters.
+// opts carries optional per-request flags (e.g. include_bots, with_trend
+// for Lead Time); pass nil when none are supplied.
+func (s *Service) CalculateMetric(ctx context.Context, name string, filters models.MetricFilters, timeRange models.TimeRange, opts map[string]interface{}) ([]models.MetricResult, error) {
 	calc, exists := s.registry.Get(name)
 	if !exists {
 		return nil, fmt.Errorf("metric %s not found", name)
@@ -97,6 +99,9 @@ func (s *Service) CalculateMetric(ctx context.Context, name string, filters mode
 	data.Filters = filters
 	if !timeRange.Start.IsZero() || !timeRange.End.IsZero() {
 		data.TimeRange = timeRange
+	}
+	if len(opts) > 0 {
+		data.Options = opts
 	}
 
 	// Calculate metric

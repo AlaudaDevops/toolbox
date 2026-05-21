@@ -240,20 +240,42 @@ func (s *Syncer) Sync(ctx context.Context) error {
 				FetchedAt:    runStart,
 			}
 
-			// Reviews — skip the API call for:
-			//   - drafts (no useful review data)
+			// Reviews + commits — skip the API calls for:
+			//   - drafts (no useful review data; first_commit_at meaningless
+			//     until the PR is opened for review)
 			//   - PRs closed without merge >7d ago (rarely accrue new
 			//     reviews, and they dominate the call budget on noisy
 			//     repos during backfill)
 			//
-			// We always fetch reviews for merged PRs in window — those
-			// drive the review-latency rollup.
-			skipReviews := pr.Draft
-			if !skipReviews && pr.MergedAt == nil && pr.ClosedAt != nil &&
+			// We always fetch reviews + commits for merged PRs in window —
+			// those drive the review-latency rollup and the Lead Time
+			// first_commit_at field (DORA Phase 2).
+			skipPRAPIs := pr.Draft
+			if !skipPRAPIs && pr.MergedAt == nil && pr.ClosedAt != nil &&
 				time.Since(*pr.ClosedAt) > 7*24*time.Hour {
-				skipReviews = true
+				skipPRAPIs = true
 			}
-			if !skipReviews {
+			if !skipPRAPIs {
+				// Commits → first_commit_at (DORA Lead Time Dev-stage start).
+				// Failures are logged but never block the PR upsert:
+				// COALESCE in UpsertPullRequests preserves any earlier
+				// value, and a later sync retries.
+				commits, err := s.client.ListPRCommits(ctx, repo.Owner, repo.Name, pr.Number)
+				if err != nil {
+					s.logger.Warn("ListPRCommits failed",
+						zap.String("repo", full), zap.Int("pr", pr.Number), zap.Error(err))
+				} else {
+					var firstCommit *time.Time
+					for _, cm := range commits {
+						d := cm.Commit.Author.Date
+						if firstCommit == nil || d.Before(*firstCommit) {
+							firstCommit = &d
+						}
+					}
+					rec.FirstCommitAt = firstCommit
+				}
+			}
+			if !skipPRAPIs {
 				reviews, err := s.client.ListReviews(ctx, repo.Owner, repo.Name, pr.Number)
 				if err != nil {
 					s.logger.Warn("ListReviews failed",

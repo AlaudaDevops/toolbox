@@ -219,7 +219,7 @@ func (e *PrometheusExporter) Update(ctx context.Context) error {
 	filters := models.MetricFilters{}
 
 	// Update release frequency
-	if results, err := e.service.CalculateMetric(ctx, "release_frequency", filters, models.TimeRange{}); err == nil {
+	if results, err := e.service.CalculateMetric(ctx, "release_frequency", filters, models.TimeRange{}, nil); err == nil {
 		for _, r := range results {
 			component := r.Labels["component"]
 			if component == "" {
@@ -233,7 +233,7 @@ func (e *PrometheusExporter) Update(ctx context.Context) error {
 	}
 
 	// Update lead time
-	if results, err := e.service.CalculateMetric(ctx, "lead_time_to_release", filters, models.TimeRange{}); err == nil {
+	if results, err := e.service.CalculateMetric(ctx, "lead_time_to_release", filters, models.TimeRange{}, nil); err == nil {
 		for _, r := range results {
 			component := r.Labels["component"]
 			if component == "" {
@@ -247,7 +247,7 @@ func (e *PrometheusExporter) Update(ctx context.Context) error {
 	}
 
 	// Update cycle time
-	if results, err := e.service.CalculateMetric(ctx, "cycle_time", filters, models.TimeRange{}); err == nil {
+	if results, err := e.service.CalculateMetric(ctx, "cycle_time", filters, models.TimeRange{}, nil); err == nil {
 		for _, r := range results {
 			component := r.Labels["component"]
 			if component == "" {
@@ -261,7 +261,7 @@ func (e *PrometheusExporter) Update(ctx context.Context) error {
 	}
 
 	// Update patch ratio
-	if results, err := e.service.CalculateMetric(ctx, "patch_ratio", filters, models.TimeRange{}); err == nil {
+	if results, err := e.service.CalculateMetric(ctx, "patch_ratio", filters, models.TimeRange{}, nil); err == nil {
 		for _, r := range results {
 			component := r.Labels["component"]
 			if component == "" {
@@ -275,7 +275,7 @@ func (e *PrometheusExporter) Update(ctx context.Context) error {
 	}
 
 	// Update time to patch
-	if results, err := e.service.CalculateMetric(ctx, "time_to_patch", filters, models.TimeRange{}); err == nil {
+	if results, err := e.service.CalculateMetric(ctx, "time_to_patch", filters, models.TimeRange{}, nil); err == nil {
 		for _, r := range results {
 			component := r.Labels["component"]
 			if component == "" {

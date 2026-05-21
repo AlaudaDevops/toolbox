@@ -134,6 +134,15 @@ func (b *BaseCalculator) GetStringOption(key string, defaultValue string) string
 	return defaultValue
 }
 
+// GetBoolOption retrieves a bool option with a default fallback.
+func (b *BaseCalculator) GetBoolOption(key string, defaultValue bool) bool {
+	val := b.GetOption(key, defaultValue)
+	if v, ok := val.(bool); ok {
+		return v
+	}
+	return defaultValue
+}
+
 // GetStringSliceOption retrieves a string slice option with a default fallback
 func (b *BaseCalculator) GetStringSliceOption(key string, defaultValue []string) []string {
 	val := b.GetOption(key, nil)

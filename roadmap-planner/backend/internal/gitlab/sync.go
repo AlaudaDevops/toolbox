@@ -299,14 +299,34 @@ func (s *Syncer) Sync(ctx context.Context) error {
 				}
 			}
 
-			// Notes → reviews. Same skip rules as the github side: drop
-			// drafts, drop closed-without-merge older than 7d.
-			skipNotes := mr.Draft || mr.WorkInProg
-			if !skipNotes && mr.MergedAt == nil && mr.ClosedAt != nil &&
+			// Notes → reviews, plus commits → first_commit_at.
+			// Same skip rules as the github side: drop drafts, drop
+			// closed-without-merge older than 7d.
+			skipMRAPIs := mr.Draft || mr.WorkInProg
+			if !skipMRAPIs && mr.MergedAt == nil && mr.ClosedAt != nil &&
 				time.Since(*mr.ClosedAt) > 7*24*time.Hour {
-				skipNotes = true
+				skipMRAPIs = true
 			}
-			if !skipNotes {
+			if !skipMRAPIs {
+				// Commits → first_commit_at (DORA Lead Time Dev-stage start).
+				// Failures are logged but never block the MR upsert.
+				commits, err := s.client.ListMRCommits(ctx, p.ID, mr.IID)
+				if err != nil {
+					s.logger.Warn("ListMRCommits failed",
+						zap.String("project", p.PathWithNamespace),
+						zap.Int("iid", mr.IID), zap.Error(err))
+				} else {
+					var firstCommit *time.Time
+					for _, cm := range commits {
+						d := cm.AuthoredDate
+						if firstCommit == nil || d.Before(*firstCommit) {
+							firstCommit = &d
+						}
+					}
+					rec.FirstCommitAt = firstCommit
+				}
+			}
+			if !skipMRAPIs {
 				notes, err := s.client.ListMRNotes(ctx, p.ID, mr.IID)
 				if err != nil {
 					s.logger.Warn("ListMRNotes failed",
@@ -512,12 +532,30 @@ func (s *Syncer) sweepInstanceByMember(
 				}
 			}
 
-			skipNotes := mr.Draft || mr.WorkInProg
-			if !skipNotes && mr.MergedAt == nil && mr.ClosedAt != nil &&
+			skipMRAPIs := mr.Draft || mr.WorkInProg
+			if !skipMRAPIs && mr.MergedAt == nil && mr.ClosedAt != nil &&
 				time.Since(*mr.ClosedAt) > 7*24*time.Hour {
-				skipNotes = true
+				skipMRAPIs = true
 			}
-			if !skipNotes && mr.ProjectID > 0 {
+			if !skipMRAPIs && mr.ProjectID > 0 {
+				// Commits → first_commit_at (DORA Lead Time Dev-stage start).
+				commits, err := s.client.ListMRCommits(ctx, mr.ProjectID, mr.IID)
+				if err != nil {
+					s.logger.Warn("Pass B: ListMRCommits failed",
+						zap.String("project", projectPath),
+						zap.Int("iid", mr.IID), zap.Error(err))
+				} else {
+					var firstCommit *time.Time
+					for _, cm := range commits {
+						d := cm.AuthoredDate
+						if firstCommit == nil || d.Before(*firstCommit) {
+							firstCommit = &d
+						}
+					}
+					rec.FirstCommitAt = firstCommit
+				}
+			}
+			if !skipMRAPIs && mr.ProjectID > 0 {
 				notes, err := s.client.ListMRNotes(ctx, mr.ProjectID, mr.IID)
 				if err != nil {
 					s.logger.Warn("Pass B: ListMRNotes failed",

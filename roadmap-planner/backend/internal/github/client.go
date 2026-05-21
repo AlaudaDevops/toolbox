@@ -187,6 +187,37 @@ func (c *Client) ListReviews(ctx context.Context, owner, repo string, number int
 	return out, nil
 }
 
+// PRCommit is the slice of the PR-commits resource we use for Lead Time.
+// We only persist the earliest commit's author date (see Lead Time
+// calculator), so the struct stays narrow on purpose.
+type PRCommit struct {
+	SHA    string `json:"sha"`
+	Commit struct {
+		Author struct {
+			Date time.Time `json:"date"`
+		} `json:"author"`
+	} `json:"commit"`
+}
+
+// ListPRCommits returns the commits associated with one PR. We use this
+// to derive `pull_requests.first_commit_at` for the DORA Lead Time
+// calculator — the commit author date is the only field needed, but the
+// endpoint returns the full graph from base to head so we read it all
+// and let the caller pick min(author.date).
+//
+// We fetch a single page of up to 100 commits. PRs with more than 100
+// commits are vanishingly rare; if we ever need to handle them, paginate
+// here. GitHub's default per_page on this endpoint is 30, so the
+// per_page=100 override matters.
+func (c *Client) ListPRCommits(ctx context.Context, owner, repo string, number int) ([]PRCommit, error) {
+	path := fmt.Sprintf("/repos/%s/%s/pulls/%d/commits?per_page=100", owner, repo, number)
+	var out []PRCommit
+	if err := c.do(ctx, "GET", path, nil, &out); err != nil {
+		return nil, fmt.Errorf("list PR commits %s/%s#%d: %w", owner, repo, number, err)
+	}
+	return out, nil
+}
+
 // do is the request engine. It:
 //
 //  1. Sleeps before issuing if the rate-limit budget is near-exhausted.

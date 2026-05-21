@@ -30,12 +30,14 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/models"
 	baseModels "github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/models"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/storage"
 	"go.uber.org/zap"
 )
 
 // Collector handles periodic data collection from Jira
 type Collector struct {
 	jiraClient *jira.Client
+	store      storage.Store // optional — for PR-backed metrics (Lead Time Phase 2)
 	config     *config.Metrics
 	logger     *zap.Logger
 
@@ -43,18 +45,25 @@ type Collector struct {
 	releases      []models.EnrichedRelease
 	epics         []models.EnrichedIssue
 	issues        []models.EnrichedIssue
+	pullRequests  []models.EnrichedPR
 	lastCollected time.Time
 }
 
-// NewCollector creates a new Jira data collector
-func NewCollector(jiraClient *jira.Client, cfg *config.Metrics) *Collector {
+// NewCollector creates a new Jira data collector.
+//
+// store is optional — when nil, PR-backed metrics (DORA Lead Time
+// Phase 2) silently degrade to an empty PullRequests slice. main.go
+// should pass the production storage; the Jira-only tests pass nil.
+func NewCollector(jiraClient *jira.Client, store storage.Store, cfg *config.Metrics) *Collector {
 	return &Collector{
-		jiraClient: jiraClient,
-		config:     cfg,
-		logger:     logger.WithComponent("metrics-collector"),
-		releases:   []models.EnrichedRelease{},
-		epics:      []models.EnrichedIssue{},
-		issues:     []models.EnrichedIssue{},
+		jiraClient:   jiraClient,
+		store:        store,
+		config:       cfg,
+		logger:       logger.WithComponent("metrics-collector"),
+		releases:     []models.EnrichedRelease{},
+		epics:        []models.EnrichedIssue{},
+		issues:       []models.EnrichedIssue{},
+		pullRequests: []models.EnrichedPR{},
 	}
 }
 
@@ -121,10 +130,20 @@ func (c *Collector) Collect(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch issues: %w", err)
 	}
 
+	// Fetch pull requests (for DORA Lead Time Phase 2). Soft-fail if the
+	// store is unavailable or the query errors — Jira-only metrics still
+	// work, only Lead Time stage attribution degrades.
+	prs, err := c.fetchPullRequests(ctx)
+	if err != nil {
+		c.logger.Warn("PR fetch failed; Lead Time stage attribution will be empty", zap.Error(err))
+		prs = nil
+	}
+
 	// Update cached data
 	c.mu.Lock()
 	c.epics = epics
 	c.issues = issues
+	c.pullRequests = prs
 	c.lastCollected = time.Now()
 	c.mu.Unlock()
 
@@ -132,9 +151,39 @@ func (c *Collector) Collect(ctx context.Context) error {
 		zap.Int("releases", len(releases)),
 		zap.Int("epics", len(epics)),
 		zap.Int("issues", len(issues)),
+		zap.Int("pull_requests", len(prs)),
 		zap.Duration("duration", time.Since(startTime)))
 
 	return nil
+}
+
+// fetchPullRequests returns all merged PRs in the historical window
+// from the storage layer for use by the DORA Lead Time calculator.
+// Returns an empty slice (not error) when no store is configured —
+// this lets the Jira-only stack work without storage.
+func (c *Collector) fetchPullRequests(ctx context.Context) ([]models.EnrichedPR, error) {
+	if c.store == nil {
+		return nil, nil
+	}
+	since := time.Now().AddDate(0, 0, -c.config.HistoricalDays)
+	rows, err := c.store.ListPullRequestsSince(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.EnrichedPR, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, models.EnrichedPR{
+			ID:            r.ID,
+			Source:        r.Source,
+			JiraKey:       r.JiraKey,
+			AuthorLogin:   r.AuthorLogin,
+			IsBot:         r.AuthorID == "bot",
+			CreatedAt:     r.CreatedAt,
+			FirstCommitAt: r.FirstCommitAt,
+			MergedAt:      r.MergedAt,
+		})
+	}
+	return out, nil
 }
 
 // fetchReleases gets release/version data from Jira
@@ -377,10 +426,14 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	issues := make([]models.EnrichedIssue, len(c.issues))
 	copy(issues, c.issues)
 
+	prs := make([]models.EnrichedPR, len(c.pullRequests))
+	copy(prs, c.pullRequests)
+
 	return &models.CalculationContext{
-		Releases: releases,
-		Epics:    epics,
-		Issues:   issues,
+		Releases:     releases,
+		Epics:        epics,
+		Issues:       issues,
+		PullRequests: prs,
 		TimeRange: models.TimeRange{
 			Start: time.Now().AddDate(0, 0, -c.config.HistoricalDays),
 			End:   time.Now(),

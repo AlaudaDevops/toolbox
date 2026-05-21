@@ -56,6 +56,10 @@ func (h *MetricsHandler) ListMetrics(c *gin.Context) {
 
 // GetMetric returns a specific metric with optional filters
 // GET /api/metrics/:name
+//
+// Recognised query parameters in addition to component/pillar/quarter:
+//   include_bots — bool, Lead Time only (default false)
+//   with_trend   — bool, Lead Time only (default true)
 func (h *MetricsHandler) GetMetric(c *gin.Context) {
 	name := c.Param("name")
 
@@ -69,7 +73,11 @@ func (h *MetricsHandler) GetMetric(c *gin.Context) {
 	// Parse time range
 	timeRange := h.parseTimeRange(c)
 
-	results, err := h.service.CalculateMetric(c.Request.Context(), name, filters, timeRange)
+	// Per-request options (Lead Time uses these; other calculators
+	// ignore them silently).
+	opts := parseMetricOptions(c)
+
+	results, err := h.service.CalculateMetric(c.Request.Context(), name, filters, timeRange, opts)
 	if err != nil {
 		h.logger.Error("Failed to calculate metric",
 			zap.String("metric", name),
@@ -139,6 +147,23 @@ func (h *MetricsHandler) GetCollectorStatus(c *gin.Context) {
 		"epics_count":    collector.EpicCount(),
 		"issues_count":   collector.IssuesCount(),
 	})
+}
+
+// parseMetricOptions extracts calculator-specific query flags (only the
+// keys known today are surfaced; new flags are added as calculators
+// learn to read them from data.Options).
+func parseMetricOptions(c *gin.Context) map[string]interface{} {
+	opts := map[string]interface{}{}
+	if v := c.Query("include_bots"); v != "" {
+		opts["include_bots"] = v == "true" || v == "1" || v == "yes"
+	}
+	if v := c.Query("with_trend"); v != "" {
+		opts["with_trend"] = v == "true" || v == "1" || v == "yes"
+	}
+	if len(opts) == 0 {
+		return nil
+	}
+	return opts
 }
 
 // parseTimeRange parses the from/to query parameters into a TimeRange
