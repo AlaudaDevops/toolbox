@@ -342,6 +342,12 @@ func mergeIssueLists(epics, issues []models.EnrichedIssue) []models.EnrichedIssu
 // EnrichedRelease so callers can reuse its parsed Component field
 // (set by collector via ConvertJiraVersionToVersion); zero values map
 // to C5.
+//
+// The returned T3 is normalised to end-of-day (23:59:59.999999999).
+// Jira version releaseDate only carries a calendar date, parsed at
+// midnight; comparing PR merge timestamps directly would drop any PR
+// merged later on the same calendar day as "after release", losing
+// the last PR on release day for many shipped issues.
 func matchReleasedVersion(versionNames []string, byName map[string]models.EnrichedRelease, window models.TimeRange) (time.Time, models.EnrichedRelease) {
 	var bestDate time.Time
 	var best models.EnrichedRelease
@@ -358,7 +364,17 @@ func matchReleasedVersion(versionNames []string, byName map[string]models.Enrich
 			best = r
 		}
 	}
+	if !bestDate.IsZero() {
+		bestDate = endOfDay(bestDate)
+	}
 	return bestDate, best
+}
+
+// endOfDay snaps a timestamp to 23:59:59.999999999 of the same calendar
+// day in its original location. Used for Jira release date comparison;
+// see matchReleasedVersion.
+func endOfDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, t.Location())
 }
 
 // filterPreReleasePRs drops PRs whose merged_at is *after* the release

@@ -157,14 +157,45 @@ func TestMatchReleasedVersion_PicksEarliestInWindow(t *testing.T) {
 	}
 	names := []string{"tektoncd-operator-v4.7.0", "tektoncd-operator-v4.6.0", "tektoncd-operator-v4.5.0"}
 	gotDate, gotRelease := matchReleasedVersion(names, releases, window)
-	if !gotDate.Equal(a) {
-		t.Errorf("date = %v, want %v", gotDate, a)
+	// gotDate is normalised to end-of-day (P1-2); compare calendar day.
+	if gotDate.Year() != a.Year() || gotDate.Month() != a.Month() || gotDate.Day() != a.Day() {
+		t.Errorf("date = %v, want same day as %v", gotDate, a)
 	}
 	if gotRelease.Name != "tektoncd-operator-v4.5.0" {
 		t.Errorf("name = %q, want tektoncd-operator-v4.5.0", gotRelease.Name)
 	}
 	if gotRelease.Component != "tektoncd-operator" {
 		t.Errorf("component = %q, want tektoncd-operator", gotRelease.Component)
+	}
+}
+
+// TestMatchReleasedVersion_NormalisesToEndOfDay verifies T3 is snapped
+// to 23:59:59.999999999, so a PR merged later on release day is still
+// inside the release window (and not treated as a hotfix).
+func TestMatchReleasedVersion_NormalisesToEndOfDay(t *testing.T) {
+	midnight := time.Date(2026, 4, 10, 0, 0, 0, 0, time.UTC)
+	releases := map[string]models.EnrichedRelease{
+		"tektoncd-operator-v4.6.3": {Name: "tektoncd-operator-v4.6.3", Component: "tektoncd-operator", Released: true, ReleaseDate: midnight},
+	}
+	window := models.TimeRange{Start: midnight.AddDate(0, -1, 0), End: midnight.AddDate(0, 1, 0)}
+
+	gotDate, _ := matchReleasedVersion([]string{"tektoncd-operator-v4.6.3"}, releases, window)
+	if gotDate.Hour() != 23 || gotDate.Minute() != 59 || gotDate.Second() != 59 {
+		t.Errorf("releaseDate not normalised to end-of-day: %s", gotDate)
+	}
+	if gotDate.Day() != midnight.Day() {
+		t.Errorf("calendar day shifted: got %s, want same day as %s", gotDate, midnight)
+	}
+
+	// A PR merged at 14:00 on the same day must survive the hotfix filter.
+	pr := models.EnrichedPR{
+		ID:        "p1",
+		JiraKey:   "X-1",
+		CreatedAt: midnight.Add(-72 * time.Hour),
+		MergedAt:  ptrTime(midnight.Add(14 * time.Hour)),
+	}
+	if kept := filterPreReleasePRs([]models.EnrichedPR{pr}, gotDate); len(kept) != 1 {
+		t.Fatalf("same-day PR dropped by filterPreReleasePRs: kept %d, want 1", len(kept))
 	}
 }
 

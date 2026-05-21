@@ -401,7 +401,7 @@ UI 细节：
 T0 = min(p.first_commit_at)  for p in s.linked_prs   // 第一次写代码
 T1 = min(p.created_at)        for p in s.linked_prs   // 第一次开 PR (ready-for-review)
 T2 = max(p.merged_at)         for p in s.linked_prs   // 最后一个 PR merge
-T3 = s.fix_version.releaseDate                         // 上架时刻
+T3 = s.fix_version.releaseDate (snapped to end-of-day) // 上架时刻
 ```
 
 3 段定义（**保证 dev + review + release = total，无 gap**）：
@@ -553,7 +553,7 @@ GET /api/metrics/lead_time?component=tektoncd-operator&window_months=9&include_b
 |---|---|---|
 | E1 | 1 个 issue 关联多 fix_version | **按 component filter 范围筛选**：先 filter `fix_version.name` 与 component prefix 匹配的子集，再取最早 released=true 的 releaseDate 作 T3；如全集都 released=true（极少），取最早 |
 | E2 | 1 个 PR 引用多 issue | 该 PR 计入每个 issue 的 linked_prs 各一次（重复但正确）；**worst_issues 展示侧按 jira_key 去重**——同一 PR 让多个 issue 同时进 top-N 时仅显示第一个并标 `cross_referenced: true` |
-| E3 | PR.merged_at > fix_version.releaseDate | 该 PR 不算入当前 issue（视为 hotfix，归下一 release）|
+| E3 | PR.merged_at 晚于 release day（calendar day 比较）| 该 PR 不算入当前 issue（视为 hotfix，归下一 release）。**Jira release date 是 calendar date，calculator 在 release 当日 EOD 之前 merge 的 PR 不算 hotfix**——避免丢失 release day 当天的 last PR |
 | E4 | PR.first_commit_at < issue.created（提前编码）| 仍以 PR.first_commit_at 为 T0（commit-centric 严守 D3）|
 | E5 | issue.fix_version 名称不匹配 `{component}-v{semver}`（如 `argo-cd-2.9.0` 无 `v` 前缀） | calculator 直接复用 `EnrichedRelease.Component`（collector 已 parsed，跟 release_frequency 同源），不重新解析；component filter 仍可命中 |
 | E6 | 窗口边界：first_commit 在窗口外但 release 在窗口内 | 计入（窗口判定按 release 日期，对齐 DORA 惯例）|
