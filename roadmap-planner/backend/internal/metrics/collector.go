@@ -440,10 +440,11 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	copy(prs, c.pullRequests)
 
 	return &models.CalculationContext{
-		Releases:     releases,
-		Epics:        epics,
-		Issues:       issues,
-		PullRequests: prs,
+		Releases:         releases,
+		Epics:            epics,
+		Issues:           issues,
+		PullRequests:     prs,
+		PRStoreAvailable: c.store != nil,
 		TimeRange: models.TimeRange{
 			Start: time.Now().AddDate(0, 0, -c.config.HistoricalDays),
 			End:   time.Now(),

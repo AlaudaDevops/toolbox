@@ -185,7 +185,16 @@ func NewLeadTimeCalculator(options map[string]interface{}) *LeadTimeCalculator {
 // Calculate runs the full 3-stage attribution + trend computation.
 // Per-request flags from data.Options (include_bots, with_trend) override
 // the calculator's startup defaults.
+//
+// When no PR storage backend is configured (PRStoreAvailable == false),
+// Calculate falls back to a Jira-only calendar lead time (issue.created
+// → release.releaseDate, in days) and marks the result as degraded.
+// This preserves the pre-Phase-2 Lead Time signal for minimal
+// deployments where storage.enabled is still false.
 func (c *LeadTimeCalculator) Calculate(ctx context.Context, data *models.CalculationContext) ([]models.MetricResult, error) {
+	if !data.PRStoreAvailable {
+		return c.calculateJiraOnlyFallback(data), nil
+	}
 	includeBots := readBoolOpt(data.Options, "include_bots", c.GetBoolOption("include_bots", false))
 	withTrend := readBoolOpt(data.Options, "with_trend", c.GetBoolOption("with_trend", true))
 
@@ -312,6 +321,79 @@ func legacyDaySummary(totals []float64) (minDays, maxDays, avgDays float64) {
 	}
 	avgDays = (sum / float64(len(sorted))) / 24
 	return
+}
+
+// calculateJiraOnlyFallback runs the pre-Phase-2 calendar Lead Time
+// (issue.created → release.releaseDate, days) when no PR store is
+// available. Output is intentionally minimal: Value + the legacy
+// metadata keys (min/max/average/count) so MetricBreakdown.jsx renders
+// numbers instead of N/A. Stage attribution, worst_issues, trend, and
+// coverage are absent and metadata.degraded is set so the UI can warn
+// the operator that storage.enabled is off.
+//
+// This breaks D3 (commit-centric start) — but only on minimal
+// deployments where PR data is not even ingested. The trade-off is
+// documented in plan §10.
+func (c *LeadTimeCalculator) calculateJiraOnlyFallback(data *models.CalculationContext) []models.MetricResult {
+	versionByName := indexReleases(data.Releases)
+	componentBuckets := make(map[string][]float64)
+
+	for _, iss := range mergeIssueLists(data.Epics, data.Issues) {
+		if iss.CreatedDate.IsZero() {
+			continue
+		}
+		relDate, release := matchReleasedVersion(iss.Versions, versionByName, data.TimeRange)
+		if relDate.IsZero() {
+			continue
+		}
+		component := release.Component
+		if component == "" {
+			component = release.Name
+		}
+		if len(data.Filters.Components) > 0 && !containsString(data.Filters.Components, component) {
+			continue
+		}
+		leadDays := relDate.Sub(iss.CreatedDate).Hours() / 24
+		if leadDays < 0 {
+			continue
+		}
+		componentBuckets[component] = append(componentBuckets[component], leadDays)
+	}
+
+	results := make([]models.MetricResult, 0, len(componentBuckets))
+	for component, days := range componentBuckets {
+		if len(days) == 0 {
+			continue
+		}
+		sorted := append([]float64(nil), days...)
+		sort.Float64s(sorted)
+		var sum float64
+		for _, d := range sorted {
+			sum += d
+		}
+		avg := sum / float64(len(sorted))
+
+		results = append(results, models.MetricResult{
+			Name:  c.Name(),
+			Value: percentile(sorted, 50),
+			Unit:  c.Unit(),
+			Labels: map[string]string{
+				"component": component,
+			},
+			Timestamp: time.Now(),
+			Metadata: map[string]interface{}{
+				"min":             sorted[0],
+				"max":             sorted[len(sorted)-1],
+				"average":         avg,
+				"count":           len(sorted),
+				"sample_size":     len(sorted),
+				"percentile":      50,
+				"degraded":        "no_pr_store",
+				"degraded_reason": "PR storage is not enabled; falling back to issue.created → release.releaseDate calendar lead time (days). Stage attribution, worst_issues, trend, and coverage are unavailable until storage.enabled = true and a PR sync has run.",
+			},
+		})
+	}
+	return results
 }
 
 // PrometheusMetrics returns the Prometheus metric descriptors.

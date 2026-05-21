@@ -81,8 +81,15 @@ type CalculationContext struct {
 	Epics        []EnrichedIssue
 	Issues       []EnrichedIssue
 	PullRequests []EnrichedPR // DORA Phase 2 — required for Lead Time 3-stage attribution
-	TimeRange    TimeRange
-	Filters      MetricFilters
+	// PRStoreAvailable is true when the collector has a configured
+	// storage backend that can serve PR data. Distinguishes "no PR
+	// store configured" (legacy / minimal deployments) from "store
+	// configured but the slice is empty for this window" — the Lead
+	// Time calculator falls back to a Jira-only path in the former
+	// case to avoid silently dropping the whole metric.
+	PRStoreAvailable bool
+	TimeRange        TimeRange
+	Filters          MetricFilters
 	// Options carries per-request flags (e.g. include_bots, with_trend
 	// for Lead Time) that override the calculator's startup defaults.
 	// Calculators should read these first and fall back to GetBoolOption

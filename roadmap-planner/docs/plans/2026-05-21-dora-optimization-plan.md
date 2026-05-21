@@ -572,6 +572,7 @@ GET /api/metrics/lead_time?component=tektoncd-operator&window_months=9&include_b
 - calculator 是**纯函数**，不写表；按需调用、按需聚合
 - 数据源刷新走现有 collector 链：Jira sync（按 fixVersion / changelog） + GitHub PR sync（含新增 commits API）
 - **PR fetch lookback**：collector 拉 PR 时用 `since = now - (HistoricalDays + 180d)`。Lead Time 按 release date 判定 window，但关联 PR 可能在 release window 起点前 merge；buffer 跟 E9 long-dev 阈值（180d）对齐，超出 180d 的 issue 已经被 E9 排除，所以更早的 PR 不需要 fetch
+- **无 PR store fallback**：当 `storage.enabled = false`（最小部署）时 `PRStoreAvailable` 为 false，calculator 退化到 Jira-only calendar lead time（issue.created → release.releaseDate，days），输出 Value + legacy `min/max/count` + `degraded: "no_pr_store"` 标记。这破坏 D3 commit-centric 起点，但只在 PR 数据完全不可达时生效，避免老 deployment 升级后 Lead Time 整体消失。UI 可读 `metadata.degraded` 显示配置警告
 - 性能预算：9 月 ~50 issue × 平均 3 PR ≈ 150 PR 维度查询，单次 calculator 调用 < 200ms（含 percentile 计算）
 - 如未来 issue 数量级 > 1000，再考虑预聚合（brainstorm §5.1 的 `metric_period_values` 表可启用，本 plan 内不实施）
 

@@ -355,6 +355,65 @@ func TestTrend_MoMDirection(t *testing.T) {
 	}
 }
 
+// TestCalculate_FallbackWhenNoPRStore exercises the path that fires
+// when storage.enabled is false: PRStoreAvailable=false makes
+// Calculate return the legacy Jira-only days output, with the degraded
+// flag set so the UI can warn. Prevents the regression where Lead Time
+// would otherwise disappear on minimal deployments.
+func TestCalculate_FallbackWhenNoPRStore(t *testing.T) {
+	c := NewLeadTimeCalculator(nil)
+
+	relDate := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
+	window := models.TimeRange{
+		Start: relDate.AddDate(0, -9, 0),
+		End:   relDate.AddDate(0, 1, 0),
+	}
+	releases := []models.EnrichedRelease{
+		{ID: "v1", Name: "argo-cd-2.9.0", Component: "argo-cd", Released: true, ReleaseDate: relDate},
+	}
+	issues := []models.EnrichedIssue{
+		{Key: "DEVOPS-1", Name: "one", IssueType: "Story",
+			Versions:    []string{"argo-cd-2.9.0"},
+			CreatedDate: relDate.AddDate(0, 0, -10), ReleaseDate: relDate},
+		{Key: "DEVOPS-2", Name: "two", IssueType: "Bug",
+			Versions:    []string{"argo-cd-2.9.0"},
+			CreatedDate: relDate.AddDate(0, 0, -30), ReleaseDate: relDate},
+	}
+
+	ctx := &models.CalculationContext{
+		Releases: releases, Issues: issues,
+		PullRequests:     nil,
+		PRStoreAvailable: false, // ← storage.enabled = false scenario
+		TimeRange:        window,
+	}
+	results, err := c.Calculate(context.Background(), ctx)
+	if err != nil {
+		t.Fatalf("Calculate: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len(results) = %d, want 1 (Lead Time must NOT disappear when PR store is unavailable)", len(results))
+	}
+	r := results[0]
+	if r.Unit != "days" {
+		t.Errorf("fallback Unit = %q, want days", r.Unit)
+	}
+	if r.Value <= 0 {
+		t.Errorf("fallback Value = %v, want > 0 (median of {10, 30} days)", r.Value)
+	}
+	if got := r.Metadata["degraded"]; got != "no_pr_store" {
+		t.Errorf("metadata.degraded = %v, want \"no_pr_store\" so UI knows to warn", got)
+	}
+	if _, ok := r.Metadata["degraded_reason"].(string); !ok {
+		t.Error("metadata.degraded_reason missing — operator needs the failure mode spelled out")
+	}
+	// Stage / trend / coverage are intentionally absent in fallback.
+	for _, missing := range []string{"stages", "worst_issues", "trend", "coverage"} {
+		if _, present := r.Metadata[missing]; present {
+			t.Errorf("metadata.%s leaked into fallback path — fallback must stay minimal", missing)
+		}
+	}
+}
+
 // --- end-to-end Calculate sanity check --------------------------------
 
 // TestCalculate_EndToEnd builds a tiny CalculationContext with two
@@ -399,7 +458,9 @@ func TestCalculate_EndToEnd(t *testing.T) {
 	}
 
 	ctx := &models.CalculationContext{
-		Releases: releases, Issues: issues, PullRequests: prs, TimeRange: window,
+		Releases: releases, Issues: issues, PullRequests: prs,
+		PRStoreAvailable: true,
+		TimeRange:        window,
 	}
 	results, err := c.Calculate(context.Background(), ctx)
 	if err != nil {
