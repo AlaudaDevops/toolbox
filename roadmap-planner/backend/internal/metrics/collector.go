@@ -157,15 +157,25 @@ func (c *Collector) Collect(ctx context.Context) error {
 	return nil
 }
 
+// prFetchLookbackDays is the extra lookback applied when loading PRs
+// for the Lead Time calculator. The calculator filters issues by
+// release date, but their linked PRs may have merged well before the
+// release-date window opens. The buffer is aligned with the
+// excludedLongDevThreshold (180d) — issues older than that are dropped
+// by Lead Time E9 anyway, so we never need PRs older than (window
+// start - 180d).
+const prFetchLookbackDays = 180
+
 // fetchPullRequests returns all merged PRs in the historical window
-// from the storage layer for use by the DORA Lead Time calculator.
-// Returns an empty slice (not error) when no store is configured —
-// this lets the Jira-only stack work without storage.
+// (plus a lookback buffer; see prFetchLookbackDays) from the storage
+// layer for use by the DORA Lead Time calculator. Returns an empty
+// slice (not error) when no store is configured — this lets the
+// Jira-only stack work without storage.
 func (c *Collector) fetchPullRequests(ctx context.Context) ([]models.EnrichedPR, error) {
 	if c.store == nil {
 		return nil, nil
 	}
-	since := time.Now().AddDate(0, 0, -c.config.HistoricalDays)
+	since := time.Now().AddDate(0, 0, -(c.config.HistoricalDays + prFetchLookbackDays))
 	rows, err := c.store.ListPullRequestsSince(ctx, since)
 	if err != nil {
 		return nil, err

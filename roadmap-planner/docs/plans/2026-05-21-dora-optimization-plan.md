@@ -569,6 +569,7 @@ GET /api/metrics/lead_time?component=tektoncd-operator&window_months=9&include_b
 
 - calculator 是**纯函数**，不写表；按需调用、按需聚合
 - 数据源刷新走现有 collector 链：Jira sync（按 fixVersion / changelog） + GitHub PR sync（含新增 commits API）
+- **PR fetch lookback**：collector 拉 PR 时用 `since = now - (HistoricalDays + 180d)`。Lead Time 按 release date 判定 window，但关联 PR 可能在 release window 起点前 merge；buffer 跟 E9 long-dev 阈值（180d）对齐，超出 180d 的 issue 已经被 E9 排除，所以更早的 PR 不需要 fetch
 - 性能预算：9 月 ~50 issue × 平均 3 PR ≈ 150 PR 维度查询，单次 calculator 调用 < 200ms（含 percentile 计算）
 - 如未来 issue 数量级 > 1000，再考虑预聚合（brainstorm §5.1 的 `metric_period_values` 表可启用，本 plan 内不实施）
 
