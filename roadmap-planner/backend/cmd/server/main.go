@@ -80,24 +80,38 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize metrics system if enabled
+	// Open the persistent store once and share it across both the
+	// metrics collector (DORA Lead Time needs PR data) and the
+	// team-analytics path. nil when storage is disabled — both consumers
+	// soft-fail in that mode.
+	var sharedStore storage.Store
+	if cfg.Storage.Enabled {
+		s, err := openStore(cfg.Storage)
+		if err != nil {
+			logger.Error("Failed to open store", zap.Error(err))
+		} else if err := s.Migrate(ctx); err != nil {
+			logger.Error("Failed to migrate store", zap.Error(err))
+		} else {
+			logger.Info("Persistent store ready",
+				zap.String("type", cfg.Storage.Type),
+				zap.Int("backfill_days", cfg.Storage.BackfillDays))
+			sharedStore = s
+		}
+	}
 
+	// Initialize metrics system if enabled.
 	if cfg.Metrics.Enabled {
 		logger.Info("Initializing metrics system")
-		err = initMetrics(ctx, router, cfg)
-		if err != nil {
+		if err := initMetrics(ctx, router, cfg, sharedStore); err != nil {
 			logger.Error("Failed to initialize metrics system", zap.Error(err))
 		}
 	}
 
-	// Initialize team-analytics storage + GitHub sync if enabled.
-	//
-	// We open the store once and let it close on process exit; the
-	// GitHub syncer runs on a configurable interval in its own goroutine.
-	// Both are no-ops when the corresponding config blocks are off, so
-	// existing deployments stay unchanged.
-	if cfg.Storage.Enabled {
-		if err := initTeamAnalytics(ctx, router, cfg); err != nil {
+	// Initialize team-analytics + GitHub sync if both storage is open
+	// and the config block is enabled. The store handle is shared with
+	// the metrics collector above.
+	if cfg.Storage.Enabled && sharedStore != nil {
+		if err := initTeamAnalytics(ctx, router, cfg, sharedStore); err != nil {
 			logger.Error("Failed to initialize team analytics", zap.Error(err))
 		}
 	}
@@ -136,8 +150,10 @@ func main() {
 	logger.Info("Server exited")
 }
 
-// initMetrics initializes the metrics system if enabled in config
-func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) error {
+// initMetrics initializes the metrics system if enabled in config.
+// store may be nil (storage disabled) — in that case PR-backed metrics
+// like DORA Lead Time stage attribution silently degrade to empty.
+func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config, store storage.Store) error {
 	if cfg.Jira.BaseURL == "" || cfg.Jira.Username == "" || cfg.Jira.Password == "" {
 		logger.Warn("Metrics enabled but Jira credentials not configured in config file")
 		return nil
@@ -153,8 +169,9 @@ func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) er
 		logger.Error("Failed to create Jira client for metrics", zap.Error(err))
 		return err
 	}
-	// Create collector and service
-	collector := metrics.NewCollector(jiraClient, &cfg.Metrics)
+	// Create collector and service. The store handle (may be nil) gives
+	// the collector access to pull_requests rows for DORA Lead Time.
+	collector := metrics.NewCollector(jiraClient, store, &cfg.Metrics)
 	metricsService := metrics.NewService(&cfg.Metrics, collector)
 
 	// Register calculators
@@ -189,22 +206,11 @@ func initMetrics(ctx context.Context, router *gin.Engine, cfg *config.Config) er
 	return nil
 }
 
-// initTeamAnalytics opens the persistent store, runs migrations, mounts
-// the contributions REST endpoints, and (if configured) starts the
-// GitHub sync loop. Failures here are non-fatal — the rest of the app
-// continues to serve roadmap + metrics.
-func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Config) error {
-	store, err := openStore(cfg.Storage)
-	if err != nil {
-		return fmt.Errorf("open store: %w", err)
-	}
-	if err := store.Migrate(ctx); err != nil {
-		return fmt.Errorf("migrate: %w", err)
-	}
-	logger.Info("Team analytics store ready",
-		zap.String("type", cfg.Storage.Type),
-		zap.Int("backfill_days", cfg.Storage.BackfillDays))
-
+// initTeamAnalytics mounts the contributions REST endpoints and (if
+// configured) starts the GitHub sync loop, using a store opened by the
+// caller. Failures here are non-fatal — the rest of the app continues
+// to serve roadmap + metrics.
+func initTeamAnalytics(ctx context.Context, router *gin.Engine, cfg *config.Config, store storage.Store) error {
 	service := contributions.NewService(store)
 	pillarMap := contributions.NewPillarMap(cfg.TeamAnalytics)
 	service.SetPillarMap(pillarMap)

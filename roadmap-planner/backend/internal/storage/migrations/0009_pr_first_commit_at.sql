@@ -1,0 +1,34 @@
+-- ----------------------------------------------------------------------
+-- 0009_pr_first_commit_at — DORA Lead Time Phase 2 (2026-05-21).
+--
+-- Adds pull_requests.first_commit_at so the Lead Time calculator can
+-- measure from "first commit author date" rather than PR.created_at.
+-- The squash-merge workflow rewrites commit author dates on the local
+-- ref, so we fetch this value once at sync time via the platform PR
+-- commits API:
+--
+--   GitHub: GET /repos/{owner}/{repo}/pulls/{number}/commits
+--   GitLab: GET /projects/{id}/merge_requests/{iid}/commits
+--
+-- and take the earliest commit's author.date.
+--
+-- This is the only schema change for the DORA Lead Time 3-stage
+-- attribution work (Dev → Review → Release, see
+-- docs/plans/2026-05-21-dora-optimization-plan.md §Phase 2). All other
+-- inputs (pull_requests.jira_key from W5, issue_snapshots.versions
+-- from W1, in-memory data.Releases) are already in place.
+--
+--   pull_requests.first_commit_at
+--     Earliest commit author date on the PR. Nullable because:
+--       (a) Backfill is incremental — historical PRs populate over the
+--           first sync cycles after this migration applies.
+--       (b) Some PRs (e.g. forks with squash-merged history) may not
+--           expose the original commits even via the API.
+--       (c) The Lead Time calculator handles NULL through the C2/C3
+--           fallback rules in the plan's detailed design §4.
+--     No index — column is read per-issue inside the calculator after
+--     the existing idx_pr_jira lookup has narrowed to that issue's
+--     linked PRs (typically <10 rows).
+-- ----------------------------------------------------------------------
+
+ALTER TABLE pull_requests ADD COLUMN first_commit_at TIMESTAMP;

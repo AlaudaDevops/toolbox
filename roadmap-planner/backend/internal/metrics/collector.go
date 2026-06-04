@@ -30,12 +30,14 @@ import (
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/logger"
 	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/metrics/models"
 	baseModels "github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/models"
+	"github.com/AlaudaDevops/toolbox/roadmap-planner/backend/internal/storage"
 	"go.uber.org/zap"
 )
 
 // Collector handles periodic data collection from Jira
 type Collector struct {
 	jiraClient *jira.Client
+	store      storage.Store // optional — for PR-backed metrics (Lead Time Phase 2)
 	config     *config.Metrics
 	logger     *zap.Logger
 
@@ -43,18 +45,35 @@ type Collector struct {
 	releases      []models.EnrichedRelease
 	epics         []models.EnrichedIssue
 	issues        []models.EnrichedIssue
+	pullRequests  []models.EnrichedPR
 	lastCollected time.Time
+	// prFetchOK reflects whether the last fetchPullRequests call
+	// succeeded. When false, GetData reports PRStoreAvailable=false so
+	// the Lead Time calculator falls back to the Jira-only path —
+	// otherwise a transient PR query failure would silently produce an
+	// empty PR set, classify every issue as C4, and drop the metric.
+	// Optimistic on startup (no fetch attempted yet); flipped only when
+	// fetchPullRequests actually returns an error against a configured
+	// store.
+	prFetchOK bool
 }
 
-// NewCollector creates a new Jira data collector
-func NewCollector(jiraClient *jira.Client, cfg *config.Metrics) *Collector {
+// NewCollector creates a new Jira data collector.
+//
+// store is optional — when nil, PR-backed metrics (DORA Lead Time
+// Phase 2) silently degrade to an empty PullRequests slice. main.go
+// should pass the production storage; the Jira-only tests pass nil.
+func NewCollector(jiraClient *jira.Client, store storage.Store, cfg *config.Metrics) *Collector {
 	return &Collector{
-		jiraClient: jiraClient,
-		config:     cfg,
-		logger:     logger.WithComponent("metrics-collector"),
-		releases:   []models.EnrichedRelease{},
-		epics:      []models.EnrichedIssue{},
-		issues:     []models.EnrichedIssue{},
+		jiraClient:   jiraClient,
+		store:        store,
+		config:       cfg,
+		logger:       logger.WithComponent("metrics-collector"),
+		releases:     []models.EnrichedRelease{},
+		epics:        []models.EnrichedIssue{},
+		issues:       []models.EnrichedIssue{},
+		pullRequests: []models.EnrichedPR{},
+		prFetchOK:    true,
 	}
 }
 
@@ -121,10 +140,27 @@ func (c *Collector) Collect(ctx context.Context) error {
 		return fmt.Errorf("failed to fetch issues: %w", err)
 	}
 
+	// Fetch pull requests (for DORA Lead Time Phase 2). Soft-fail if the
+	// store is unavailable or the query errors — Jira-only metrics still
+	// work, only Lead Time stage attribution degrades. Track the failure
+	// so GetData reports PRStoreAvailable=false and the Lead Time
+	// calculator falls back to the Jira-only days output; otherwise the
+	// PR-backed path runs against an empty PR slice and the metric
+	// vanishes entirely.
+	prs, err := c.fetchPullRequests(ctx)
+	prFetchOK := true
+	if err != nil {
+		c.logger.Warn("PR fetch failed; Lead Time will degrade to Jira-only fallback", zap.Error(err))
+		prs = nil
+		prFetchOK = false
+	}
+
 	// Update cached data
 	c.mu.Lock()
 	c.epics = epics
 	c.issues = issues
+	c.pullRequests = prs
+	c.prFetchOK = prFetchOK
 	c.lastCollected = time.Now()
 	c.mu.Unlock()
 
@@ -132,9 +168,49 @@ func (c *Collector) Collect(ctx context.Context) error {
 		zap.Int("releases", len(releases)),
 		zap.Int("epics", len(epics)),
 		zap.Int("issues", len(issues)),
+		zap.Int("pull_requests", len(prs)),
 		zap.Duration("duration", time.Since(startTime)))
 
 	return nil
+}
+
+// prFetchLookbackDays is the extra lookback applied when loading PRs
+// for the Lead Time calculator. The calculator filters issues by
+// release date, but their linked PRs may have merged well before the
+// release-date window opens. The buffer is aligned with the
+// excludedLongDevThreshold (180d) — issues older than that are dropped
+// by Lead Time E9 anyway, so we never need PRs older than (window
+// start - 180d).
+const prFetchLookbackDays = 180
+
+// fetchPullRequests returns all merged PRs in the historical window
+// (plus a lookback buffer; see prFetchLookbackDays) from the storage
+// layer for use by the DORA Lead Time calculator. Returns an empty
+// slice (not error) when no store is configured — this lets the
+// Jira-only stack work without storage.
+func (c *Collector) fetchPullRequests(ctx context.Context) ([]models.EnrichedPR, error) {
+	if c.store == nil {
+		return nil, nil
+	}
+	since := time.Now().AddDate(0, 0, -(c.config.HistoricalDays + prFetchLookbackDays))
+	rows, err := c.store.ListPullRequestsSince(ctx, since)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]models.EnrichedPR, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, models.EnrichedPR{
+			ID:            r.ID,
+			Source:        r.Source,
+			JiraKey:       r.JiraKey,
+			AuthorLogin:   r.AuthorLogin,
+			IsBot:         r.AuthorID == "bot",
+			CreatedAt:     r.CreatedAt,
+			FirstCommitAt: r.FirstCommitAt,
+			MergedAt:      r.MergedAt,
+		})
+	}
+	return out, nil
 }
 
 // fetchReleases gets release/version data from Jira
@@ -159,8 +235,52 @@ func (c *Collector) fetchReleases(ctx context.Context) ([]models.EnrichedRelease
 		c.logger.Debug("Filtered releases")
 	}
 
+	releases = c.dropInvalidComponentReleases(releases)
+
 	c.logger.Debug("Fetched releases", zap.Int("count", len(releases)), zap.Int("original", originalCount))
 	return releases, nil
+}
+
+// dropInvalidComponentReleases removes releases that must not feed any
+// component dimension: names that do not parse to component-X.Y.Z
+// (Component is empty — legacy names like "0.3", "v2.1") and components
+// in metrics.exclude_plugins (D6 — v3-era plugins). Dropping here keeps
+// every calculator clean without per-calculator filtering, and also
+// removes the releases from the versionDates maps so issues linked only
+// to invalid versions stay out of release-scoped metrics.
+func (c *Collector) dropInvalidComponentReleases(releases []models.EnrichedRelease) []models.EnrichedRelease {
+	kept := make([]models.EnrichedRelease, 0, len(releases))
+	dropped := make([]string, 0)
+	for _, r := range releases {
+		if r.Component == "" || c.config.IsPluginExcluded(r.Component) {
+			dropped = append(dropped, r.Name)
+			continue
+		}
+		kept = append(kept, r)
+	}
+	if len(dropped) > 0 {
+		c.logger.Debug("Dropped releases with invalid or excluded components",
+			zap.Int("count", len(dropped)), zap.Strings("names", dropped))
+	}
+	return kept
+}
+
+// dropExcludedComponents removes metrics.exclude_plugins entries from an
+// issue's component list (both Jira Component fields and components
+// extracted from version names) so D6 plugins disappear from issue-based
+// component dimensions (cycle_time, time_to_patch).
+func (c *Collector) dropExcludedComponents(components []string) []string {
+	if len(c.config.ExcludePlugins) == 0 || len(components) == 0 {
+		return components
+	}
+	kept := make([]string, 0, len(components))
+	for _, comp := range components {
+		if c.config.IsPluginExcluded(comp) {
+			continue
+		}
+		kept = append(kept, comp)
+	}
+	return kept
 }
 
 // enrichRelease converts a basic Version to an EnrichedRelease
@@ -205,8 +325,11 @@ func parseVersionName(name string) (component string, major, minor, patch int) {
 		return
 	}
 
-	// If no version pattern found, the whole name is the component
-	component = name
+	// No version pattern found — the name does not identify a component.
+	// Legacy names like "0.3", "v2.1" or "1.0" used to fall back to the
+	// whole name here, which polluted every per-component metric with
+	// bogus component buckets. Return empty so collectors/calculators
+	// drop the release from component dimensions.
 	return
 }
 
@@ -286,6 +409,7 @@ func (c *Collector) fetchEpics(ctx context.Context) ([]models.EnrichedIssue, err
 				}
 			}
 		}
+		enriched.Components = c.dropExcludedComponents(enriched.Components)
 
 		epics = append(epics, enriched)
 	}
@@ -355,6 +479,7 @@ func (c *Collector) fetchIssues(ctx context.Context) ([]models.EnrichedIssue, er
 				}
 			}
 		}
+		enriched.Components = c.dropExcludedComponents(enriched.Components)
 		issues = append(issues, enriched)
 	}
 
@@ -377,10 +502,15 @@ func (c *Collector) GetData() (*models.CalculationContext, error) {
 	issues := make([]models.EnrichedIssue, len(c.issues))
 	copy(issues, c.issues)
 
+	prs := make([]models.EnrichedPR, len(c.pullRequests))
+	copy(prs, c.pullRequests)
+
 	return &models.CalculationContext{
-		Releases: releases,
-		Epics:    epics,
-		Issues:   issues,
+		Releases:         releases,
+		Epics:            epics,
+		Issues:           issues,
+		PullRequests:     prs,
+		PRStoreAvailable: c.store != nil && c.prFetchOK,
 		TimeRange: models.TimeRange{
 			Start: time.Now().AddDate(0, 0, -c.config.HistoricalDays),
 			End:   time.Now(),
