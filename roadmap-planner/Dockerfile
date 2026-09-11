@@ -2,7 +2,7 @@
 # Build args (all declared once, at the top of the file).
 # CI overrides these via `--build-arg`; locals use these defaults.
 ARG NODE_IMAGE=node:24-alpine
-ARG GO_IMAGE=golang:1.26.3-alpine
+ARG GO_IMAGE=golang:1.26.8-alpine
 ARG RUNTIME_IMAGE=alpine:latest
 
 # Stage 1: Build frontend
