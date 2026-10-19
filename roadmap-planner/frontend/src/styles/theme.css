@@ -590,7 +590,9 @@ button, input, select, textarea { font-family: inherit; color: inherit; }
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.fade-in { animation: atlas-fade-up 360ms var(--ease-out) both; }
+/* `backwards`, not `both`: a retained transform would make this element the
+   containing block for position:fixed descendants (modal overlays). */
+.fade-in { animation: atlas-fade-up 360ms var(--ease-out) backwards; }
 
 /* Subtle pulse */
 @keyframes atlas-pulse {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useRoadmap } from '../hooks/useRoadmap';
 import { useAuth } from '../hooks/useAuth';
@@ -362,7 +363,8 @@ const KanbanBoard = () => {
         </div>
       </DragDropContext>
 
-      {/* Modals */}
+      {/* Modals — portaled to body so they center on the viewport */}
+      {createPortal(<>
       {showCreateMilestone && (
         <CreateMilestoneModal
           pillar={selectedPillar}
@@ -419,6 +421,7 @@ const KanbanBoard = () => {
           }}
         />
       )}
+      </>, document.body)}
     </div>
   );
 };
