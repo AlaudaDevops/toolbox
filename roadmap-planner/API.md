@@ -108,7 +108,7 @@ Get basic roadmap data including pillars, quarters, components, and versions.
       "component": "connectors-operator"
     }
   ],
-  "quarters": ["2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q3", "2026Q4"],
+  "quarters": ["2026Q1", "2026Q2", "2026Q3", "2026Q4", "2027Q1", "2027Q2", "2027Q3", "2027Q4"],
   "project": {
     "id": "10000",
     "name": "DevOps Project",

@@ -400,7 +400,7 @@ func Load() (*Config, error) {
 	viper.SetDefault("server.static_file_path", "../frontend/build")
 	viper.SetDefault("server.cors.allowed_origins", []string{"http://localhost:3000"})
 	viper.SetDefault("jira.project", "DEVOPS")
-	viper.SetDefault("jira.quarters", []string{"2025Q1", "2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q4"})
+	viper.SetDefault("jira.quarters", []string{"2026Q1", "2026Q2", "2026Q3", "2026Q4", "2027Q1", "2027Q2", "2027Q3", "2027Q4"})
 	viper.SetDefault("jira.sync_enabled", false)
 	viper.SetDefault("jira.sync_interval", "30m")
 	viper.SetDefault("jira.backfill_days", 0)
