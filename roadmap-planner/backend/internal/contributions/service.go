@@ -115,12 +115,12 @@ type Bucket struct {
 // `quarter_assignments` from the Milestone-prefix chain so the bucket
 // matches the release cadence rather than calendar quarters.
 type PeriodBucket struct {
-	Period    string `json:"period"`
-	JiraDone  int    `json:"jira_done"`
+	Period    string  `json:"period"`
+	JiraDone  int     `json:"jira_done"`
 	Points    float64 `json:"points"`
-	PRsMerged int    `json:"prs_merged"`
-	PRsOpened int    `json:"prs_opened"`
-	Reviews   int    `json:"reviews"`
+	PRsMerged int     `json:"prs_merged"`
+	PRsOpened int     `json:"prs_opened"`
+	Reviews   int     `json:"reviews"`
 }
 
 // FoldWeeksByCalendarQuarter sums weekly buckets into PeriodBuckets
